@@ -180,6 +180,23 @@
   version = "v1.3.0"
 
 [[projects]]
+  digest = "1:4aa986c7ae3819095cf1b49aad677c6fca33ee1138bea39a3b91563837f24b68"
+  name = "github.com/openzipkin/zipkin-go"
+  packages = [
+    ".",
+    "idgenerator",
+    "middleware/grpc",
+    "model",
+    "propagation",
+    "propagation/b3",
+    "reporter",
+    "reporter/http",
+  ]
+  pruneopts = "UT"
+  revision = "c29478e51bfb2e9c93e0e9f5e015e5993a490399"
+  version = "v0.2.2"
+
+[[projects]]
   digest = "1:40e195917a951a8bf867cd05de2a46aaf1806c50cf92eebf4c16f78cd196f747"
   name = "github.com/pkg/errors"
   packages = ["."]
@@ -394,6 +411,9 @@
     "github.com/onsi/ginkgo",
     "github.com/onsi/gomega",
     "github.com/onsi/gomega/gbytes",
+    "github.com/openzipkin/zipkin-go",
+    "github.com/openzipkin/zipkin-go/middleware/grpc",
+    "github.com/openzipkin/zipkin-go/reporter/http",
     "github.com/pkg/errors",
     "github.com/spf13/cobra",
     "github.com/spf13/pflag",

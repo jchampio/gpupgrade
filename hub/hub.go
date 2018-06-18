@@ -12,6 +12,9 @@ import (
 
 	"github.com/greenplum-db/gp-common-go-libs/gplog"
 	"github.com/hashicorp/go-multierror"
+	zipkin "github.com/openzipkin/zipkin-go"
+	zipkingrpc "github.com/openzipkin/zipkin-go/middleware/grpc"
+	zipkinhttp "github.com/openzipkin/zipkin-go/reporter/http"
 	"github.com/pkg/errors"
 	"golang.org/x/xerrors"
 	"google.golang.org/grpc"
@@ -98,13 +101,34 @@ func (h *Hub) Start() error {
 		return errors.Wrap(err, "failed to listen")
 	}
 
+	// Set up Zipkin tracing.
+	reporter := zipkinhttp.NewReporter("http://localhost:9411/api/v2/spans")
+	defer reporter.Close()
+
+	endpoint, err := zipkin.NewEndpoint("hub", lis.Addr().String())
+	if err != nil {
+		return err
+	}
+
+	tracer, err := zipkin.NewTracer(reporter,
+		zipkin.WithSampler(zipkin.AlwaysSample),
+		zipkin.WithLocalEndpoint(endpoint),
+	)
+	if err != nil {
+		return err
+	}
+
 	// Set up an interceptor function to log any panics we get from request
 	// handlers.
 	interceptor := func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp interface{}, err error) {
 		defer log.WritePanics()
 		return handler(ctx, req)
 	}
-	server := grpc.NewServer(grpc.UnaryInterceptor(interceptor))
+
+	server := grpc.NewServer(
+		grpc.UnaryInterceptor(interceptor),
+		grpc.StatsHandler(zipkingrpc.NewServerHandler(tracer)),
+	)
 
 	h.mu.Lock()
 	if h.stopped == nil {

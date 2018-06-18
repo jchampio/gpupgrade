@@ -101,3 +101,7 @@ required = [
 [[constraint]]
   branch = "master"
   name = "golang.org/x/xerrors"
+
+[[constraint]]
+  name = "github.com/openzipkin/zipkin-go"
+  version = "0.2.2"

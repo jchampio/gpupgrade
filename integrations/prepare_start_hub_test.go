@@ -30,7 +30,7 @@ var _ = Describe("Start Hub", func() {
 		gpUpgradeSession := runCommand("prepare", "start-hub")
 		Eventually(gpUpgradeSession).Should(Exit(0))
 
-		verificationCmd := exec.Command("bash", "-c", `ps -ef | grep -Gq "[g]pupgrade_hub$"`)
+		verificationCmd := exec.Command("bash", "-c", `ps -ef | grep -Gq "[g]pupgrade_hub --daemon$"`)
 		verificationSession, err := Start(verificationCmd, GinkgoWriter, GinkgoWriter)
 		Expect(err).NotTo(HaveOccurred())
 		Eventually(verificationSession).Should(Exit(0))

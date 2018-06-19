@@ -49,13 +49,17 @@ func (p Preparer) StartHub() error {
 	}
 
 	//assume that gpupgrade_hub is on the PATH
-	cmd := exec.Command("gpupgrade_hub")
-	cmdErr := cmd.Start()
+	cmd := exec.Command("gpupgrade_hub", "--daemonize")
+	stdout, cmdErr := cmd.Output()
 	if cmdErr != nil {
-		gplog.Error("gpupgrade_hub kickoff failed")
-		return cmdErr
+		err := fmt.Errorf("failed to start hub (%s)", cmdErr)
+		if exitErr, ok := cmdErr.(*exec.ExitError); ok {
+			// Annotate with the Stderr capture, if we have it.
+			err = fmt.Errorf("%s: %s", err, exitErr.Stderr)
+		}
+		return err
 	}
-	gplog.Debug("gpupgrade_hub started")
+	gplog.Debug("gpupgrade_hub started successfully: %s", stdout)
 	return nil
 }
 

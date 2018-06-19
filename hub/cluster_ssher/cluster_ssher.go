@@ -48,9 +48,10 @@ func (c *ClusterSsher) Start(hostnames []string) {
 	gphome := os.Getenv("GPHOME")
 	agentPath := filepath.Join(gphome, "bin", "gpupgrade_agent")
 	greenplumPath := filepath.Join(gphome, "greenplum_path.sh")
-	////ssh -n -f user@host "sh -c 'cd /whereever; nohup ./whatever > /dev/null 2>&1 &'"
-	completeCommandString := fmt.Sprintf(`sh -c '. %s ; nohup %s > /dev/null 2>&1 & '`, greenplumPath, agentPath)
-	c.remoteExec(hostnames, statedir, []string{completeCommandString})
+	completeCommandString := fmt.Sprintf(`sh -c '. %s ; %s --daemonize'`, greenplumPath, agentPath)
+
+	// FIXME: don't ignore errors here, bubble them up!
+	_ = c.remoteExec(hostnames, statedir, []string{completeCommandString})
 
 	//check that all the agents are running
 	var err error

@@ -74,7 +74,7 @@ var _ = Describe("prepare", func() {
 			Eventually(prepareStartAgentsSession).Should(Exit(0))
 
 			Expect(commandExecer.Command()).To(Equal("ssh"))
-			Expect(strings.Join(commandExecer.Args(), "")).To(ContainSubstring("nohup"))
+			Expect(strings.Join(commandExecer.Args(), "")).To(ContainSubstring("--daemonize"))
 			Expect(cm.IsComplete(upgradestatus.START_AGENTS)).To(BeTrue())
 		})
 	})

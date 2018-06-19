@@ -92,7 +92,7 @@ var _ = Describe("ClusterSsher", func() {
 				"-o",
 				"StrictHostKeyChecking=no",
 				"doesnt matter",
-				"sh -c '. " + pathToGreenplumPathScript + " ; nohup " + pathToAgent + " > /dev/null 2>&1 & '",
+				"sh -c '. " + pathToGreenplumPathScript + " ; " + pathToAgent + " --daemonize'",
 			}))
 
 			Expect(cw.WasReset("start-agents")).To(BeTrue())

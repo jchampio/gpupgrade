@@ -1,6 +1,7 @@
 package services
 
 import (
+	"fmt"
 	"net"
 	"strconv"
 	"sync"
@@ -23,6 +24,7 @@ type AgentServer struct {
 	server  *grpc.Server
 	lis     net.Listener
 	stopped chan struct{}
+	daemon  bool
 }
 
 type AgentConfig struct {
@@ -37,6 +39,12 @@ func NewAgentServer(execer helpers.CommandExecer, conf AgentConfig) *AgentServer
 		conf:          conf,
 		stopped:       make(chan struct{}, 1),
 	}
+}
+
+// MakeDaemon tells the AgentServer to disconnect its stdout/stderr streams
+// after successfully starting up.
+func (a *AgentServer) MakeDaemon() {
+	a.daemon = true
 }
 
 func (a *AgentServer) Start() {
@@ -55,6 +63,14 @@ func (a *AgentServer) Start() {
 
 	pb.RegisterAgentServer(server, a)
 	reflection.Register(server)
+
+	// TODO: Research daemonize to see what else may need to be
+	// done for the child process to safely detach from the parent
+	if a.daemon {
+		fmt.Printf("Agent started on port %d (pid %d)\n", a.conf.Port, os.Getpid())
+		os.Stderr.Close()
+		os.Stdout.Close()
+	}
 
 	err = server.Serve(lis)
 	if err != nil {

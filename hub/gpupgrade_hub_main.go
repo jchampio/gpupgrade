@@ -4,6 +4,7 @@ import (
 	"os"
 	"os/exec"
 	"runtime/debug"
+	"syscall"
 	"time"
 
 	"github.com/greenplum-db/gp-common-go-libs/gplog"
@@ -21,13 +22,50 @@ import (
 
 func main() {
 	var logdir string
+	var daemonize bool
+	var daemon bool
 	var RootCmd = &cobra.Command{
-		Use:   "gpupgrade_hub [--log-directory path]",
+		Use:   os.Args[0],
 		Short: "Start the gpupgrade_hub (blocks)",
 		Long:  `Start the gpupgrade_hub (blocks)`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			gplog.InitializeLogging("gpupgrade_hub", logdir)
 			debug.SetTraceback("all")
+
+			if daemonize {
+				// Strip out the --daemonize option and add --daemon.
+				daemonArgs := make([]string, 0)
+				for _, arg := range os.Args[1:] {
+					if arg == "--daemonize" {
+						arg = "--daemon"
+					}
+					daemonArgs = append(daemonArgs, arg)
+				}
+
+				command := exec.Command(os.Args[0], daemonArgs...)
+				// TODO: what's a good timeout?
+				err := utils.Daemonize(command, os.Stdout, os.Stderr, 2*time.Second)
+
+				if err != nil {
+					exitError, ok := err.(*exec.ExitError)
+					if ok {
+						// Exit with the same code as the child, if we can
+						// figure it out.
+						code := 1
+
+						status, ok := exitError.Sys().(syscall.WaitStatus)
+						if ok {
+							code = status.ExitStatus()
+						}
+
+						os.Exit(code)
+					}
+
+					// Otherwise, deal with the error normally.
+				}
+
+				return err
+			}
 
 			conf := &services.HubConfig{
 				CliToHubPort:   7527,
@@ -44,7 +82,12 @@ func main() {
 				services.NewPingerManager(conf.StateDir, 500*time.Millisecond),
 				commandExecer,
 			)
+
 			hub := services.NewHub(&services.ClusterPair{}, grpc.DialContext, commandExecer, conf, clusterSsher, cm)
+			if daemon {
+				hub.MakeDaemon()
+			}
+
 			hub.Start()
 
 			hub.Stop()
@@ -54,6 +97,10 @@ func main() {
 	}
 
 	RootCmd.PersistentFlags().StringVar(&logdir, "log-directory", "", "gpupgrade_hub log directory")
+
+	RootCmd.Flags().BoolVar(&daemonize, "daemonize", false, "start hub in the background")
+	RootCmd.Flags().BoolVar(&daemon, "daemon", false, "disconnect standard streams (internal option; use --daemonize instead)")
+	RootCmd.Flags().MarkHidden("daemon")
 
 	if err := RootCmd.Execute(); err != nil {
 		if gplog.GetLogger() == nil {

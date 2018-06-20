@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"os"
 	"strconv"
 	"strings"
 	"sync"
@@ -43,6 +44,7 @@ type Hub struct {
 	server  *grpc.Server
 	lis     net.Listener
 	stopped chan struct{}
+	daemon  bool
 }
 
 type Connection struct {
@@ -72,6 +74,12 @@ func NewHub(pair *ClusterPair, grpcDialer dialer, execer helpers.CommandExecer, 
 	return h
 }
 
+// MakeDaemon tells the Hub to disconnect its stdout/stderr streams after
+// successfully starting up.
+func (h *Hub) MakeDaemon() {
+	h.daemon = true
+}
+
 func (h *Hub) Start() {
 	lis, err := net.Listen("tcp", ":"+strconv.Itoa(h.conf.CliToHubPort))
 	if err != nil {
@@ -86,6 +94,14 @@ func (h *Hub) Start() {
 
 	pb.RegisterCliToHubServer(server, h)
 	reflection.Register(server)
+
+	// TODO: Research daemonize to see what else may need to be
+	// done for the child process to safely detach from the parent
+	if h.daemon {
+		fmt.Printf("Hub started on port %d (pid %d)\n", h.conf.CliToHubPort, os.Getpid())
+		os.Stderr.Close()
+		os.Stdout.Close()
+	}
 
 	err = server.Serve(lis)
 	if err != nil {

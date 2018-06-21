@@ -1,10 +1,13 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
 	"syscall"
 	"time"
+
+	"golang.org/x/crypto/ssh/terminal"
 
 	"github.com/greenplum-db/gp-common-go-libs/gplog"
 	"github.com/greenplum-db/gpupgrade/agent/services"
@@ -30,6 +33,11 @@ func main() {
 		Long:  `Start the Command Listener (blocks)`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			gplog.InitializeLogging("gpupgrade_agent", logdir)
+
+			if daemon && terminal.IsTerminal(int(os.Stdout.Fd())) {
+				// Shouldn't be calling this from the command line.
+				return fmt.Errorf("--daemon is an internal option (did you mean --daemonize?)")
+			}
 
 			// TODO: this is all copy-pasted from the hub code. Consolidate!
 			if daemonize {

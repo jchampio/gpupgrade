@@ -25,8 +25,6 @@ const (
 )
 
 type Checklist interface {
-	LoadSteps(steps []Step) // XXX Feels like this is an implementation detail.
-
 	AllSteps() []StateReader
 	GetStepReader(step string) StateReader
 	GetStepWriter(step string) StateWriter
@@ -52,22 +50,26 @@ type ChecklistManager struct {
 	readOnly       map[string]bool        // value is true iff step was added via AddReadOnlyStep()
 }
 
-type Step struct {
-	Name_   string
-	Code_   pb.UpgradeSteps
-	Status_ func(r StateReader) pb.StepStatus // TODO can this be a StatusFunc?
+// A StatusFunc returns a StepStatus for a read-only step. It is passed the name
+// of the step to facilitate sharing of step implementations.
+type StatusFunc func(name string) pb.StepStatus
+
+type step struct {
+	name   string
+	code   pb.UpgradeSteps
+	status StatusFunc
 }
 
-func (s Step) Name() string {
-	return s.Name_
+func (s step) Name() string {
+	return s.name
 }
 
-func (s Step) Code() pb.UpgradeSteps {
-	return s.Code_
+func (s step) Code() pb.UpgradeSteps {
+	return s.code
 }
 
-func (s Step) Status() pb.StepStatus {
-	return s.Status_(s)
+func (s step) Status() pb.StepStatus {
+	return s.status(s.name)
 }
 
 func NewChecklistManager(stateDirPath string) *ChecklistManager {
@@ -78,20 +80,11 @@ func NewChecklistManager(stateDirPath string) *ChecklistManager {
 	}
 }
 
-func (c *ChecklistManager) LoadSteps(steps []Step) {
-	c.steps = make([]StateReader, len(steps))
-	c.stepmap = map[string]StateReader{}
-	for i, step := range steps {
-		c.steps[i] = step
-		c.stepmap[step.Name_] = step
-	}
-}
-
 // AddWritableStep creates a step with a writable status that is backed by the
 // filesystem. The given name must be filesystem-friendly, since it will be used
 // in the backing path.
 func (c *ChecklistManager) AddWritableStep(name string, code pb.UpgradeSteps) {
-	statusFunc := func(r StateReader) pb.StepStatus {
+	statusFunc := func(name string) pb.StepStatus {
 		checker := StateCheck{
 			Path: filepath.Join(c.pathToStateDir, name),
 			Step: code,
@@ -102,26 +95,15 @@ func (c *ChecklistManager) AddWritableStep(name string, code pb.UpgradeSteps) {
 	c.addStep(name, code, statusFunc)
 }
 
-// A StatusFunc returns a StepStatus for a read-only step. It is passed the name
-// of the step to facilitate sharing of step implementations.
-type StatusFunc func(name string) pb.StepStatus
-
 // AddReadOnlyStep creates a step with a custom status retrieval mechanism, as
 // determined by the given StatusFunc.
 func (c *ChecklistManager) AddReadOnlyStep(name string, code pb.UpgradeSteps, status StatusFunc) {
-	c.addStep(name, code, func(r StateReader) pb.StepStatus {
-		return status(r.Name())
-	})
-
+	c.addStep(name, code, status)
 	c.readOnly[name] = true
 }
 
-func (c *ChecklistManager) addStep(name string, code pb.UpgradeSteps, status func(r StateReader) pb.StepStatus) {
-	step := Step{
-		Name_:   name,
-		Code_:   code,
-		Status_: status,
-	}
+func (c *ChecklistManager) addStep(name string, code pb.UpgradeSteps, status StatusFunc) {
+	s := step{name, code, status}
 
 	// Since checklist setup isn't influenced by the user, it's always a
 	// programmer error for a step to be added twice. Panic instead of making
@@ -130,8 +112,8 @@ func (c *ChecklistManager) addStep(name string, code pb.UpgradeSteps, status fun
 		panic(fmt.Sprintf(`step "%s" has already been added`, name))
 	}
 
-	c.steps = append(c.steps, step)
-	c.stepmap[name] = step
+	c.steps = append(c.steps, s)
+	c.stepmap[name] = s
 }
 
 func (c *ChecklistManager) GetStepReader(step string) StateReader {

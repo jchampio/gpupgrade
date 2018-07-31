@@ -29,14 +29,12 @@ func (cm *MockChecklistManager) GetStepReader(step string) upgradestatus.StateRe
 	return MockStepReader{step: step, code: cm.loadedCodes[step], manager: cm}
 }
 
-func (cm *MockChecklistManager) LoadSteps(steps []upgradestatus.Step) {
-	for _, step := range steps {
-		cm.loadedNames = append(cm.loadedNames, step.Name_)
-		cm.loadedCodes[step.Name_] = step.Code_
-	}
+func (cm *MockChecklistManager) AddStep(name string, code pb.UpgradeSteps) {
+	cm.loadedNames = append(cm.loadedNames, name)
+	cm.loadedCodes[name] = code
 }
 
-// Use LoadSteps() to store the list of steps that this mock should return from
+// Use AddStep() to store the list of steps that this mock should return from
 // AllSteps().
 func (cm *MockChecklistManager) AllSteps() []upgradestatus.StateReader {
 	steps := make([]upgradestatus.StateReader, len(cm.loadedNames))

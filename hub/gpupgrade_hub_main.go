@@ -55,46 +55,39 @@ func main() {
 
 			hub := services.NewHub(source, target, grpc.DialContext, conf, cm)
 
+			// Set up the checklist steps in order.
+			//
 			// TODO: make sure the implementations here, and the Checklist below, are
 			// fully exercised in end-to-end tests. It feels like we should be able to
 			// pull these into a Hub method or helper function, but currently the
 			// interfaces aren't well componentized.
-			stateCheck := func(step upgradestatus.StateReader) pb.StepStatus {
-				checker := upgradestatus.StateCheck{
-					Path: filepath.Join(conf.StateDir, step.Name()),
-					Step: step.Code(),
-				}
-				return checker.GetStatus()
-			}
+			cm.AddWritableStep(upgradestatus.CONFIG, pb.UpgradeSteps_CONFIG)
+			cm.AddWritableStep(upgradestatus.SEGINSTALL, pb.UpgradeSteps_SEGINSTALL)
+			cm.AddWritableStep(upgradestatus.INIT_CLUSTER, pb.UpgradeSteps_INIT_CLUSTER)
 
-			shutDownStatus := func(step upgradestatus.StateReader) pb.StepStatus {
-				stepdir := filepath.Join(conf.StateDir, step.Name())
-				return upgradestatus.ClusterShutdownStatus(stepdir, source.Executor)
-			}
+			cm.AddReadOnlyStep(upgradestatus.SHUTDOWN_CLUSTERS, pb.UpgradeSteps_SHUTDOWN_CLUSTERS,
+				func(stepName string) pb.StepStatus {
+					stepdir := filepath.Join(conf.StateDir, stepName)
+					return upgradestatus.ClusterShutdownStatus(stepdir, source.Executor)
+				})
 
-			convertMasterStatus := func(step upgradestatus.StateReader) pb.StepStatus {
-				convertMasterPath := filepath.Join(conf.StateDir, step.Name())
-				sourceDataDir := source.MasterDataDir()
-				return upgradestatus.SegmentConversionStatus(convertMasterPath, sourceDataDir, source.Executor)
-			}
+			cm.AddReadOnlyStep(upgradestatus.CONVERT_MASTER, pb.UpgradeSteps_CONVERT_MASTER,
+				func(stepName string) pb.StepStatus {
+					convertMasterPath := filepath.Join(conf.StateDir, stepName)
+					sourceDataDir := source.MasterDataDir()
+					return upgradestatus.SegmentConversionStatus(convertMasterPath, sourceDataDir, source.Executor)
+				})
 
-			convertPrimariesStatus := func(step upgradestatus.StateReader) pb.StepStatus {
-				return services.PrimaryConversionStatus(hub)
-			}
+			cm.AddWritableStep(upgradestatus.START_AGENTS, pb.UpgradeSteps_START_AGENTS)
+			cm.AddWritableStep(upgradestatus.SHARE_OIDS, pb.UpgradeSteps_SHARE_OIDS)
 
-			// {Name_: *, Code_: *, Status_:, *}
-			cm.LoadSteps([]upgradestatus.Step{
-				{upgradestatus.CONFIG, pb.UpgradeSteps_CONFIG, stateCheck},
-				{upgradestatus.SEGINSTALL, pb.UpgradeSteps_SEGINSTALL, stateCheck},
-				{upgradestatus.INIT_CLUSTER, pb.UpgradeSteps_INIT_CLUSTER, stateCheck},
-				{upgradestatus.SHUTDOWN_CLUSTERS, pb.UpgradeSteps_SHUTDOWN_CLUSTERS, shutDownStatus},
-				{upgradestatus.CONVERT_MASTER, pb.UpgradeSteps_CONVERT_MASTER, convertMasterStatus},
-				{upgradestatus.START_AGENTS, pb.UpgradeSteps_START_AGENTS, stateCheck},
-				{upgradestatus.SHARE_OIDS, pb.UpgradeSteps_SHARE_OIDS, stateCheck},
-				{upgradestatus.CONVERT_PRIMARIES, pb.UpgradeSteps_CONVERT_PRIMARIES, convertPrimariesStatus},
-				{upgradestatus.VALIDATE_START_CLUSTER, pb.UpgradeSteps_VALIDATE_START_CLUSTER, stateCheck},
-				{upgradestatus.RECONFIGURE_PORTS, pb.UpgradeSteps_RECONFIGURE_PORTS, stateCheck},
-			})
+			cm.AddReadOnlyStep(upgradestatus.CONVERT_PRIMARIES, pb.UpgradeSteps_CONVERT_PRIMARIES,
+				func(stepName string) pb.StepStatus {
+					return services.PrimaryConversionStatus(hub)
+				})
+
+			cm.AddWritableStep(upgradestatus.VALIDATE_START_CLUSTER, pb.UpgradeSteps_VALIDATE_START_CLUSTER)
+			cm.AddWritableStep(upgradestatus.RECONFIGURE_PORTS, pb.UpgradeSteps_RECONFIGURE_PORTS)
 
 			if shouldDaemonize {
 				hub.MakeDaemon()

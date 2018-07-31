@@ -38,15 +38,10 @@ var _ = Describe("status", func() {
 		})
 	})
 
-	// FIXME: The LoadSteps() method is ugly. It kind of proves that this should
-	// be an end-to-end acceptance test, which ensures that `status upgrade`
-	// does something actually useful.
 	Describe("upgrade", func() {
 		It("Reports status from the hub Checklist", func() {
-			cm.LoadSteps([]upgradestatus.Step{
-				{Name_: upgradestatus.CONFIG, Code_: pb.UpgradeSteps_CONFIG, Status_: nil},
-				{Name_: upgradestatus.SEGINSTALL, Code_: pb.UpgradeSteps_SEGINSTALL, Status_: nil},
-			})
+			cm.AddStep(upgradestatus.CONFIG, pb.UpgradeSteps_CONFIG)
+			cm.AddStep(upgradestatus.SEGINSTALL, pb.UpgradeSteps_SEGINSTALL)
 
 			statusSession := runCommand("status", "upgrade")
 			Eventually(statusSession).Should(Exit(0))

@@ -21,10 +21,24 @@ var _ = Describe("upgradestatus/ChecklistManager", func() {
 	})
 
 	Describe("MarkInProgress", func() {
-		It("Leaves an in-progress file in the state dir", func() {
-			tempdir, _ := ioutil.TempDir("", "")
+		var (
+			tempdir string
+			cm      *upgradestatus.ChecklistManager
+		)
 
-			cm := upgradestatus.NewChecklistManager(filepath.Join(tempdir, ".gpupgrade"))
+		BeforeEach(func() {
+			var err error
+			tempdir, err = ioutil.TempDir("", "")
+			Expect(err).NotTo(HaveOccurred())
+
+			cm = upgradestatus.NewChecklistManager(filepath.Join(tempdir, ".gpupgrade"))
+		})
+
+		AfterEach(func() {
+			os.RemoveAll(tempdir)
+		})
+
+		It("Leaves an in-progress file in the state dir", func() {
 			step := cm.GetStepWriter("fancy_step")
 			step.ResetStateDir()
 			err := step.MarkInProgress()
@@ -35,9 +49,6 @@ var _ = Describe("upgradestatus/ChecklistManager", func() {
 		})
 
 		It("still succeeds if file already exists", func() {
-			tempdir, _ := ioutil.TempDir("", "")
-
-			cm := upgradestatus.NewChecklistManager(filepath.Join(tempdir, ".gpupgrade"))
 			step := cm.GetStepWriter("fancy_step")
 			step.ResetStateDir()
 			step.MarkInProgress() // lay the file down once
@@ -53,9 +64,6 @@ var _ = Describe("upgradestatus/ChecklistManager", func() {
 				return nil, errors.New("Disk full or something")
 			}
 
-			tempdir, _ := ioutil.TempDir("", "")
-
-			cm := upgradestatus.NewChecklistManager(filepath.Join(tempdir, ".gpupgrade"))
 			step := cm.GetStepWriter("fancy_step")
 			step.ResetStateDir()
 			err := step.MarkInProgress()

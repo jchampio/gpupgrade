@@ -44,10 +44,10 @@ type StateWriter interface {
 }
 
 type ChecklistManager struct {
-	pathToStateDir string // TODO: rename
-	steps          []StateReader
-	stepmap        map[string]StateReader // maps step name to StateReader implementation
-	readOnly       map[string]bool        // value is true iff step was added via AddReadOnlyStep()
+	stateDir string                 // the directory where writable step status is kept
+	steps    []StateReader          // backing slice for AllSteps()
+	stepmap  map[string]StateReader // maps step name to StateReader implementation
+	readOnly map[string]bool        // value is true iff step was added via AddReadOnlyStep()
 }
 
 // A StatusFunc returns a StepStatus for a read-only step. It is passed the name
@@ -74,9 +74,9 @@ func (s step) Status() pb.StepStatus {
 
 func NewChecklistManager(stateDirPath string) *ChecklistManager {
 	return &ChecklistManager{
-		pathToStateDir: stateDirPath,
-		stepmap:        map[string]StateReader{},
-		readOnly:       map[string]bool{},
+		stateDir: stateDirPath,
+		stepmap:  map[string]StateReader{},
+		readOnly: map[string]bool{},
 	}
 }
 
@@ -86,7 +86,7 @@ func NewChecklistManager(stateDirPath string) *ChecklistManager {
 func (c *ChecklistManager) AddWritableStep(name string, code pb.UpgradeSteps) {
 	statusFunc := func(name string) pb.StepStatus {
 		checker := StateCheck{
-			Path: filepath.Join(c.pathToStateDir, name),
+			Path: filepath.Join(c.stateDir, name),
 			Step: code,
 		}
 		return checker.GetStatus()
@@ -131,7 +131,7 @@ func (c *ChecklistManager) GetStepWriter(step string) StateWriter {
 		panic(fmt.Sprintf(`attempted to write to read-only step "%s"`, step))
 	}
 
-	stepdir := filepath.Join(c.pathToStateDir, step)
+	stepdir := filepath.Join(c.stateDir, step)
 	return StepWriter{stepdir: stepdir}
 }
 

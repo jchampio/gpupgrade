@@ -49,12 +49,13 @@ type ChecklistManager struct {
 	pathToStateDir string // TODO: rename
 	steps          []StateReader
 	stepmap        map[string]StateReader // maps step name to StateReader implementation
+	readOnly       map[string]bool        // value is true iff step was added via AddReadOnlyStep()
 }
 
 type Step struct {
 	Name_   string
 	Code_   pb.UpgradeSteps
-	Status_ func(r StateReader) pb.StepStatus
+	Status_ func(r StateReader) pb.StepStatus // TODO can this be a StatusFunc?
 }
 
 func (s Step) Name() string {
@@ -73,6 +74,7 @@ func NewChecklistManager(stateDirPath string) *ChecklistManager {
 	return &ChecklistManager{
 		pathToStateDir: stateDirPath,
 		stepmap:        map[string]StateReader{},
+		readOnly:       map[string]bool{},
 	}
 }
 
@@ -97,10 +99,28 @@ func (c *ChecklistManager) AddWritableStep(name string, code pb.UpgradeSteps) {
 		return checker.GetStatus()
 	}
 
+	c.addStep(name, code, statusFunc)
+}
+
+// A StatusFunc returns a StepStatus for a read-only step. It is passed the name
+// of the step to facilitate sharing of step implementations.
+type StatusFunc func(name string) pb.StepStatus
+
+// AddReadOnlyStep creates a step with a custom status retrieval mechanism, as
+// determined by the given StatusFunc.
+func (c *ChecklistManager) AddReadOnlyStep(name string, code pb.UpgradeSteps, status StatusFunc) {
+	c.addStep(name, code, func(r StateReader) pb.StepStatus {
+		return status(r.Name())
+	})
+
+	c.readOnly[name] = true
+}
+
+func (c *ChecklistManager) addStep(name string, code pb.UpgradeSteps, status func(r StateReader) pb.StepStatus) {
 	step := Step{
 		Name_:   name,
 		Code_:   code,
-		Status_: statusFunc,
+		Status_: status,
 	}
 
 	// Since checklist setup isn't influenced by the user, it's always a
@@ -123,6 +143,12 @@ func (c *ChecklistManager) AllSteps() []StateReader {
 }
 
 func (c *ChecklistManager) GetStepWriter(step string) StateWriter {
+	if c.readOnly[step] {
+		// This is always a programmer error: we shouldn't ever write to a
+		// read-only step. Panic instead of making callers add an error path.
+		panic(fmt.Sprintf(`attempted to write to read-only step "%s"`, step))
+	}
+
 	stepdir := filepath.Join(c.pathToStateDir, step)
 	return StepWriter{stepdir: stepdir}
 }

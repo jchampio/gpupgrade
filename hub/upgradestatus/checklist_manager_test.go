@@ -209,4 +209,47 @@ var _ = Describe("upgradestatus/ChecklistManager", func() {
 			Expect(func() { cm.AddWritableStep("my-step", 0) }).To(Panic())
 		})
 	})
+
+	Describe("AddReadOnlyStep", func() {
+		It("adds a step that can be read using the given status func", func() {
+			cm := upgradestatus.NewChecklistManager("some/random/dir")
+			cm.AddReadOnlyStep("my-step", 0, func(name string) pb.StepStatus {
+				Expect(name).To(Equal("my-step"))
+				return pb.StepStatus_FAILED
+			})
+
+			reader := cm.GetStepReader("my-step")
+			Expect(reader.Status()).To(Equal(pb.StepStatus_FAILED))
+		})
+
+		It("adds a step that cannot be written", func() {
+			cm := upgradestatus.NewChecklistManager("some/random/dir")
+			cm.AddReadOnlyStep("my-step", 0, func(string) pb.StepStatus {
+				return pb.StepStatus_COMPLETE
+			})
+
+			Expect(func() { cm.GetStepWriter("my-step") }).To(Panic())
+		})
+
+		It("adds a step that is retrievable via AllSteps", func() {
+			cm := upgradestatus.NewChecklistManager("some/random/dir")
+			cm.AddReadOnlyStep("my-step", 0, func(string) pb.StepStatus {
+				return pb.StepStatus_COMPLETE
+			})
+
+			allSteps := cm.AllSteps()
+			Expect(allSteps).To(HaveLen(1))
+			Expect(allSteps[0].Name()).To(Equal("my-step"))
+		})
+
+		It("panics if a step with the same name has already been added", func() {
+			cm := upgradestatus.NewChecklistManager("some/random/dir")
+			statusFunc := func(string) pb.StepStatus {
+				return pb.StepStatus_COMPLETE
+			}
+
+			cm.AddReadOnlyStep("my-step", 0, statusFunc)
+			Expect(func() { cm.AddReadOnlyStep("my-step", 0, statusFunc) }).To(Panic())
+		})
+	})
 })

@@ -8,6 +8,7 @@ import (
 
 	"github.com/greenplum-db/gpupgrade/hub/upgradestatus"
 	"github.com/greenplum-db/gpupgrade/hub/upgradestatus/file"
+	pb "github.com/greenplum-db/gpupgrade/idl"
 	"github.com/greenplum-db/gpupgrade/utils"
 
 	. "github.com/onsi/ginkgo"
@@ -168,6 +169,44 @@ var _ = Describe("upgradestatus/ChecklistManager", func() {
 			step := cm.GetStepWriter("step")
 			err := step.MarkComplete()
 			Expect(err).ToNot(HaveOccurred())
+		})
+	})
+
+	Describe("AddWritableStep", func() {
+		It("adds a step that can be written and read", func() {
+			tempdir, err := ioutil.TempDir("", "")
+			Expect(err).NotTo(HaveOccurred())
+			defer os.RemoveAll(tempdir)
+
+			cm := upgradestatus.NewChecklistManager(filepath.Join(tempdir, ".gpupgrade"))
+			cm.AddWritableStep("my-step", 0)
+
+			writer := cm.GetStepWriter("my-step")
+			writer.ResetStateDir()
+			writer.MarkInProgress()
+			writer.MarkComplete()
+
+			reader := cm.GetStepReader("my-step")
+			Expect(reader.Status()).To(Equal(pb.StepStatus_COMPLETE))
+		})
+
+		It("adds a step that is retrievable via AllSteps", func() {
+			tempdir, err := ioutil.TempDir("", "")
+			Expect(err).NotTo(HaveOccurred())
+			defer os.RemoveAll(tempdir)
+
+			cm := upgradestatus.NewChecklistManager(filepath.Join(tempdir, ".gpupgrade"))
+			cm.AddWritableStep("my-step", 0)
+
+			allSteps := cm.AllSteps()
+			Expect(allSteps).To(HaveLen(1))
+			Expect(allSteps[0].Name()).To(Equal("my-step"))
+		})
+
+		It("panics if a step with the same name has already been added", func() {
+			cm := upgradestatus.NewChecklistManager("some/random/dir")
+			cm.AddWritableStep("my-step", 0)
+			Expect(func() { cm.AddWritableStep("my-step", 0) }).To(Panic())
 		})
 	})
 })

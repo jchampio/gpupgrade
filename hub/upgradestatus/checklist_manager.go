@@ -1,6 +1,7 @@
 package upgradestatus
 
 import (
+	"fmt"
 	"os"
 	"path"
 	"path/filepath"
@@ -25,6 +26,7 @@ const (
 
 type Checklist interface {
 	LoadSteps(steps []Step) // XXX Feels like this is an implementation detail.
+
 	AllSteps() []StateReader
 	GetStepReader(step string) StateReader
 	GetStepWriter(step string) StateWriter
@@ -44,7 +46,7 @@ type StateWriter interface {
 }
 
 type ChecklistManager struct {
-	pathToStateDir string
+	pathToStateDir string // TODO: rename
 	steps          []StateReader
 	stepmap        map[string]StateReader // maps step name to StateReader implementation
 }
@@ -81,6 +83,35 @@ func (c *ChecklistManager) LoadSteps(steps []Step) {
 		c.steps[i] = step
 		c.stepmap[step.Name_] = step
 	}
+}
+
+// AddWritableStep creates a step with a writable status that is backed by the
+// filesystem. The given name must be filesystem-friendly, since it will be used
+// in the backing path.
+func (c *ChecklistManager) AddWritableStep(name string, code pb.UpgradeSteps) {
+	statusFunc := func(r StateReader) pb.StepStatus {
+		checker := StateCheck{
+			Path: filepath.Join(c.pathToStateDir, name),
+			Step: code,
+		}
+		return checker.GetStatus()
+	}
+
+	step := Step{
+		Name_:   name,
+		Code_:   code,
+		Status_: statusFunc,
+	}
+
+	// Since checklist setup isn't influenced by the user, it's always a
+	// programmer error for a step to be added twice. Panic instead of making
+	// all callers check for an error that should never happen.
+	if _, ok := c.stepmap[name]; ok {
+		panic(fmt.Sprintf(`step "%s" has already been added`, name))
+	}
+
+	c.steps = append(c.steps, step)
+	c.stepmap[name] = step
 }
 
 func (c *ChecklistManager) GetStepReader(step string) StateReader {

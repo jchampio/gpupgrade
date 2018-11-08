@@ -35,6 +35,22 @@ var NumberOfConnectionAttempt = 100
 
 var successText = color.New(color.Bold, color.FgGreen).SprintfFunc()
 var failureText = color.New(color.Bold, color.FgRed).SprintfFunc()
+var codeText = color.New(color.Bold, color.FgWhite).SprintfFunc()
+
+func handleCtrlC() {
+	c := make(chan os.Signal)
+	signal.Notify(c, os.Interrupt)
+
+	go func() {
+		<-c
+
+		fmt.Println()
+		fmt.Println("The shutdown operation will continue in the background. To monitor it, use")
+		fmt.Println("    ", codeText("gpupgrade status upgrade"))
+
+		os.Exit(1)
+	}()
+}
 
 func (p Preparer) ShutdownClusters() error {
 	var msg *pb.PrepareShutdownClustersReply
@@ -45,6 +61,8 @@ func (p Preparer) ShutdownClusters() error {
 	if err != nil {
 		return err
 	}
+
+	handleCtrlC()
 
 	fmt.Println("Waiting for clusters to shut down...")
 

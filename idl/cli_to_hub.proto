@@ -12,7 +12,7 @@ service CliToHub {
     rpc CheckVersion(CheckVersionRequest) returns (CheckVersionReply) {}
     rpc CheckDiskSpace(CheckDiskSpaceRequest) returns (CheckDiskSpaceReply) {}
     rpc PrepareInitCluster(PrepareInitClusterRequest) returns (PrepareInitClusterReply) {}
-    rpc PrepareShutdownClusters(PrepareShutdownClustersRequest) returns (PrepareShutdownClustersReply) {}
+    rpc PrepareShutdownClusters(PrepareShutdownClustersRequest) returns (stream PrepareShutdownClustersReply) {}
     rpc UpgradeConvertMaster(UpgradeConvertMasterRequest) returns (UpgradeConvertMasterReply) {}
     rpc PrepareStartAgents(PrepareStartAgentsRequest) returns (PrepareStartAgentsReply) {}
     rpc UpgradeShareOids(UpgradeShareOidsRequest) returns (UpgradeShareOidsReply) {}
@@ -120,8 +120,17 @@ message CheckDiskSpaceReply {
     repeated string SegmentFileSysUsage = 1;
 }
 
+enum WhichCluster {
+    UNKNOWN = 0;
+    SOURCE = 1;
+    TARGET = 2;
+}
+
 message PrepareShutdownClustersRequest {}
-message PrepareShutdownClustersReply {}
+message PrepareShutdownClustersReply {
+    WhichCluster cluster = 1;
+    bool succeeded = 2;
+}
 
 message PrepareInitClusterRequest {}
 message PrepareInitClusterReply {}

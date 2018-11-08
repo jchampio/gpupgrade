@@ -3,14 +3,17 @@ package commanders
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
+	"os/signal"
 	"path"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/fatih/color"
 	"github.com/pkg/errors"
 
 	pb "github.com/greenplum-db/gpupgrade/idl"
@@ -30,13 +33,55 @@ func NewPreparer(client pb.CliToHubClient) Preparer {
 
 var NumberOfConnectionAttempt = 100
 
+var successText = color.New(color.Bold, color.FgGreen).SprintfFunc()
+var failureText = color.New(color.Bold, color.FgRed).SprintfFunc()
+
 func (p Preparer) ShutdownClusters() error {
-	_, err := p.client.PrepareShutdownClusters(context.Background(),
+	var msg *pb.PrepareShutdownClustersReply
+
+	// Connect to the stream from the hub.
+	client, err := p.client.PrepareShutdownClusters(context.Background(),
 		&pb.PrepareShutdownClustersRequest{})
 	if err != nil {
-		gplog.Error(err.Error())
+		return err
 	}
-	gplog.Info("request to shutdown clusters sent to hub")
+
+	fmt.Println("Waiting for clusters to shut down...")
+
+	// Read every message from the hub.
+	for {
+		if msg, err = client.Recv(); err != nil {
+			break
+		}
+
+		gplog.Debug("received message from server: %v", msg)
+
+		var cluster, status string
+
+		switch msg.Cluster {
+		case pb.WhichCluster_SOURCE:
+			cluster = "source"
+		case pb.WhichCluster_TARGET:
+			cluster = "target"
+		default:
+			cluster = "<unknown>"
+		}
+
+		if msg.Succeeded {
+			status = successText("[success]")
+		} else {
+			status = failureText("[failure]")
+		}
+
+		fmt.Printf("%s cluster %65s\n", cluster, status)
+	}
+
+	// The only error we expect is EOF at the end of the stream. Otherwise,
+	// something is wrong.
+	if err != io.EOF {
+		return errors.Wrap(err, "failed to shut down clusters")
+	}
+
 	return nil
 }
 

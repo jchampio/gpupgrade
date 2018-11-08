@@ -6,47 +6,61 @@ import (
 	"github.com/greenplum-db/gpupgrade/hub/upgradestatus"
 	pb "github.com/greenplum-db/gpupgrade/idl"
 	"github.com/greenplum-db/gpupgrade/utils"
-	"github.com/greenplum-db/gpupgrade/utils/log"
-
-	"golang.org/x/net/context"
 
 	"github.com/greenplum-db/gp-common-go-libs/gplog"
+	multierror "github.com/hashicorp/go-multierror"
 )
 
-func (h *Hub) PrepareShutdownClusters(ctx context.Context, in *pb.PrepareShutdownClustersRequest) (*pb.PrepareShutdownClustersReply, error) {
+func (h *Hub) PrepareShutdownClusters(in *pb.PrepareShutdownClustersRequest, stream pb.CliToHub_PrepareShutdownClustersServer) error {
 	gplog.Info("starting PrepareShutdownClusters()")
 
-	go h.ShutdownClusters()
-
-	return &pb.PrepareShutdownClustersReply{}, nil
+	return h.ShutdownClusters(stream)
 }
 
-func (h *Hub) ShutdownClusters() {
-	defer log.WritePanics()
+func (h *Hub) ShutdownClusters(stream pb.CliToHub_PrepareShutdownClustersServer) error {
+	var shutdownErr error
+
+	// This type links each utils.Cluster to its protobuf type code.
+	type cluster struct {
+		*utils.Cluster
+		typeCode pb.WhichCluster
+	}
+
+	clusters := []cluster{
+		{h.source, pb.WhichCluster_SOURCE},
+		{h.target, pb.WhichCluster_TARGET},
+	}
 
 	step := h.checklist.GetStepWriter(upgradestatus.SHUTDOWN_CLUSTERS)
 
 	step.ResetStateDir()
 	step.MarkInProgress()
 
-	var errSource error
-	errSource = StopCluster(h.source)
-	if errSource != nil {
-		gplog.Error(errSource.Error())
+	for _, cluster := range clusters {
+		err := StopCluster(cluster.Cluster)
+		if err != nil {
+			gplog.Error(err.Error())
+			shutdownErr = multierror.Append(shutdownErr, err)
+		}
+
+		reply := &pb.PrepareShutdownClustersReply{
+			Cluster:   cluster.typeCode,
+			Succeeded: err == nil,
+		}
+
+		err = stream.Send(reply)
+		if err != nil {
+			gplog.Error(err.Error())
+		}
 	}
 
-	var errTarget error
-	errTarget = StopCluster(h.target)
-	if errTarget != nil {
-		gplog.Error(errTarget.Error())
-	}
-
-	if errSource != nil || errTarget != nil {
+	if shutdownErr != nil {
 		step.MarkFailed()
-		return
+		return shutdownErr
 	}
 
 	step.MarkComplete()
+	return nil
 }
 
 func StopCluster(c *utils.Cluster) error {

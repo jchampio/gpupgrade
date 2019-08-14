@@ -21,6 +21,14 @@
   version = "v1.1.0"
 
 [[projects]]
+  digest = "1:abeb38ade3f32a92943e5be54f55ed6d6e3b6602761d74b4aab4c9dd45c18abd"
+  name = "github.com/fsnotify/fsnotify"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "c2828203cd70a50dcccfb2761f8b1f8ceef9a8e9"
+  version = "v1.4.7"
+
+[[projects]]
   digest = "1:a62049a8fa554d688c8db4845c65ddcd5986b75f3a851e4fb563c6893d292e38"
   name = "github.com/golang/mock"
   packages = ["gomock"]
@@ -332,6 +340,7 @@
   input-imports = [
     "github.com/blang/semver",
     "github.com/cloudfoundry/gosigar",
+    "github.com/fsnotify/fsnotify",
     "github.com/golang/mock/gomock",
     "github.com/golang/protobuf/proto",
     "github.com/greenplum-db/gp-common-go-libs/cluster",

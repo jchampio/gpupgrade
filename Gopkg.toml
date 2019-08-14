@@ -81,6 +81,10 @@
   name = "github.com/hashicorp/go-multierror"
   version = "1.0.0"
 
+[[constraint]]
+  name = "github.com/fsnotify/fsnotify"
+  version = "1.4.7" # fixes races and deadlocks on various platforms
+
 [prune]
   go-tests = true
   unused-packages = true

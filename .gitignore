@@ -5,3 +5,4 @@ vendor
 /gpupgrade
 /gpupgrade_hub
 /gpupgrade_agent
+/gpwatch

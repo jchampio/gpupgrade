@@ -93,6 +93,10 @@ hub-package: EXE_NAME := $(HUB)
 $(PACKAGES): %-package: .Gopkg.updated
 	$(PREFIX) go build $(GOFLAGS) -o $(EXE_NAME)$(POSTFIX) -ldflags $(VERSION_LD_STR) github.com/greenplum-db/gpupgrade/$*
 
+.PHONY: gpwatch
+gpwatch:
+	$(PREFIX) go build $(GOFLAGS) -o $@$(POSTFIX) watch/main.go
+
 install_agent: agent-package
 		@psql -t -d template1 -c 'SELECT DISTINCT hostname FROM gp_segment_configuration WHERE content != -1' > /tmp/seg_hosts 2>/dev/null; \
 		if [ $$? -eq 0 ]; then \

@@ -94,7 +94,7 @@ $(PACKAGES): %-package: .Gopkg.updated
 	$(PREFIX) go build $(GOFLAGS) -o $(EXE_NAME)$(POSTFIX) -ldflags $(VERSION_LD_STR) github.com/greenplum-db/gpupgrade/$*
 
 .PHONY: gpwatch
-gpwatch:
+gpwatch: .Gopkg.updated
 	$(PREFIX) go build $(GOFLAGS) -o $@$(POSTFIX) watch/main.go
 
 install_agent: agent-package

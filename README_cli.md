@@ -31,6 +31,13 @@ of the conversion by running ```gpupgrade status upgrade```.
 
 1. ```gpupgrade upgrade reconfigure-ports```
 
+
+NOW:
+
+1. ```gpupgrade initialize --old-bindir OLDDIR --new-bindir NEWDIR```
+1. ```gpupgrade execute```
+1. ```gpupgrade finalize```
+
 ###TODO
 
 1. why is ```Install binaries on segments``` always pending?

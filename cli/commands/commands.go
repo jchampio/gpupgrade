@@ -52,6 +52,7 @@ func BuildRootCommand() *cobra.Command {
 	root := &cobra.Command{Use: "gpupgrade"}
 
 	root.AddCommand(prepare, config, status, check, version, upgrade)
+	root.AddCommand(initializeStep())
 
 	subPrepareInit := createPrepareInitSubcommand()
 	prepare.AddCommand(subPrepareStartHub, subPrepareInitCluster, subPrepareShutdownClusters, subPrepareStartAgents,
@@ -502,4 +503,30 @@ var version = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Println(utils.VersionString("gpupgrade"))
 	},
+}
+
+//////////////////////////////////////// Initialize
+func initializeStep() *cobra.Command {
+	var oldBinDir, newBinDir string
+
+	subInit := &cobra.Command{
+		Use:   "initialize",
+		Short: "prepare the system for upgrade",
+		Long:  `prepare the system for upgrade`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			// If we got here, the args are okay and the user doesn't need a usage
+			// dump on failure.
+			cmd.SilenceUsage = true
+
+			return commanders.InitializeStep(oldBinDir, newBinDir)
+		},
+	}
+
+	subInit.PersistentFlags().StringVar(&oldBinDir, "old-bindir", "", "install directory for old gpdb version")
+	subInit.MarkPersistentFlagRequired("old-bindir")
+	subInit.PersistentFlags().StringVar(&newBinDir, "new-bindir", "", "install directory for new gpdb version")
+	subInit.MarkPersistentFlagRequired("new-bindir")
+
+	return subInit
+
 }

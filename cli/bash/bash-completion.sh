@@ -394,9 +394,9 @@ _gpupgrade_config()
     noun_aliases=()
 }
 
-_gpupgrade_initiailize()
+_gpupgrade_initialize()
 {
-    last_command="gpupgrade_initiailize"
+    last_command="gpupgrade_initialize"
     commands=()
 
     flags=()
@@ -709,7 +709,7 @@ _gpupgrade()
     commands=()
     commands+=("check")
     commands+=("config")
-    commands+=("initiailize")
+    commands+=("initialize")
     commands+=("prepare")
     commands+=("status")
     commands+=("upgrade")

@@ -19,6 +19,11 @@ import (
 	"golang.org/x/net/context"
 )
 
+func (h *Hub) TellHubToInitializeUpgrade(ctx context.Context, in *idl.TellHubToInitializeUpgradeRequest) (*idl.TellHubToInitializeUpgradeReply, error) {
+	fmt.Fprint(os.Stdout, "running steps on hub")
+	return &idl.TellHubToInitializeUpgradeReply{}, nil
+}
+
 func (h *Hub) PrepareInitCluster(ctx context.Context, in *idl.PrepareInitClusterRequest) (*idl.PrepareInitClusterReply, error) {
 	gplog.Info("starting %s", upgradestatus.INIT_CLUSTER)
 

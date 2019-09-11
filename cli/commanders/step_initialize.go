@@ -84,5 +84,11 @@ func InitializeStep(oldBinDir string, newBinDir string) error {
 		os.Exit(1)
 	}
 
+	err = preparer.TellHubToInitializeUpgrade(client)
+	if err != nil {
+		gplog.Error(err.Error())
+		os.Exit(1)
+	}
+
 	return nil
 }

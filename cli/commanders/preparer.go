@@ -96,6 +96,16 @@ func (p Preparer) StartAgents() error {
 	return nil
 }
 
+func (p Preparer) TellHubToInitializeUpgrade(client idl.CliToHubClient) error {
+	_, err := client.TellHubToInitializeUpgrade(context.Background(), &idl.TellHubToInitializeUpgradeRequest{})
+	if err != nil {
+		return err
+	}
+
+	fmt.Println("hub started successfully")
+	return nil
+}
+
 func HowManyHubsRunning() (int, error) {
 	howToLookForHub := `ps -ef | grep -Gc "[g]pupgrade_hub$"` // use square brackets to avoid finding yourself in matches
 	output, err := exec.Command("bash", "-c", howToLookForHub).Output()

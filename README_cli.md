@@ -9,13 +9,7 @@ actually upgrade their cluster.
 We run the following commands.  Each command prints some status information, and you can see the state 
 of the conversion by running ```gpupgrade status upgrade```.
 
-1. ```gpupgrade prepare init --old-bindir OLDDIR --new-bindir NEWDIR```
-
-1. ```gpupgrade prepare start-hub```
-
-1. ```gpupgrade check config```
-
-1. ```gpupgrade prepare start-agents```
+1. ```gpupgrade initialize --old-bindir OLDDIR --new-bindir NEWDIR --old-port OLDPORT```
 
 1. ```gpupgrade prepare init-cluster```
 

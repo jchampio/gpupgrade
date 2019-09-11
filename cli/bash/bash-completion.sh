@@ -394,6 +394,27 @@ _gpupgrade_config()
     noun_aliases=()
 }
 
+_gpupgrade_initialize()
+{
+    last_command="gpupgrade_initialize"
+    commands=()
+
+    flags=()
+    two_word_flags=()
+    local_nonpersistent_flags=()
+    flags_with_completion=()
+    flags_completion=()
+
+    flags+=("--new-bindir=")
+    flags+=("--old-bindir=")
+
+    must_have_one_flag=()
+    must_have_one_flag+=("--new-bindir=")
+    must_have_one_flag+=("--old-bindir=")
+    must_have_one_noun=()
+    noun_aliases=()
+}
+
 _gpupgrade_prepare_init()
 {
     last_command="gpupgrade_prepare_init"
@@ -688,6 +709,7 @@ _gpupgrade()
     commands=()
     commands+=("check")
     commands+=("config")
+    commands+=("initialize")
     commands+=("prepare")
     commands+=("status")
     commands+=("upgrade")

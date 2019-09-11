@@ -23,6 +23,7 @@ import (
 
 func main() {
 	var logdir string
+	var oldbindir, newbindir string
 	var shouldDaemonize bool
 	var doLogVersionAndExit bool
 
@@ -48,6 +49,11 @@ func main() {
 				StateDir:       utils.GetStateDir(),
 				LogDir:         logdir,
 			}
+			err := services.DoInit(conf.StateDir, oldbindir, newbindir)
+			if err != nil {
+				return err
+			}
+
 			source := &utils.Cluster{ConfigPath: filepath.Join(conf.StateDir, utils.SOURCE_CONFIG_FILENAME)}
 			target := &utils.Cluster{ConfigPath: filepath.Join(conf.StateDir, utils.TARGET_CONFIG_FILENAME)}
 			cm := upgradestatus.NewChecklistManager(conf.StateDir)
@@ -92,7 +98,7 @@ func main() {
 				hub.MakeDaemon()
 			}
 
-			err := hub.Start()
+			err = hub.Start()
 			if err != nil {
 				return err
 			}
@@ -104,11 +110,15 @@ func main() {
 	}
 
 	RootCmd.PersistentFlags().StringVar(&logdir, "log-directory", "", "gpupgrade_hub log directory")
+	RootCmd.PersistentFlags().StringVar(&oldbindir, "old-bindir", "", "gpupgrade_hub old-bindir")
+	RootCmd.PersistentFlags().StringVar(&newbindir, "new-bindir", "", "gpupgrade_hub new-bindir")
+	err := RootCmd.MarkPersistentFlagRequired("old-bindir")
+	err = RootCmd.MarkPersistentFlagRequired("new-bindir")
 
 	daemon.MakeDaemonizable(RootCmd, &shouldDaemonize)
 	utils.VersionAddCmdlineOption(RootCmd, &doLogVersionAndExit)
 
-	err := RootCmd.Execute()
+	err = RootCmd.Execute()
 	if err != nil && err != daemon.ErrSuccessfullyDaemonized {
 		if gplog.GetLogger() == nil {
 			// In case we didn't get through RootCmd.Execute(), set up logging

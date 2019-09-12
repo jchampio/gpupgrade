@@ -41,7 +41,7 @@ func (p Preparer) ShutdownClusters() error {
 	return nil
 }
 
-func (p Preparer) StartHub() error {
+func (p Preparer) StartHub(oldBinDir, newBinDir string) error {
 	countHubs, err := HowManyHubsRunning()
 	if err != nil {
 		gplog.Error("failed to determine if hub already running")
@@ -53,7 +53,8 @@ func (p Preparer) StartHub() error {
 	}
 
 	//assume that gpupgrade_hub is on the PATH
-	cmd := exec.Command("gpupgrade_hub", "--daemonize")
+	cmd := exec.Command("gpupgrade_hub", "--daemonize", "--old-bindir", oldBinDir,
+		"--new-bindir", newBinDir)
 	stdout, cmdErr := cmd.Output()
 	if cmdErr != nil {
 		err := fmt.Errorf("failed to start hub (%s)", cmdErr)
@@ -96,8 +97,8 @@ func (p Preparer) StartAgents() error {
 	return nil
 }
 
-func (p Preparer) TellHubToInitializeUpgrade(client idl.CliToHubClient) error {
-	_, err := client.TellHubToInitializeUpgrade(context.Background(), &idl.TellHubToInitializeUpgradeRequest{})
+func (p Preparer) TellHubToInitializeUpgrade(client idl.CliToHubClient, oldBinDir string, newBinDir string) error {
+	_, err := client.TellHubToInitializeUpgrade(context.Background(), &idl.TellHubToInitializeUpgradeRequest{OldBinDir: oldBinDir, NewBinDir: newBinDir})
 	if err != nil {
 		return err
 	}

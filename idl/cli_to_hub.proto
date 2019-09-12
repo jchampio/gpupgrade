@@ -36,7 +36,10 @@ message UpgradeCopyMasterDataDirReply {}
 message UpgradeValidateStartClusterRequest {}
 message UpgradeValidateStartClusterReply {}
 
-message TellHubToInitializeUpgradeRequest {}
+message TellHubToInitializeUpgradeRequest {
+    string oldBinDir = 1;
+    string newBinDir = 2;
+}
 message TellHubToInitializeUpgradeReply {}
 
 message PingRequest {}

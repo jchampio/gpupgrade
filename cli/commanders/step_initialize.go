@@ -69,7 +69,7 @@ func connectToHub() idl.CliToHubClient {
 func InitializeStep(oldBinDir string, newBinDir string) error {
 
 	preparer := Preparer{}
-	err := preparer.StartHub()
+	err := preparer.StartHub(oldBinDir, newBinDir)
 	if err != nil {
 		gplog.Error(err.Error())
 		os.Exit(1)
@@ -84,7 +84,7 @@ func InitializeStep(oldBinDir string, newBinDir string) error {
 		os.Exit(1)
 	}
 
-	err = preparer.TellHubToInitializeUpgrade(client)
+	err = preparer.TellHubToInitializeUpgrade(client, oldBinDir, newBinDir)
 	if err != nil {
 		gplog.Error(err.Error())
 		os.Exit(1)

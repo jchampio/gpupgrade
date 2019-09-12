@@ -369,7 +369,7 @@ var subPrepareStartHub = &cobra.Command{
 	Long:  "starts the hub",
 	Run: func(cmd *cobra.Command, args []string) {
 		preparer := commanders.Preparer{}
-		err := preparer.StartHub()
+		err := preparer.StartHub("foo", "bar") //TODO: this step will disappear
 		if err != nil {
 			gplog.Error(err.Error())
 			os.Exit(1)

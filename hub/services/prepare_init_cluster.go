@@ -20,7 +20,11 @@ import (
 )
 
 func (h *Hub) TellHubToInitializeUpgrade(ctx context.Context, in *idl.TellHubToInitializeUpgradeRequest) (*idl.TellHubToInitializeUpgradeReply, error) {
-	fmt.Fprint(os.Stdout, "running steps on hub")
+	//_, err := fmt.Fprint(os.Stdout, "running steps on hub")
+	//if err != nil {
+	//	return &idl.TellHubToInitializeUpgradeReply{}, err
+	//}
+
 	return &idl.TellHubToInitializeUpgradeReply{}, nil
 }
 

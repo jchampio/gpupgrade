@@ -2,10 +2,14 @@ package commanders
 
 import (
 	"context"
+	"fmt"
 	"github.com/greenplum-db/gp-common-go-libs/gplog"
 	"github.com/greenplum-db/gpupgrade/idl"
+	"github.com/pkg/errors"
 	"google.golang.org/grpc"
 	"os"
+	"os/exec"
+	"path"
 	"strconv"
 	"time"
 )
@@ -66,25 +70,70 @@ func connectToHub() idl.CliToHubClient {
 	return idl.NewCliToHubClient(conn)
 }
 
-func InitializeStep(oldBinDir string, newBinDir string) error {
+func StartHub(oldBinDir, newBinDir string) error {
+	countHubs, err := HowManyHubsRunning()
+	if err != nil {
+		gplog.Error("failed to determine if hub already running")
+		return err
+	}
+	if countHubs >= 1 {
+		gplog.Error("gpupgrade_hub process already running")
+		return errors.New("gpupgrade_hub process already running")
+	}
 
-	preparer := Preparer{}
-	err := preparer.StartHub(oldBinDir, newBinDir)
+	hub_path := path.Join(newBinDir, "gpupgrade_hub")
+	cmd := exec.Command(hub_path, "--daemonize", "--old-bindir", oldBinDir,
+		"--new-bindir", newBinDir)
+	stdout, cmdErr := cmd.Output()
+	if cmdErr != nil {
+		err := fmt.Errorf("failed to start hub (%s)", cmdErr)
+		if exitErr, ok := cmdErr.(*exec.ExitError); ok {
+			// Annotate with the Stderr capture, if we have it.
+			err = fmt.Errorf("%s: %s", err, exitErr.Stderr)
+		}
+		return err
+	}
+	gplog.Debug("gpupgrade_hub started successfully: %s", stdout)
+	return nil
+}
+
+func VerifyConnectivity(client idl.CliToHubClient) error {
+	_, err := client.Ping(context.Background(), &idl.PingRequest{})
+	for i := 0; i < NumberOfConnectionAttempt && err != nil; i++ {
+		_, err = client.Ping(context.Background(), &idl.PingRequest{})
+		time.Sleep(100 * time.Millisecond)
+	}
+	return err
+}
+
+func TellHubToInitializeUpgrade(client idl.CliToHubClient, oldBinDir, newBinDir string) error {
+	_, err := client.TellHubToInitializeUpgrade(context.Background(), &idl.TellHubToInitializeUpgradeRequest{OldBinDir: oldBinDir, NewBinDir: newBinDir})
+	if err != nil {
+		return err
+	}
+
+	fmt.Println("hub started successfully")
+	return nil
+}
+
+func InitializeStep(oldBinDir, newBinDir string) error {
+
+	err := StartHub(oldBinDir, newBinDir)
 	if err != nil {
 		gplog.Error(err.Error())
 		os.Exit(1)
 	}
 
 	client := connectToHub()
-	err = preparer.VerifyConnectivity(client)
 
+	err = VerifyConnectivity(client)
 	if err != nil {
 		gplog.Error("gpupgrade is unable to connect via gRPC to the hub")
 		gplog.Error("%v", err)
 		os.Exit(1)
 	}
 
-	err = preparer.TellHubToInitializeUpgrade(client, oldBinDir, newBinDir)
+	err = TellHubToInitializeUpgrade(client, oldBinDir, newBinDir)
 	if err != nil {
 		gplog.Error(err.Error())
 		os.Exit(1)

@@ -2,9 +2,6 @@ package commanders_test
 
 import (
 	"errors"
-	"io/ioutil"
-	"os"
-	"path/filepath"
 
 	"github.com/greenplum-db/gpupgrade/cli/commanders"
 	"github.com/greenplum-db/gpupgrade/idl"
@@ -81,46 +78,46 @@ var _ = Describe("preparer", func() {
 		})
 	})
 
-	Describe("DoInit", func() {
-		var (
-			sourceBinDir string = "/old/does/not/exist"
-			targetBinDir string = "/new/does/not/exist"
-			dir          string
-		)
-
-		BeforeEach(func() {
-			var err error
-			dir, err = ioutil.TempDir("", "")
-			Expect(err).ToNot(HaveOccurred())
-		})
-
-		AfterEach(func() {
-			os.RemoveAll(dir)
-		})
-
-		It("populates cluster configuration files with the parameters it is passed", func() {
-			stateDir := filepath.Join(dir, "foo")
-			sourceFilename := filepath.Join(stateDir, utils.SOURCE_CONFIG_FILENAME)
-			targetFilename := filepath.Join(stateDir, utils.TARGET_CONFIG_FILENAME)
-			err := commanders.DoInit(stateDir, sourceBinDir, targetBinDir)
-			Expect(err).To(BeNil())
-
-			source := &utils.Cluster{ConfigPath: filepath.Join(stateDir, utils.SOURCE_CONFIG_FILENAME)}
-			err = source.Load()
-			Expect(err).To(BeNil())
-			Expect(sourceFilename).To(BeAnExistingFile())
-			Expect(source.BinDir).To(Equal(sourceBinDir))
-
-			target := &utils.Cluster{ConfigPath: filepath.Join(stateDir, utils.TARGET_CONFIG_FILENAME)}
-			err = target.Load()
-			Expect(err).To(BeNil())
-			Expect(targetFilename).To(BeAnExistingFile())
-			Expect(target.BinDir).To(Equal(targetBinDir))
-		})
-
-		It("errs out when the state dir already exists", func() {
-			err := commanders.DoInit(dir, "/old/does/not/exist", "/new/does/not/exist")
-			Expect(err).ToNot(BeNil())
-		})
-	})
+	//Describe("DoInit", func() {
+	//	var (
+	//		sourceBinDir string = "/old/does/not/exist"
+	//		targetBinDir string = "/new/does/not/exist"
+	//		dir          string
+	//	)
+	//
+	//	BeforeEach(func() {
+	//		var err error
+	//		dir, err = ioutil.TempDir("", "")
+	//		Expect(err).ToNot(HaveOccurred())
+	//	})
+	//
+	//	AfterEach(func() {
+	//		os.RemoveAll(dir)
+	//	})
+	//
+	//	It("populates cluster configuration files with the parameters it is passed", func() {
+	//		stateDir := filepath.Join(dir, "foo")
+	//		sourceFilename := filepath.Join(stateDir, utils.SOURCE_CONFIG_FILENAME)
+	//		targetFilename := filepath.Join(stateDir, utils.TARGET_CONFIG_FILENAME)
+	//		err := commanders.DoInit(stateDir, sourceBinDir, targetBinDir)
+	//		Expect(err).To(BeNil())
+	//
+	//		source := &utils.Cluster{ConfigPath: filepath.Join(stateDir, utils.SOURCE_CONFIG_FILENAME)}
+	//		err = source.Load()
+	//		Expect(err).To(BeNil())
+	//		Expect(sourceFilename).To(BeAnExistingFile())
+	//		Expect(source.BinDir).To(Equal(sourceBinDir))
+	//
+	//		target := &utils.Cluster{ConfigPath: filepath.Join(stateDir, utils.TARGET_CONFIG_FILENAME)}
+	//		err = target.Load()
+	//		Expect(err).To(BeNil())
+	//		Expect(targetFilename).To(BeAnExistingFile())
+	//		Expect(target.BinDir).To(Equal(targetBinDir))
+	//	})
+	//
+	//	It("errs out when the state dir already exists", func() {
+	//		err := commanders.DoInit(dir, "/old/does/not/exist", "/new/does/not/exist")
+	//		Expect(err).ToNot(BeNil())
+	//	})
+	//})
 })

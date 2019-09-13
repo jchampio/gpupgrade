@@ -36,26 +36,6 @@ func (m *MockCliToHubClient) EXPECT() *MockCliToHubClientMockRecorder {
 	return m.recorder
 }
 
-// CheckConfig mocks base method
-func (m *MockCliToHubClient) CheckConfig(arg0 context.Context, arg1 *idl.CheckConfigRequest, arg2 ...grpc.CallOption) (*idl.CheckConfigReply, error) {
-	m.ctrl.T.Helper()
-	varargs := []interface{}{arg0, arg1}
-	for _, a := range arg2 {
-		varargs = append(varargs, a)
-	}
-	ret := m.ctrl.Call(m, "CheckConfig", varargs...)
-	ret0, _ := ret[0].(*idl.CheckConfigReply)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// CheckConfig indicates an expected call of CheckConfig
-func (mr *MockCliToHubClientMockRecorder) CheckConfig(arg0, arg1 interface{}, arg2 ...interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	varargs := append([]interface{}{arg0, arg1}, arg2...)
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CheckConfig", reflect.TypeOf((*MockCliToHubClient)(nil).CheckConfig), varargs...)
-}
-
 // CheckDiskSpace mocks base method
 func (m *MockCliToHubClient) CheckDiskSpace(arg0 context.Context, arg1 *idl.CheckDiskSpaceRequest, arg2 ...grpc.CallOption) (*idl.CheckDiskSpaceReply, error) {
 	m.ctrl.T.Helper()
@@ -214,26 +194,6 @@ func (mr *MockCliToHubClientMockRecorder) PrepareShutdownClusters(arg0, arg1 int
 	mr.mock.ctrl.T.Helper()
 	varargs := append([]interface{}{arg0, arg1}, arg2...)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PrepareShutdownClusters", reflect.TypeOf((*MockCliToHubClient)(nil).PrepareShutdownClusters), varargs...)
-}
-
-// PrepareStartAgents mocks base method
-func (m *MockCliToHubClient) PrepareStartAgents(arg0 context.Context, arg1 *idl.PrepareStartAgentsRequest, arg2 ...grpc.CallOption) (*idl.PrepareStartAgentsReply, error) {
-	m.ctrl.T.Helper()
-	varargs := []interface{}{arg0, arg1}
-	for _, a := range arg2 {
-		varargs = append(varargs, a)
-	}
-	ret := m.ctrl.Call(m, "PrepareStartAgents", varargs...)
-	ret0, _ := ret[0].(*idl.PrepareStartAgentsReply)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// PrepareStartAgents indicates an expected call of PrepareStartAgents
-func (mr *MockCliToHubClientMockRecorder) PrepareStartAgents(arg0, arg1 interface{}, arg2 ...interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	varargs := append([]interface{}{arg0, arg1}, arg2...)
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PrepareStartAgents", reflect.TypeOf((*MockCliToHubClient)(nil).PrepareStartAgents), varargs...)
 }
 
 // SetConfig mocks base method
@@ -439,21 +399,6 @@ func (m *MockCliToHubServer) EXPECT() *MockCliToHubServerMockRecorder {
 	return m.recorder
 }
 
-// CheckConfig mocks base method
-func (m *MockCliToHubServer) CheckConfig(arg0 context.Context, arg1 *idl.CheckConfigRequest) (*idl.CheckConfigReply, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CheckConfig", arg0, arg1)
-	ret0, _ := ret[0].(*idl.CheckConfigReply)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// CheckConfig indicates an expected call of CheckConfig
-func (mr *MockCliToHubServerMockRecorder) CheckConfig(arg0, arg1 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CheckConfig", reflect.TypeOf((*MockCliToHubServer)(nil).CheckConfig), arg0, arg1)
-}
-
 // CheckDiskSpace mocks base method
 func (m *MockCliToHubServer) CheckDiskSpace(arg0 context.Context, arg1 *idl.CheckDiskSpaceRequest) (*idl.CheckDiskSpaceReply, error) {
 	m.ctrl.T.Helper()
@@ -572,21 +517,6 @@ func (m *MockCliToHubServer) PrepareShutdownClusters(arg0 context.Context, arg1 
 func (mr *MockCliToHubServerMockRecorder) PrepareShutdownClusters(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PrepareShutdownClusters", reflect.TypeOf((*MockCliToHubServer)(nil).PrepareShutdownClusters), arg0, arg1)
-}
-
-// PrepareStartAgents mocks base method
-func (m *MockCliToHubServer) PrepareStartAgents(arg0 context.Context, arg1 *idl.PrepareStartAgentsRequest) (*idl.PrepareStartAgentsReply, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "PrepareStartAgents", arg0, arg1)
-	ret0, _ := ret[0].(*idl.PrepareStartAgentsReply)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// PrepareStartAgents indicates an expected call of PrepareStartAgents
-func (mr *MockCliToHubServerMockRecorder) PrepareStartAgents(arg0, arg1 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PrepareStartAgents", reflect.TypeOf((*MockCliToHubServer)(nil).PrepareStartAgents), arg0, arg1)
 }
 
 // SetConfig mocks base method

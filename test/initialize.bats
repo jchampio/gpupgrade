@@ -5,7 +5,7 @@ load helpers
 setup() {
     STATE_DIR=`mktemp -d`
     export GPUPGRADE_HOME="${STATE_DIR}/gpupgrade"
-    gpupgrade prepare init --old-bindir /dummy --new-bindir /dummy
+    gpupgrade initialize --old-bindir=/usr/local/gpdb6/bin/ --new-bindir=/usr/local/gpdb6/bin/
 
     kill_hub
 }
@@ -30,33 +30,17 @@ teardown() {
     [[ "$output" = *"Unable to load target cluster configuration"* ]]
 }
 
-@test "start-hub fails if both configurations haven't been initialized" {
-	rm $GPUPGRADE_HOME/source_cluster_config.json
-	rm $GPUPGRADE_HOME/target_cluster_config.json
-    run gpupgrade prepare start-hub
-    [ "$status" -eq 1 ]
-
-	echo $output
-    [[ "$output" = *"Unable to load source or target cluster configuration"* ]]
-}
-
-@test "start-hub finds the right hub binary and starts a daemonized process" {
-    # The '3>&-' below is there because we must close fd 3 before forking new
-    # processes in a BATS suite. For a full explanation, see
-    #    https://github.com/bats-core/bats-core#file-descriptor-3-read-this-if-bats-hangs
-    gpupgrade prepare start-hub 3>&-
+@test "initialize starts a daemonized gpupgrade_hub process" {
     ps -ef | grep -Gq "[g]pupgrade_hub --daemon$"
 }
 
-@test "start-hub returns an error if the hub is already running" {
-    gpupgrade prepare start-hub 3>&-
-
+@test "initialize returns an error when it is ran twice" {
     # second start should return an error
-    ! gpupgrade prepare start-hub
+    ! gpupgrade initialize --old-bindir=/usr/local/gpdb6/bin/ --new-bindir=/usr/local/gpdb6/bin/
     # TODO: check for a useful error message
 }
 
-@test "start-hub does not return an error if an unrelated process has gpupgrade_hub in its name" {
+@test "initialize does not return an error if an unrelated process has gpupgrade_hub in its name" {
     # Create a long-running process with gpupgrade_hub in the name.
     exec -a gpupgrade_hub_test_log sleep 5 3>&- &
     bgproc=$! # save the PID to kill later

@@ -38,7 +38,7 @@ func (h *Hub) CheckConfigStep() error {
 
 	dbConn := db.NewDBConn("localhost", 0, "template1")
 	defer dbConn.Close()
-	err = ReloadAndCommitClusterStep(h.source, dbConn)
+	err = ReloadAndCommitCluster(h.source, dbConn)
 	if err != nil {
 		gplog.Error(err.Error())
 		step.MarkFailed()
@@ -51,7 +51,7 @@ func (h *Hub) CheckConfigStep() error {
 
 // ReloadAndCommitCluster() will fill in a utils.Cluster using a database
 // connection and additionally write the results to disk.
-func ReloadAndCommitClusterStep(cluster *utils.Cluster, conn *dbconn.DBConn) error {
+func ReloadAndCommitCluster(cluster *utils.Cluster, conn *dbconn.DBConn) error {
 	newCluster, err := utils.ClusterFromDB(conn, cluster.BinDir, cluster.ConfigPath)
 	if err != nil {
 		return errors.Wrap(err, "could not retrieve cluster configuration")

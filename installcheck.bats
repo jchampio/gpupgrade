@@ -24,7 +24,7 @@ teardown() {
 }
 
 @test "gpugrade can make it as far as we currently know..." {
-    gpupgrade prepare init \
+    gpupgrade initialize \
               --old-bindir "$GPHOME"/bin \
               --new-bindir "$GPHOME_NEW"/bin \
               --old-port 15432 3>&-

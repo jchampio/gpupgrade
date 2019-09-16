@@ -70,7 +70,8 @@ func connectToHub() idl.CliToHubClient {
 	return idl.NewCliToHubClient(conn)
 }
 
-func StartHub(oldBinDir, newBinDir string, oldPort int) error {
+// TODO: how should we find the gpupgrade_hub executable?  Right now, it's via newBinDir
+func StartHub(newBinDir string) error {
 	countHubs, err := HowManyHubsRunning()
 	if err != nil {
 		gplog.Error("failed to determine if hub already running")
@@ -82,8 +83,7 @@ func StartHub(oldBinDir, newBinDir string, oldPort int) error {
 	}
 
 	hub_path := path.Join(newBinDir, "gpupgrade_hub")
-	cmd := exec.Command(hub_path, "--daemonize", "--old-bindir", oldBinDir,
-		"--new-bindir", newBinDir, "--old-port", strconv.Itoa(oldPort))
+	cmd := exec.Command(hub_path, "--daemonize")
 	stdout, cmdErr := cmd.Output()
 	if cmdErr != nil {
 		err := fmt.Errorf("failed to start hub (%s)", cmdErr)
@@ -118,7 +118,7 @@ func TellHubToInitializeUpgrade(client idl.CliToHubClient, oldBinDir, newBinDir 
 
 func InitializeStep(oldBinDir, newBinDir string, oldPort int) error {
 
-	err := StartHub(oldBinDir, newBinDir, oldPort)
+	err := StartHub(newBinDir)
 	if err != nil {
 		gplog.Error(err.Error())
 		os.Exit(1)

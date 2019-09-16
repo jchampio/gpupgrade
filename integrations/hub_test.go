@@ -41,8 +41,7 @@ var _ = Describe("gpupgrade_hub", func() {
 	It("daemonizes and prints the PID when passed the --daemonize option", func() {
 		// XXX for now, assume we're running the utility from PATH
 		stdout := gbytes.NewBuffer()
-		cmd := exec.Command("gpupgrade_hub", "--daemonize", "--old-bindir", "olddir",
-			"--new-bindir", "newdir")
+		cmd := exec.Command("gpupgrade_hub", "--daemonize")
 		session, err := Start(cmd, stdout, GinkgoWriter)
 
 		Expect(err).NotTo(HaveOccurred())

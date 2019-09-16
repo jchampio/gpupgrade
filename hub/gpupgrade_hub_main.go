@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 	"runtime/debug"
 
 	"github.com/greenplum-db/gp-common-go-libs/gplog"
@@ -13,7 +12,6 @@ import (
 	"github.com/greenplum-db/gpupgrade/utils"
 	"github.com/greenplum-db/gpupgrade/utils/daemon"
 	"github.com/greenplum-db/gpupgrade/utils/log"
-	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"google.golang.org/grpc"
 )
@@ -23,8 +21,6 @@ import (
 
 func main() {
 	var logdir string
-	var oldbindir, newbindir string
-	var oldPort int
 	var shouldDaemonize bool
 	var doLogVersionAndExit bool
 
@@ -50,28 +46,15 @@ func main() {
 				StateDir:       utils.GetStateDir(),
 				LogDir:         logdir,
 			}
-			err := services.DoInit(conf.StateDir, oldbindir, newbindir)
-			if err != nil {
+			err := os.Mkdir(conf.StateDir, 0700)
+			if os.IsExist(err) {
+				return fmt.Errorf("gpupgrade state dir (%s) already exists. Did you already run gpupgrade initialize?", conf.StateDir)
+			} else if err != nil {
 				return err
 			}
-
-			source := &utils.Cluster{ConfigPath: filepath.Join(conf.StateDir, utils.SOURCE_CONFIG_FILENAME)}
-			target := &utils.Cluster{ConfigPath: filepath.Join(conf.StateDir, utils.TARGET_CONFIG_FILENAME)}
 			cm := upgradestatus.NewChecklistManager(conf.StateDir)
 
-			// Load the cluster configuration.
-			errSource := source.Load()
-			errTarget := target.Load()
-			if errSource != nil && errTarget != nil {
-				errBoth := errors.Errorf("Source error: %s\nTarget error: %s", errSource.Error(), errTarget.Error())
-				return errors.Wrap(errBoth, "Unable to load source or target cluster configuration")
-			} else if errSource != nil {
-				return errors.Wrap(errSource, "Unable to load source cluster configuration")
-			} else if errTarget != nil {
-				return errors.Wrap(errTarget, "Unable to load target cluster configuration")
-			}
-
-			hub := services.NewHub(source, target, grpc.DialContext, conf, cm)
+			hub := services.NewHub(nil, nil, grpc.DialContext, conf, cm)
 
 			// Set up the checklist steps in order.
 			//
@@ -104,24 +87,16 @@ func main() {
 				return err
 			}
 
-			hub.Stop()
-
 			return nil
 		},
 	}
 
 	RootCmd.PersistentFlags().StringVar(&logdir, "log-directory", "", "gpupgrade_hub log directory")
-	RootCmd.PersistentFlags().StringVar(&oldbindir, "old-bindir", "", "gpupgrade_hub old-bindir")
-	RootCmd.PersistentFlags().StringVar(&newbindir, "new-bindir", "", "gpupgrade_hub new-bindir")
-	RootCmd.PersistentFlags().IntVar(&oldPort, "old-port", 0, "gpupgrade_hub old-port")
-	err := RootCmd.MarkPersistentFlagRequired("old-bindir")
-	err = RootCmd.MarkPersistentFlagRequired("new-bindir")
-	err = RootCmd.MarkPersistentFlagRequired("old-port")
 
 	daemon.MakeDaemonizable(RootCmd, &shouldDaemonize)
 	utils.VersionAddCmdlineOption(RootCmd, &doLogVersionAndExit)
 
-	err = RootCmd.Execute()
+	err := RootCmd.Execute()
 	if err != nil && err != daemon.ErrSuccessfullyDaemonized {
 		if gplog.GetLogger() == nil {
 			// In case we didn't get through RootCmd.Execute(), set up logging

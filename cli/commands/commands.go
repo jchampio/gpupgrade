@@ -432,6 +432,7 @@ var version = &cobra.Command{
 //////////////////////////////////////// Initialize
 func initializeStep() *cobra.Command {
 	var oldBinDir, newBinDir string
+	var oldPort int
 
 	subInit := &cobra.Command{
 		Use:   "initialize",
@@ -442,7 +443,7 @@ func initializeStep() *cobra.Command {
 			// dump on failure.
 			cmd.SilenceUsage = true
 
-			return commanders.InitializeStep(oldBinDir, newBinDir)
+			return commanders.InitializeStep(oldBinDir, newBinDir, oldPort)
 		},
 	}
 
@@ -450,6 +451,8 @@ func initializeStep() *cobra.Command {
 	subInit.MarkPersistentFlagRequired("old-bindir")
 	subInit.PersistentFlags().StringVar(&newBinDir, "new-bindir", "", "install directory for new gpdb version")
 	subInit.MarkPersistentFlagRequired("new-bindir")
+	subInit.PersistentFlags().IntVar(&oldPort, "old-port", 0, "master port for old gpdb cluster")
+	subInit.MarkPersistentFlagRequired("old-port")
 
 	return subInit
 

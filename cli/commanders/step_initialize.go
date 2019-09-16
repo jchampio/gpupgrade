@@ -70,7 +70,7 @@ func connectToHub() idl.CliToHubClient {
 	return idl.NewCliToHubClient(conn)
 }
 
-func StartHub(oldBinDir, newBinDir string) error {
+func StartHub(oldBinDir, newBinDir string, oldPort int) error {
 	countHubs, err := HowManyHubsRunning()
 	if err != nil {
 		gplog.Error("failed to determine if hub already running")
@@ -83,7 +83,7 @@ func StartHub(oldBinDir, newBinDir string) error {
 
 	hub_path := path.Join(newBinDir, "gpupgrade_hub")
 	cmd := exec.Command(hub_path, "--daemonize", "--old-bindir", oldBinDir,
-		"--new-bindir", newBinDir)
+		"--new-bindir", newBinDir, "--old-port", strconv.Itoa(oldPort))
 	stdout, cmdErr := cmd.Output()
 	if cmdErr != nil {
 		err := fmt.Errorf("failed to start hub (%s)", cmdErr)
@@ -106,8 +106,8 @@ func VerifyConnectivity(client idl.CliToHubClient) error {
 	return err
 }
 
-func TellHubToInitializeUpgrade(client idl.CliToHubClient, oldBinDir, newBinDir string) error {
-	_, err := client.TellHubToInitializeUpgrade(context.Background(), &idl.TellHubToInitializeUpgradeRequest{OldBinDir: oldBinDir, NewBinDir: newBinDir})
+func TellHubToInitializeUpgrade(client idl.CliToHubClient, oldBinDir, newBinDir string, oldPort int) error {
+	_, err := client.TellHubToInitializeUpgrade(context.Background(), &idl.TellHubToInitializeUpgradeRequest{OldBinDir: oldBinDir, NewBinDir: newBinDir, OldPort: int32(oldPort)})
 	if err != nil {
 		return err
 	}
@@ -116,9 +116,9 @@ func TellHubToInitializeUpgrade(client idl.CliToHubClient, oldBinDir, newBinDir 
 	return nil
 }
 
-func InitializeStep(oldBinDir, newBinDir string) error {
+func InitializeStep(oldBinDir, newBinDir string, oldPort int) error {
 
-	err := StartHub(oldBinDir, newBinDir)
+	err := StartHub(oldBinDir, newBinDir, oldPort)
 	if err != nil {
 		gplog.Error(err.Error())
 		os.Exit(1)
@@ -133,7 +133,7 @@ func InitializeStep(oldBinDir, newBinDir string) error {
 		os.Exit(1)
 	}
 
-	err = TellHubToInitializeUpgrade(client, oldBinDir, newBinDir)
+	err = TellHubToInitializeUpgrade(client, oldBinDir, newBinDir, oldPort)
 	if err != nil {
 		gplog.Error(err.Error())
 		os.Exit(1)

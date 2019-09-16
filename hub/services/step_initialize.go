@@ -2,8 +2,10 @@ package services
 
 import (
 	"fmt"
+	"path"
 	"path/filepath"
 
+	"github.com/greenplum-db/gp-common-go-libs/cluster"
 	"github.com/greenplum-db/gp-common-go-libs/dbconn"
 	"github.com/greenplum-db/gp-common-go-libs/gplog"
 	"github.com/greenplum-db/gpupgrade/db"
@@ -17,7 +19,12 @@ import (
 func (h *Hub) TellHubToInitializeUpgrade(ctx context.Context, in *idl.TellHubToInitializeUpgradeRequest) (*idl.TellHubToInitializeUpgradeReply, error) {
 	gplog.Info("starting the hub....")
 
-	err := h.CheckConfigStep(int(in.OldPort))
+	err := h.createClusterConfigs(in.OldBinDir, in.NewBinDir)
+	if err != nil {
+		return &idl.TellHubToInitializeUpgradeReply{}, err
+	}
+
+	err = h.CheckConfigStep(int(in.OldPort))
 	if err != nil {
 		return &idl.TellHubToInitializeUpgradeReply{}, err
 	}
@@ -25,6 +32,43 @@ func (h *Hub) TellHubToInitializeUpgrade(ctx context.Context, in *idl.TellHubToI
 	err = h.PrepareStartAgentsStep()
 
 	return &idl.TellHubToInitializeUpgradeReply{}, err
+}
+
+// create old/new clusters, write to disk and re-read from disk to make sure it is "durable"
+func (h *Hub) createClusterConfigs(oldBinDir, newBinDir string) error {
+	emptyCluster := cluster.NewCluster([]cluster.SegConfig{})
+
+	source := &utils.Cluster{Cluster: emptyCluster, BinDir: path.Clean(oldBinDir), ConfigPath: filepath.Join(h.conf.StateDir, utils.SOURCE_CONFIG_FILENAME)}
+	err := source.Commit()
+	if err != nil {
+		return errors.Wrap(err, "Unable to save source cluster configuration")
+	}
+
+	target := &utils.Cluster{Cluster: emptyCluster, BinDir: path.Clean(newBinDir), ConfigPath: filepath.Join(h.conf.StateDir, utils.TARGET_CONFIG_FILENAME)}
+	err = target.Commit()
+	if err != nil {
+		return errors.Wrap(err, "Unable to save target cluster configuration")
+	}
+
+	source = &utils.Cluster{ConfigPath: filepath.Join(h.conf.StateDir, utils.SOURCE_CONFIG_FILENAME)}
+	target = &utils.Cluster{ConfigPath: filepath.Join(h.conf.StateDir, utils.TARGET_CONFIG_FILENAME)}
+
+	errSource := source.Load()
+	errTarget := target.Load()
+	if errSource != nil && errTarget != nil {
+		errBoth := errors.Errorf("Source error: %s\nTarget error: %s", errSource.Error(), errTarget.Error())
+		return errors.Wrap(errBoth, "Unable to load source or target cluster configuration")
+	} else if errSource != nil {
+		return errors.Wrap(errSource, "Unable to load source cluster configuration")
+	} else if errTarget != nil {
+		return errors.Wrap(errTarget, "Unable to load target cluster configuration")
+	}
+
+	// link in source/target to hub
+	h.source = source
+	h.target = target
+
+	return nil
 }
 
 func (h *Hub) CheckConfigStep(oldPort int) error {

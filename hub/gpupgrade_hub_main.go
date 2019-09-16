@@ -24,6 +24,7 @@ import (
 func main() {
 	var logdir string
 	var oldbindir, newbindir string
+	var oldPort int
 	var shouldDaemonize bool
 	var doLogVersionAndExit bool
 
@@ -112,8 +113,10 @@ func main() {
 	RootCmd.PersistentFlags().StringVar(&logdir, "log-directory", "", "gpupgrade_hub log directory")
 	RootCmd.PersistentFlags().StringVar(&oldbindir, "old-bindir", "", "gpupgrade_hub old-bindir")
 	RootCmd.PersistentFlags().StringVar(&newbindir, "new-bindir", "", "gpupgrade_hub new-bindir")
+	RootCmd.PersistentFlags().IntVar(&oldPort, "old-port", 0, "gpupgrade_hub old-port")
 	err := RootCmd.MarkPersistentFlagRequired("old-bindir")
 	err = RootCmd.MarkPersistentFlagRequired("new-bindir")
+	err = RootCmd.MarkPersistentFlagRequired("old-port")
 
 	daemon.MakeDaemonizable(RootCmd, &shouldDaemonize)
 	utils.VersionAddCmdlineOption(RootCmd, &doLogVersionAndExit)

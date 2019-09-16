@@ -37,6 +37,7 @@ message UpgradeValidateStartClusterReply {}
 message TellHubToInitializeUpgradeRequest {
     string oldBinDir = 1;
     string newBinDir = 2;
+    int32 oldPort = 3;
 }
 message TellHubToInitializeUpgradeReply {}
 

@@ -226,23 +226,6 @@ __handle_word()
     __handle_word
 }
 
-_gpupgrade_check_config()
-{
-    last_command="gpupgrade_check_config"
-    commands=()
-
-    flags=()
-    two_word_flags=()
-    local_nonpersistent_flags=()
-    flags_with_completion=()
-    flags_completion=()
-
-
-    must_have_one_flag=()
-    must_have_one_noun=()
-    noun_aliases=()
-}
-
 _gpupgrade_check_disk-space()
 {
     last_command="gpupgrade_check_disk-space"
@@ -315,7 +298,6 @@ _gpupgrade_check()
 {
     last_command="gpupgrade_check"
     commands=()
-    commands+=("config")
     commands+=("disk-space")
     commands+=("object-count")
     commands+=("seginstall")
@@ -407,31 +389,12 @@ _gpupgrade_initialize()
 
     flags+=("--new-bindir=")
     flags+=("--old-bindir=")
+    flags+=("--old-port=")
 
     must_have_one_flag=()
     must_have_one_flag+=("--new-bindir=")
     must_have_one_flag+=("--old-bindir=")
-    must_have_one_noun=()
-    noun_aliases=()
-}
-
-_gpupgrade_prepare_init()
-{
-    last_command="gpupgrade_prepare_init"
-    commands=()
-
-    flags=()
-    two_word_flags=()
-    local_nonpersistent_flags=()
-    flags_with_completion=()
-    flags_completion=()
-
-    flags+=("--new-bindir=")
-    flags+=("--old-bindir=")
-
-    must_have_one_flag=()
-    must_have_one_flag+=("--new-bindir=")
-    must_have_one_flag+=("--old-bindir=")
+    must_have_one_flag+=("--old-port=")
     must_have_one_noun=()
     noun_aliases=()
 }
@@ -470,49 +433,12 @@ _gpupgrade_prepare_shutdown-clusters()
     noun_aliases=()
 }
 
-_gpupgrade_prepare_start-agents()
-{
-    last_command="gpupgrade_prepare_start-agents"
-    commands=()
-
-    flags=()
-    two_word_flags=()
-    local_nonpersistent_flags=()
-    flags_with_completion=()
-    flags_completion=()
-
-
-    must_have_one_flag=()
-    must_have_one_noun=()
-    noun_aliases=()
-}
-
-_gpupgrade_prepare_start-hub()
-{
-    last_command="gpupgrade_prepare_start-hub"
-    commands=()
-
-    flags=()
-    two_word_flags=()
-    local_nonpersistent_flags=()
-    flags_with_completion=()
-    flags_completion=()
-
-
-    must_have_one_flag=()
-    must_have_one_noun=()
-    noun_aliases=()
-}
-
 _gpupgrade_prepare()
 {
     last_command="gpupgrade_prepare"
     commands=()
-    commands+=("init")
     commands+=("init-cluster")
     commands+=("shutdown-clusters")
-    commands+=("start-agents")
-    commands+=("start-hub")
 
     flags=()
     two_word_flags=()

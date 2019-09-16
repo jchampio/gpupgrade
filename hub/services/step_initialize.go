@@ -17,7 +17,7 @@ import (
 func (h *Hub) TellHubToInitializeUpgrade(ctx context.Context, in *idl.TellHubToInitializeUpgradeRequest) (*idl.TellHubToInitializeUpgradeReply, error) {
 	gplog.Info("starting the hub....")
 
-	err := h.CheckConfigStep()
+	err := h.CheckConfigStep(int(in.OldPort))
 	if err != nil {
 		return &idl.TellHubToInitializeUpgradeReply{}, err
 	}
@@ -27,7 +27,7 @@ func (h *Hub) TellHubToInitializeUpgrade(ctx context.Context, in *idl.TellHubToI
 	return &idl.TellHubToInitializeUpgradeReply{}, err
 }
 
-func (h *Hub) CheckConfigStep() error {
+func (h *Hub) CheckConfigStep(oldPort int) error {
 	gplog.Info("starting %s", upgradestatus.CONFIG)
 
 	step, err := h.InitializeStep(upgradestatus.CONFIG)
@@ -36,7 +36,7 @@ func (h *Hub) CheckConfigStep() error {
 		return err
 	}
 
-	dbConn := db.NewDBConn("localhost", 0, "template1")
+	dbConn := db.NewDBConn("localhost", oldPort, "template1")
 	defer dbConn.Close()
 	err = ReloadAndCommitCluster(h.source, dbConn)
 	if err != nil {

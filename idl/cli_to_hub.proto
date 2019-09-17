@@ -11,7 +11,7 @@ service CliToHub {
     rpc CheckVersion (CheckVersionRequest) returns (CheckVersionReply) {}
     rpc CheckDiskSpace (CheckDiskSpaceRequest) returns (CheckDiskSpaceReply) {}
     rpc PrepareInitCluster (PrepareInitClusterRequest) returns (PrepareInitClusterReply) {}
-    rpc TellHubToInitializeUpgrade (TellHubToInitializeUpgradeRequest) returns (TellHubToInitializeUpgradeReply) {}
+    rpc Initialize(InitializeRequest) returns (InitializeReply) {}
     rpc PrepareShutdownClusters (PrepareShutdownClustersRequest) returns (PrepareShutdownClustersReply) {}
     rpc UpgradeConvertMaster (UpgradeConvertMasterRequest) returns (stream Chunk) {}
     rpc UpgradeCopyMasterDataDir (UpgradeCopyMasterDataDirRequest) returns (UpgradeCopyMasterDataDirReply) {}
@@ -34,12 +34,12 @@ message UpgradeCopyMasterDataDirReply {}
 message UpgradeValidateStartClusterRequest {}
 message UpgradeValidateStartClusterReply {}
 
-message TellHubToInitializeUpgradeRequest {
+message InitializeRequest {
     string oldBinDir = 1;
     string newBinDir = 2;
     int32 oldPort = 3;
 }
-message TellHubToInitializeUpgradeReply {}
+message InitializeReply {}
 
 message PingRequest {}
 message PingReply {}

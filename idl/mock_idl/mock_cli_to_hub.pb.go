@@ -136,6 +136,26 @@ func (mr *MockCliToHubClientMockRecorder) GetConfig(arg0, arg1 interface{}, arg2
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetConfig", reflect.TypeOf((*MockCliToHubClient)(nil).GetConfig), varargs...)
 }
 
+// Initialize mocks base method
+func (m *MockCliToHubClient) Initialize(arg0 context.Context, arg1 *idl.InitializeRequest, arg2 ...grpc.CallOption) (*idl.InitializeReply, error) {
+	m.ctrl.T.Helper()
+	varargs := []interface{}{arg0, arg1}
+	for _, a := range arg2 {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "Initialize", varargs...)
+	ret0, _ := ret[0].(*idl.InitializeReply)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// Initialize indicates an expected call of Initialize
+func (mr *MockCliToHubClientMockRecorder) Initialize(arg0, arg1 interface{}, arg2 ...interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]interface{}{arg0, arg1}, arg2...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Initialize", reflect.TypeOf((*MockCliToHubClient)(nil).Initialize), varargs...)
+}
+
 // Ping mocks base method
 func (m *MockCliToHubClient) Ping(arg0 context.Context, arg1 *idl.PingRequest, arg2 ...grpc.CallOption) (*idl.PingReply, error) {
 	m.ctrl.T.Helper()
@@ -254,26 +274,6 @@ func (mr *MockCliToHubClientMockRecorder) StatusUpgrade(arg0, arg1 interface{}, 
 	mr.mock.ctrl.T.Helper()
 	varargs := append([]interface{}{arg0, arg1}, arg2...)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StatusUpgrade", reflect.TypeOf((*MockCliToHubClient)(nil).StatusUpgrade), varargs...)
-}
-
-// TellHubToInitializeUpgrade mocks base method
-func (m *MockCliToHubClient) TellHubToInitializeUpgrade(arg0 context.Context, arg1 *idl.TellHubToInitializeUpgradeRequest, arg2 ...grpc.CallOption) (*idl.TellHubToInitializeUpgradeReply, error) {
-	m.ctrl.T.Helper()
-	varargs := []interface{}{arg0, arg1}
-	for _, a := range arg2 {
-		varargs = append(varargs, a)
-	}
-	ret := m.ctrl.Call(m, "TellHubToInitializeUpgrade", varargs...)
-	ret0, _ := ret[0].(*idl.TellHubToInitializeUpgradeReply)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// TellHubToInitializeUpgrade indicates an expected call of TellHubToInitializeUpgrade
-func (mr *MockCliToHubClientMockRecorder) TellHubToInitializeUpgrade(arg0, arg1 interface{}, arg2 ...interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	varargs := append([]interface{}{arg0, arg1}, arg2...)
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "TellHubToInitializeUpgrade", reflect.TypeOf((*MockCliToHubClient)(nil).TellHubToInitializeUpgrade), varargs...)
 }
 
 // UpgradeConvertMaster mocks base method
@@ -474,6 +474,21 @@ func (mr *MockCliToHubServerMockRecorder) GetConfig(arg0, arg1 interface{}) *gom
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetConfig", reflect.TypeOf((*MockCliToHubServer)(nil).GetConfig), arg0, arg1)
 }
 
+// Initialize mocks base method
+func (m *MockCliToHubServer) Initialize(arg0 context.Context, arg1 *idl.InitializeRequest) (*idl.InitializeReply, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Initialize", arg0, arg1)
+	ret0, _ := ret[0].(*idl.InitializeReply)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// Initialize indicates an expected call of Initialize
+func (mr *MockCliToHubServerMockRecorder) Initialize(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Initialize", reflect.TypeOf((*MockCliToHubServer)(nil).Initialize), arg0, arg1)
+}
+
 // Ping mocks base method
 func (m *MockCliToHubServer) Ping(arg0 context.Context, arg1 *idl.PingRequest) (*idl.PingReply, error) {
 	m.ctrl.T.Helper()
@@ -562,21 +577,6 @@ func (m *MockCliToHubServer) StatusUpgrade(arg0 context.Context, arg1 *idl.Statu
 func (mr *MockCliToHubServerMockRecorder) StatusUpgrade(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StatusUpgrade", reflect.TypeOf((*MockCliToHubServer)(nil).StatusUpgrade), arg0, arg1)
-}
-
-// TellHubToInitializeUpgrade mocks base method
-func (m *MockCliToHubServer) TellHubToInitializeUpgrade(arg0 context.Context, arg1 *idl.TellHubToInitializeUpgradeRequest) (*idl.TellHubToInitializeUpgradeReply, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "TellHubToInitializeUpgrade", arg0, arg1)
-	ret0, _ := ret[0].(*idl.TellHubToInitializeUpgradeReply)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// TellHubToInitializeUpgrade indicates an expected call of TellHubToInitializeUpgrade
-func (mr *MockCliToHubServerMockRecorder) TellHubToInitializeUpgrade(arg0, arg1 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "TellHubToInitializeUpgrade", reflect.TypeOf((*MockCliToHubServer)(nil).TellHubToInitializeUpgrade), arg0, arg1)
 }
 
 // UpgradeConvertMaster mocks base method

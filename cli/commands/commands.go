@@ -52,7 +52,7 @@ func BuildRootCommand() *cobra.Command {
 	root := &cobra.Command{Use: "gpupgrade"}
 
 	root.AddCommand(prepare, config, status, check, version, upgrade)
-	root.AddCommand(initializeStep())
+	root.AddCommand(initialize())
 
 	prepare.AddCommand(subPrepareInitCluster, subPrepareShutdownClusters)
 
@@ -430,7 +430,7 @@ var version = &cobra.Command{
 }
 
 //////////////////////////////////////// Initialize
-func initializeStep() *cobra.Command {
+func initialize() *cobra.Command {
 	var oldBinDir, newBinDir string
 	var oldPort int
 
@@ -443,7 +443,13 @@ func initializeStep() *cobra.Command {
 			// dump on failure.
 			cmd.SilenceUsage = true
 
-			return commanders.InitializeStep(oldBinDir, newBinDir, oldPort)
+			err := commanders.StartHub(newBinDir)
+			if err != nil {
+				return errors.Wrap(err, "starting hub")
+			}
+
+			client := connectToHub()
+			return commanders.Initialize(client, oldBinDir, newBinDir, oldPort)
 		},
 	}
 
@@ -455,5 +461,4 @@ func initializeStep() *cobra.Command {
 	subInit.MarkPersistentFlagRequired("old-port")
 
 	return subInit
-
 }

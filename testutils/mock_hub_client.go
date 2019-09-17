@@ -21,19 +21,11 @@ func NewMockHubClient() *MockHubClient {
 	return &MockHubClient{}
 }
 
-func (m *MockHubClient) Ping(ctx context.Context, in *idl.PingRequest, opts ...grpc.CallOption) (*idl.PingReply, error) {
-	return nil, nil
-}
-
 func (m *MockHubClient) StatusUpgrade(ctx context.Context, in *idl.StatusUpgradeRequest, opts ...grpc.CallOption) (*idl.StatusUpgradeReply, error) {
 	return nil, nil
 }
 
 func (m *MockHubClient) StatusConversion(ctx context.Context, in *idl.StatusConversionRequest, opts ...grpc.CallOption) (*idl.StatusConversionReply, error) {
-	return nil, nil
-}
-
-func (m *MockHubClient) CheckSeginstall(ctx context.Context, in *idl.CheckSeginstallRequest, opts ...grpc.CallOption) (*idl.CheckSeginstallReply, error) {
 	return nil, nil
 }
 

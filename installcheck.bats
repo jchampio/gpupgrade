@@ -29,14 +29,6 @@ teardown() {
               --new-bindir "$GPHOME_NEW"/bin \
               --old-port 15432 3>&-
 
-    gpupgrade prepare start-hub 3>&-
-
-    gpupgrade check config
-    gpupgrade check version
-    gpupgrade check seginstall
-
-    gpupgrade prepare start-agents
-
     gpupgrade prepare init-cluster
 
     gpupgrade prepare shutdown-clusters

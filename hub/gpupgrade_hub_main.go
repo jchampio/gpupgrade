@@ -63,7 +63,6 @@ func main() {
 			// pull these into a Hub method or helper function, but currently the
 			// interfaces aren't well componentized.
 			cm.AddWritableStep(upgradestatus.CONFIG, idl.UpgradeSteps_CONFIG)
-			cm.AddWritableStep(upgradestatus.SEGINSTALL, idl.UpgradeSteps_SEGINSTALL)
 			cm.AddWritableStep(upgradestatus.START_AGENTS, idl.UpgradeSteps_START_AGENTS)
 			cm.AddWritableStep(upgradestatus.INIT_CLUSTER, idl.UpgradeSteps_INIT_CLUSTER)
 			cm.AddWritableStep(upgradestatus.SHUTDOWN_CLUSTERS, idl.UpgradeSteps_SHUTDOWN_CLUSTERS)

@@ -16,25 +16,22 @@ import (
 	"golang.org/x/net/context"
 )
 
-func (h *Hub) TellHubToInitializeUpgrade(ctx context.Context, in *idl.TellHubToInitializeUpgradeRequest) (*idl.TellHubToInitializeUpgradeReply, error) {
-	gplog.Info("starting the hub....")
-
-	err := h.fillClusterConfigsStep(in.OldBinDir, in.NewBinDir, int(in.OldPort))
+func (h *Hub) Initialize(ctx context.Context, in *idl.InitializeRequest) (*idl.InitializeReply, error) {
+	err := h.fillClusterConfigsSubStep(in.OldBinDir, in.NewBinDir, int(in.OldPort))
 	if err != nil {
-		return &idl.TellHubToInitializeUpgradeReply{}, err
+		return &idl.InitializeReply{}, err
 	}
 
-	err = h.startAgentsStep()
+	err = h.startAgentsSubStep()
 	if err != nil {
-		return &idl.TellHubToInitializeUpgradeReply{}, err
+		return &idl.InitializeReply{}, err
 	}
 
-	return &idl.TellHubToInitializeUpgradeReply{}, nil
+	return &idl.InitializeReply{}, nil
 }
 
 // create old/new clusters, write to disk and re-read from disk to make sure it is "durable"
-func (h *Hub) fillClusterConfigsStep(oldBinDir, newBinDir string, oldPort int) error {
-
+func (h *Hub) fillClusterConfigsSubStep(oldBinDir, newBinDir string, oldPort int) error {
 	gplog.Info("starting %s", upgradestatus.CONFIG)
 
 	step, err := h.InitializeStep(upgradestatus.CONFIG)
@@ -55,7 +52,7 @@ func (h *Hub) fillClusterConfigsStep(oldBinDir, newBinDir string, oldPort int) e
 	return nil
 }
 
-func (h *Hub) startAgentsStep() error {
+func (h *Hub) startAgentsSubStep() error {
 	gplog.Info("starting %s", upgradestatus.START_AGENTS)
 
 	step, err := h.InitializeStep(upgradestatus.START_AGENTS)
@@ -129,6 +126,9 @@ func ReloadAndCommitCluster(cluster *utils.Cluster, conn *dbconn.DBConn) error {
 }
 
 func StartAgents(source *utils.Cluster, target *utils.Cluster) error {
+	// XXX If there are failures, does it matter what agents have successfully
+	// started, or do we just want to stop all of them and kick back to the
+	// user?
 	logStr := "start agents on master and hosts"
 	agentPath := filepath.Join(target.BinDir, "gpupgrade_agent")
 	runAgentCmd := func(contentID int) string { return agentPath + " --daemonize" }
@@ -145,11 +145,8 @@ func StartAgents(source *utils.Cluster, target *utils.Cluster) error {
 	}
 	source.CheckClusterError(remoteOutput, errStr, errMessage, true)
 
-	// Agents print their port and PID to stdout.
+	// Agents print their port and PID to stdout; log them for posterity.
 	for content, output := range remoteOutput.Stdouts {
-		// XXX If there are failures, does it matter what agents have
-		// successfully started, or do we just want to stop all of them and kick
-		// back to the user?
 		if remoteOutput.Errors[content] == nil {
 			gplog.Info("[%s] %s", source.Segments[content].Hostname, output)
 		}

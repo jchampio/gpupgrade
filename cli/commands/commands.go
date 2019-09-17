@@ -19,7 +19,6 @@ package commands
  * 			config       gather cluster configuration
  * 			disk-space   check that disk space usage is less than 80% on all segments
  * 			object-count count database objects and numeric objects
- * 			seginstall   confirms that the new software is installed on all segments
  * 			version      validate current version is upgradable
  *
  * 		Flags:
@@ -52,7 +51,7 @@ func BuildRootCommand() *cobra.Command {
 	root := &cobra.Command{Use: "gpupgrade"}
 
 	root.AddCommand(prepare, config, status, check, version, upgrade)
-	root.AddCommand(initializeStep())
+	root.AddCommand(initialize())
 
 	prepare.AddCommand(subPrepareInitCluster, subPrepareShutdownClusters)
 
@@ -62,7 +61,7 @@ func BuildRootCommand() *cobra.Command {
 
 	status.AddCommand(subStatusUpgrade, subStatusConversion)
 
-	check.AddCommand(subCheckVersion, subCheckObjectCount, subCheckDiskSpace, subCheckSeginstall)
+	check.AddCommand(subCheckObjectCount, subCheckDiskSpace)
 
 	upgrade.AddCommand(subUpgradeConvertMaster, subUpgradeConvertPrimaries, subUpgradeCopyMasterDataDir,
 		subUpgradeValidateStartCluster, subUpgradeReconfigurePorts)
@@ -149,33 +148,6 @@ var subCheckObjectCount = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		client := connectToHub()
 		return commanders.NewObjectCountChecker(client).Execute()
-	},
-}
-var subCheckSeginstall = &cobra.Command{
-	Use:   "seginstall",
-	Short: "confirms that the new software is installed on all segments",
-	Long: "Running this command will validate that the new software is installed on all segments, " +
-		"and register successful or failed validation (available in `gpupgrade status upgrade`)",
-	Run: func(cmd *cobra.Command, args []string) {
-		client := connectToHub()
-		err := commanders.NewSeginstallChecker(client).Execute()
-		if err != nil {
-			gplog.Error(err.Error())
-			os.Exit(1)
-		}
-
-		fmt.Println("Seginstall is underway. Use command \"gpupgrade status upgrade\" " +
-			"to check its current status, and/or hub logs for possible errors.")
-	},
-}
-var subCheckVersion = &cobra.Command{
-	Use:     "version",
-	Short:   "validate current version is upgradable",
-	Long:    `validate current version is upgradable`,
-	Aliases: []string{"ver"},
-	RunE: func(cmd *cobra.Command, args []string) error {
-		client := connectToHub()
-		return commanders.NewVersionChecker(client).Execute()
 	},
 }
 
@@ -430,7 +402,7 @@ var version = &cobra.Command{
 }
 
 //////////////////////////////////////// Initialize
-func initializeStep() *cobra.Command {
+func initialize() *cobra.Command {
 	var oldBinDir, newBinDir string
 	var oldPort int
 
@@ -443,7 +415,20 @@ func initializeStep() *cobra.Command {
 			// dump on failure.
 			cmd.SilenceUsage = true
 
-			return commanders.InitializeStep(oldBinDir, newBinDir, oldPort)
+			err := commanders.StartHub(newBinDir)
+			if err != nil {
+				return errors.Wrap(err, "starting hub")
+			}
+
+			client := connectToHub()
+			err = commanders.Initialize(client, oldBinDir, newBinDir, oldPort)
+			if err != nil {
+				return errors.Wrap(err, "initializing hub")
+			}
+
+			// TODO: how do we rollback here?
+			return commanders.NewVersionChecker(client).Execute()
+
 		},
 	}
 
@@ -455,5 +440,4 @@ func initializeStep() *cobra.Command {
 	subInit.MarkPersistentFlagRequired("old-port")
 
 	return subInit
-
 }

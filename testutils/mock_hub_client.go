@@ -91,6 +91,6 @@ func (m *MockHubClient) GetConfig(ctx context.Context, in *idl.GetConfigRequest,
 	return nil, m.Err
 }
 
-func (m *MockHubClient) TellHubToInitializeUpgrade(ctx context.Context, in *idl.TellHubToInitializeUpgradeRequest, opts ...grpc.CallOption) (*idl.TellHubToInitializeUpgradeReply, error) {
+func (m *MockHubClient) Initialize(ctx context.Context, in *idl.InitializeRequest, opts ...grpc.CallOption) (*idl.InitializeReply, error) {
 	return nil, nil
 }

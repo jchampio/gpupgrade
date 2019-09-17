@@ -260,48 +260,12 @@ _gpupgrade_check_object-count()
     noun_aliases=()
 }
 
-_gpupgrade_check_seginstall()
-{
-    last_command="gpupgrade_check_seginstall"
-    commands=()
-
-    flags=()
-    two_word_flags=()
-    local_nonpersistent_flags=()
-    flags_with_completion=()
-    flags_completion=()
-
-
-    must_have_one_flag=()
-    must_have_one_noun=()
-    noun_aliases=()
-}
-
-_gpupgrade_check_version()
-{
-    last_command="gpupgrade_check_version"
-    commands=()
-
-    flags=()
-    two_word_flags=()
-    local_nonpersistent_flags=()
-    flags_with_completion=()
-    flags_completion=()
-
-
-    must_have_one_flag=()
-    must_have_one_noun=()
-    noun_aliases=()
-}
-
 _gpupgrade_check()
 {
     last_command="gpupgrade_check"
     commands=()
     commands+=("disk-space")
     commands+=("object-count")
-    commands+=("seginstall")
-    commands+=("version")
 
     flags=()
     two_word_flags=()

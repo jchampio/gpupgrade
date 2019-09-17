@@ -76,23 +76,23 @@ func (h *Hub) startAgentsStep() error {
 }
 
 func (h *Hub) fillClusterConfigs(oldBinDir, newBinDir string, oldPort int) error {
-
-	emptyCluster := cluster.NewCluster([]cluster.SegConfig{})
-
-	source := &utils.Cluster{Cluster: emptyCluster, BinDir: path.Clean(oldBinDir), ConfigPath: filepath.Join(h.conf.StateDir, utils.SOURCE_CONFIG_FILENAME)}
+	source := &utils.Cluster{BinDir: path.Clean(oldBinDir), ConfigPath: filepath.Join(h.conf.StateDir, utils.SOURCE_CONFIG_FILENAME)}
 	dbConn := db.NewDBConn("localhost", oldPort, "template1")
 	defer dbConn.Close()
 	err := ReloadAndCommitCluster(source, dbConn)
+	if err != nil {
+		return err
+	}
 
+	emptyCluster := cluster.NewCluster([]cluster.SegConfig{})
 	target := &utils.Cluster{Cluster: emptyCluster, BinDir: path.Clean(newBinDir), ConfigPath: filepath.Join(h.conf.StateDir, utils.TARGET_CONFIG_FILENAME)}
 	err = target.Commit()
 	if err != nil {
 		return errors.Wrap(err, "Unable to save target cluster configuration")
 	}
 
-	source = &utils.Cluster{ConfigPath: filepath.Join(h.conf.StateDir, utils.SOURCE_CONFIG_FILENAME)}
-	target = &utils.Cluster{ConfigPath: filepath.Join(h.conf.StateDir, utils.TARGET_CONFIG_FILENAME)}
-
+	// XXX: This is really not necessary as we are just verifying that
+	// the configuration that we just wrote is readable.
 	errSource := source.Load()
 	errTarget := target.Load()
 	if errSource != nil && errTarget != nil {
@@ -145,7 +145,7 @@ func StartAgents(source *utils.Cluster, target *utils.Cluster) error {
 	}
 	source.CheckClusterError(remoteOutput, errStr, errMessage, true)
 
-	// Log successful starts. Agents print their port and PID to stdout.
+	// Agents print their port and PID to stdout.
 	for content, output := range remoteOutput.Stdouts {
 		// XXX If there are failures, does it matter what agents have
 		// successfully started, or do we just want to stop all of them and kick

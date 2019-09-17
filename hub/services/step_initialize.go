@@ -19,30 +19,70 @@ import (
 func (h *Hub) TellHubToInitializeUpgrade(ctx context.Context, in *idl.TellHubToInitializeUpgradeRequest) (*idl.TellHubToInitializeUpgradeReply, error) {
 	gplog.Info("starting the hub....")
 
-	err := h.createClusterConfigs(in.OldBinDir, in.NewBinDir)
+	err := h.fillClusterConfigsStep(in.OldBinDir, in.NewBinDir, int(in.OldPort))
 	if err != nil {
 		return &idl.TellHubToInitializeUpgradeReply{}, err
 	}
 
-	err = h.CheckConfigStep(int(in.OldPort))
+	err = h.startAgentsStep()
 	if err != nil {
 		return &idl.TellHubToInitializeUpgradeReply{}, err
 	}
 
-	err = h.PrepareStartAgentsStep()
-
-	return &idl.TellHubToInitializeUpgradeReply{}, err
+	return &idl.TellHubToInitializeUpgradeReply{}, nil
 }
 
 // create old/new clusters, write to disk and re-read from disk to make sure it is "durable"
-func (h *Hub) createClusterConfigs(oldBinDir, newBinDir string) error {
+func (h *Hub) fillClusterConfigsStep(oldBinDir, newBinDir string, oldPort int) error {
+
+	gplog.Info("starting %s", upgradestatus.CONFIG)
+
+	step, err := h.InitializeStep(upgradestatus.CONFIG)
+	if err != nil {
+		gplog.Error(err.Error())
+		return err
+	}
+
+	err = h.fillClusterConfigs(oldBinDir, newBinDir, oldPort)
+
+	if err != nil {
+		gplog.Error(err.Error())
+		step.MarkFailed()
+		return err
+	}
+
+	step.MarkComplete()
+	return nil
+}
+
+func (h *Hub) startAgentsStep() error {
+	gplog.Info("starting %s", upgradestatus.START_AGENTS)
+
+	step, err := h.InitializeStep(upgradestatus.START_AGENTS)
+	if err != nil {
+		gplog.Error(err.Error())
+		return err
+	}
+
+	err = StartAgents(h.source, h.target)
+	if err != nil {
+		gplog.Error(err.Error())
+		step.MarkFailed()
+		return err
+	}
+
+	step.MarkComplete()
+	return nil
+}
+
+func (h *Hub) fillClusterConfigs(oldBinDir, newBinDir string, oldPort int) error {
+
 	emptyCluster := cluster.NewCluster([]cluster.SegConfig{})
 
 	source := &utils.Cluster{Cluster: emptyCluster, BinDir: path.Clean(oldBinDir), ConfigPath: filepath.Join(h.conf.StateDir, utils.SOURCE_CONFIG_FILENAME)}
-	err := source.Commit()
-	if err != nil {
-		return errors.Wrap(err, "Unable to save source cluster configuration")
-	}
+	dbConn := db.NewDBConn("localhost", oldPort, "template1")
+	defer dbConn.Close()
+	err := ReloadAndCommitCluster(source, dbConn)
 
 	target := &utils.Cluster{Cluster: emptyCluster, BinDir: path.Clean(newBinDir), ConfigPath: filepath.Join(h.conf.StateDir, utils.TARGET_CONFIG_FILENAME)}
 	err = target.Commit()
@@ -68,28 +108,6 @@ func (h *Hub) createClusterConfigs(oldBinDir, newBinDir string) error {
 	h.source = source
 	h.target = target
 
-	return nil
-}
-
-func (h *Hub) CheckConfigStep(oldPort int) error {
-	gplog.Info("starting %s", upgradestatus.CONFIG)
-
-	step, err := h.InitializeStep(upgradestatus.CONFIG)
-	if err != nil {
-		gplog.Error(err.Error())
-		return err
-	}
-
-	dbConn := db.NewDBConn("localhost", oldPort, "template1")
-	defer dbConn.Close()
-	err = ReloadAndCommitCluster(h.source, dbConn)
-	if err != nil {
-		gplog.Error(err.Error())
-		step.MarkFailed()
-		return err
-	}
-
-	step.MarkComplete()
 	return err
 }
 
@@ -110,27 +128,7 @@ func ReloadAndCommitCluster(cluster *utils.Cluster, conn *dbconn.DBConn) error {
 	return nil
 }
 
-func (h *Hub) PrepareStartAgentsStep() error {
-	gplog.Info("starting %s", upgradestatus.START_AGENTS)
-
-	step, err := h.InitializeStep(upgradestatus.START_AGENTS)
-	if err != nil {
-		gplog.Error(err.Error())
-		return err
-	}
-
-	err = StartAgentsStep(h.source, h.target)
-	if err != nil {
-		gplog.Error(err.Error())
-		step.MarkFailed()
-	} else {
-		step.MarkComplete()
-	}
-
-	return err
-}
-
-func StartAgentsStep(source *utils.Cluster, target *utils.Cluster) error {
+func StartAgents(source *utils.Cluster, target *utils.Cluster) error {
 	logStr := "start agents on master and hosts"
 	agentPath := filepath.Join(target.BinDir, "gpupgrade_agent")
 	runAgentCmd := func(contentID int) string { return agentPath + " --daemonize" }

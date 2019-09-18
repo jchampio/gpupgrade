@@ -14,6 +14,10 @@ import (
 	"github.com/greenplum-db/gpupgrade/idl"
 )
 
+// introduce this variable to allow exec.Command to be mocked out in tests
+var execCommandHubStart = exec.Command
+var execCommandHubCount = exec.Command
+
 // TODO: how should we find the gpupgrade_hub executable?  Right now, it's via newBinDir
 func StartHub(newBinDir string) error {
 	countHubs, err := HowManyHubsRunning()
@@ -27,7 +31,7 @@ func StartHub(newBinDir string) error {
 	}
 
 	hub_path := path.Join(newBinDir, "gpupgrade_hub")
-	cmd := exec.Command(hub_path, "--daemonize")
+	cmd := execCommandHubStart(hub_path, "--daemonize")
 	stdout, cmdErr := cmd.Output()
 	if cmdErr != nil {
 		err := fmt.Errorf("failed to start hub (%s)", cmdErr)
@@ -57,7 +61,7 @@ func Initialize(client idl.CliToHubClient, oldBinDir, newBinDir string, oldPort 
 
 func HowManyHubsRunning() (int, error) {
 	howToLookForHub := `ps -ef | grep -Gc "[g]pupgrade_hub$"` // use square brackets to avoid finding yourself in matches
-	output, err := exec.Command("bash", "-c", howToLookForHub).Output()
+	output, err := execCommandHubCount("bash", "-c", howToLookForHub).Output()
 	value, convErr := strconv.Atoi(strings.TrimSpace(string(output)))
 	if convErr != nil {
 		if err != nil {

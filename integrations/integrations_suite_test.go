@@ -1,28 +1,22 @@
 package integrations_test
 
 import (
-	"context"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"os"
 	"os/exec"
-	"path"
 	"path/filepath"
+	"runtime"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
-	"github.com/greenplum-db/gp-common-go-libs/cluster"
-	"github.com/greenplum-db/gp-common-go-libs/testhelper"
-	agentServices "github.com/greenplum-db/gpupgrade/agent/services"
-	"github.com/greenplum-db/gpupgrade/hub/services"
-	"github.com/greenplum-db/gpupgrade/testutils"
-	"github.com/greenplum-db/gpupgrade/utils"
+	multierror "github.com/hashicorp/go-multierror"
+
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"github.com/onsi/gomega/gbytes"
-	. "github.com/onsi/gomega/gexec"
-	"google.golang.org/grpc"
 )
 
 func TestCommands(t *testing.T) {
@@ -30,154 +24,94 @@ func TestCommands(t *testing.T) {
 	RunSpecs(t, "Integration Tests Suite")
 }
 
-// BeforeSuite globals
 var (
-	cliBinaryPath            string
-	hubBinaryPath            string
-	agentBinaryPath          string
-	userPreviousPathVariable string
-	testout                  *gbytes.Buffer
-	testerr                  *gbytes.Buffer
-	testlog                  *gbytes.Buffer
-	testWorkspaceDir         string
-	testStateDir             string //what would normally be ~/.gpupgrade
+	testWorkspaceDir string // will be recreated for every test
+	testStateDir     string // what would normally be ~/.gpupgrade
 )
 
-// BeforeEach globals
-var (
-	cliToHubPort   int = 7527
-	hubToAgentPort int = 6416
-	cm             *testutils.MockChecklistManager
-	source         *utils.Cluster
-	target         *utils.Cluster
-	hub            *services.Hub
-	agent          *agentServices.AgentServer
-	testExecutor   *testhelper.TestExecutor
-	agentExecutor  *testhelper.TestExecutor
+const (
+	cliToHubPort   = 7527
+	hubToAgentPort = 6416
 )
 
 var _ = BeforeSuite(func() {
-	var err error
-	cliBinaryPath, err = Build("github.com/greenplum-db/gpupgrade/cli") // if you want build flags, do a separate Build() in a specific integration test
-	Expect(err).NotTo(HaveOccurred())
-	cliDirectoryPath := path.Dir(cliBinaryPath)
+	// All gpupgrade binaries are expected to be on the path for integration
+	// tests. Be nice to developers and check up front; warn if the binaries
+	// being tested don't look like the ones that are built locally.
+	_, testPath, _, ok := runtime.Caller(0)
+	if !ok {
+		Fail("couldn't retrieve Caller() information")
+	}
 
-	hubBinaryPath, err = Build("github.com/greenplum-db/gpupgrade/hub")
-	Expect(err).NotTo(HaveOccurred())
-	hubDirectoryPath := path.Dir(hubBinaryPath)
+	var allErrs error
+	for _, bin := range []string{"gpupgrade", "gpupgrade_hub", "gpupgrade_agent"} {
+		binPath, err := exec.LookPath(bin)
+		if err != nil {
+			allErrs = multierror.Append(allErrs, err)
+			continue
+		}
 
-	agentBinaryPath, err = Build("github.com/greenplum-db/gpupgrade/agent")
-	Expect(err).NotTo(HaveOccurred())
-	// move the agent binary into the hub directory and rename to match expected name
-	renamedAgentBinaryPath := filepath.Join(hubDirectoryPath, "/gpupgrade_agent")
-	err = os.Rename(agentBinaryPath, renamedAgentBinaryPath)
-	Expect(err).NotTo(HaveOccurred())
-
-	// hub gets built as "hub", but rename for integration tests that expect
-	// "gpupgrade_hub" to be on the path
-	renamedHubBinaryPath := hubDirectoryPath + "/gpupgrade_hub"
-	err = os.Rename(hubBinaryPath, renamedHubBinaryPath)
-	Expect(err).NotTo(HaveOccurred())
-	hubBinaryPath = renamedHubBinaryPath
-
-	// put the gpupgrade_hub on the path don't need to rename the cli nor put
-	// it on the path: integration tests should use RunCommand() below
-	userPreviousPathVariable = os.Getenv("PATH")
-	os.Setenv("PATH", cliDirectoryPath+":"+hubDirectoryPath+":"+userPreviousPathVariable)
-
-	testout, testerr, testlog = testhelper.SetupTestLogger()
+		dir := filepath.Dir(binPath)
+		if !strings.HasPrefix(testPath, dir) {
+			log.Printf("warning: tested binary %s doesn't appear to be locally built", binPath)
+		}
+	}
+	if allErrs != nil {
+		Fail(fmt.Sprintf(
+			"Please put gpupgrade binaries on your PATH before running integration tests.\n%s",
+			multierror.Flatten(allErrs),
+		))
+	}
 })
 
+// BeforeEach for the integrations suite will create the testWorkspaceDir and
+// testStateDir for tests. GPUPGRADE_HOME is set to the testStateDir, so tests
+// may run the hub without worrying about colliding with the developer
+// environment. Both directories are removed in the suite AfterEach.
 var _ = BeforeEach(func() {
 	var err error
 	testWorkspaceDir, err = ioutil.TempDir("", "")
 	Expect(err).ToNot(HaveOccurred())
 	testStateDir = filepath.Join(testWorkspaceDir, ".gpupgrade")
 	os.Setenv("GPUPGRADE_HOME", testStateDir)
-	session := runCommand("initialize",
-		"--old-bindir", "/tmp", "--new-bindir", "/tmp")
-	Expect(session).To(Exit(0))
-	killAll()
-
-	cliToHubPort, err = testutils.GetOpenPort()
-	Expect(err).ToNot(HaveOccurred())
-	hubToAgentPort, err = testutils.GetOpenPort()
-	Expect(err).ToNot(HaveOccurred())
-
-	conf := &services.HubConfig{
-		CliToHubPort:   cliToHubPort,
-		HubToAgentPort: hubToAgentPort,
-		StateDir:       testStateDir,
-	}
-
-	cm = testutils.NewMockChecklistManager()
-	source, target = testutils.CreateMultinodeSampleClusterPair(testStateDir)
-	testExecutor = &testhelper.TestExecutor{}
-	testExecutor.ClusterOutput = &cluster.RemoteOutput{}
-	/*
-	 * Assigning testExecutor to both clusters assumes that most tests use
-	 * either the old or new cluster, not both.  If a test uses both and wants
-	 * to track executions separately, it will need to make more TestExecutors.
-	 */
-	source.Executor = testExecutor
-	target.Executor = testExecutor
-
-	agentConfig := agentServices.AgentConfig{
-		Port:     hubToAgentPort,
-		StateDir: testStateDir,
-	}
-	agentExecutor = &testhelper.TestExecutor{}
-	agent = agentServices.NewAgentServer(agentExecutor, agentConfig)
-	// We initialize the agent here, but only start it in test files that require an agent
-
-	// Set up the hub's Dialer to always point to the above AgentServer, no
-	// matter which host is passed.
-	agentDialer := func(ctx context.Context, _ string, opts ...grpc.DialOption) (*grpc.ClientConn, error) {
-		authority := fmt.Sprintf("127.0.0.1:%d", agentConfig.Port)
-		return grpc.DialContext(ctx, authority, opts...)
-	}
-
-	hub = services.NewHub(source, target, agentDialer, conf, cm)
-	go hub.Start()
 })
 
 var _ = AfterEach(func() {
-	hub.Stop()
-	agent.Stop()
+	os.RemoveAll(testWorkspaceDir)
+})
+
+// killHub finds all running hub processes and kills them.
+// XXX we should really use a PID file for this, and allow side-by-side hubs,
+// rather than blowing away developer state.
+func killHub() {
+	killCommand := exec.Command("pkill", "-9", "-x", "gpupgrade_hub")
+	err := killCommand.Run()
+
+	// pkill returns exit code 1 if no processes were matched, which is fine.
+	if err != nil {
+		Expect(err).To(MatchError("exit status 1"))
+	} else {
+		Expect(err).ToNot(HaveOccurred())
+	}
+
+	Expect(checkPortIsAvailable(cliToHubPort)).To(BeTrue())
+}
+
+// killAll finds all running gpupupgrade processes and kills them.
+// XXX this is ridiculously heavy-handed
+func killAll() {
+	pkillCmd := exec.Command("pkill", "-9", "^gpupgrade_")
+	err := pkillCmd.Run()
+
+	// pkill returns exit code 1 if no processes were matched, which is fine.
+	if err != nil {
+		Expect(err).To(MatchError("exit status 1"))
+	} else {
+		Expect(err).ToNot(HaveOccurred())
+	}
+
 	Expect(checkPortIsAvailable(cliToHubPort)).To(BeTrue())
 	Expect(checkPortIsAvailable(hubToAgentPort)).To(BeTrue())
-	os.RemoveAll(testWorkspaceDir)
-	utils.InitializeSystemFunctions()
-})
-
-var _ = AfterSuite(func() {
-	/* for a developer who runs `make integration` and then goes on to manually
-	* test things out they should start their own up under a different HOME dir
-	* setting than what ginkgo has been using */
-	killAll()
-	CleanupBuildArtifacts()
-})
-
-func runCommand(args ...string) *Session {
-	// IMPORTANT TEST INFO: exec.Command forks and runs in a separate process,
-	// which has its own Golang context; any mocks/fakes you set up in
-	// the test context will NOT be meaningful in the new exec.Command context.
-	cmd := exec.Command(cliBinaryPath, args...)
-	cmd.Env = append(os.Environ(), fmt.Sprintf("GPUPGRADE_HUB_PORT=%d", cliToHubPort))
-	session, err := Start(cmd, GinkgoWriter, GinkgoWriter)
-	Expect(err).NotTo(HaveOccurred())
-	<-session.Exited
-
-	return session
-}
-
-func killAll() {
-	pkillCmd := exec.Command("pkill", "-9", "gpupgrade_*")
-	pkillCmd.Run()
-}
-
-func runStatusUpgrade() string {
-	return string(runCommand("status", "upgrade").Out.Contents())
 }
 
 func checkPortIsAvailable(port int) bool {
@@ -198,14 +132,4 @@ func checkPortIsAvailable(port int) bool {
 	}
 
 	return false
-}
-
-func killHub() {
-	killCommand := exec.Command("pkill", "-9", "gpupgrade_hub")
-	session, err := Start(killCommand, GinkgoWriter, GinkgoWriter)
-
-	Expect(err).ToNot(HaveOccurred())
-	session.Wait()
-
-	Expect(checkPortIsAvailable(cliToHubPort)).To(BeTrue())
 }

@@ -1,8 +1,29 @@
+# log() prints its arguments to the TAP stream. Newlines are supported (each
+# line will be correctly escaped in TAP).
+log() {
+    while read -r line; do
+        echo "# $line" 1>&3
+    done <<< "$*"
+}
+
+# fail() is meant to be called from BATS tests. It will fail the current test
+# after printing its arguments to the TAP stream.
+fail() {
+    log "$@"
+    false
+}
+
 # abort() is meant to be called from BATS tests. It will exit the process after
 # printing its arguments to the TAP stream.
 abort() {
-    echo "# fatal: $*" 1>&3
+    log "fatal: $*"
     exit 1
+}
+
+# require_gpdb() will skip a test if a cluster's environment is not set up.
+require_gpdb() {
+	[ -n "${GPHOME}" ] || skip "this test requires an active GPDB cluster (set GPHOME)"
+    [ -n "${PGPORT}" ] || skip "this test requires an active GPDB cluster (set PGPORT)"
 }
 
 # kill_hub() simply kills any gpupgrade_hub process.

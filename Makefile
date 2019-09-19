@@ -53,11 +53,12 @@ unit:
 integration:
 		ginkgo -r -keepGoing -randomizeAllSpecs integrations
 
-# check runs all tests. Use -k to keep going after the first failure.
+# check runs all tests against the locally built gpupgrade binaries.
 .PHONY: check
+check: export PATH := $(CURDIR):$(PATH)
 check:
 		ginkgo -r -keepGoing -randomizeSuites -randomizeAllSpecs
-		PATH=.:$$PATH bats -r ./test
+		bats -r ./test
 
 test: lint unit integration
 

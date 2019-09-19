@@ -47,18 +47,25 @@ format:
 lint:
 		gometalinter --config=gometalinter.config -s vendor ./...
 
-unit:
-		ginkgo -r -keepGoing -randomizeSuites -randomizeAllSpecs --skipPackage=integrations
+.PHONY: check check-ginkgo check-bats unit integration test
 
-integration:
-		ginkgo -r -keepGoing -randomizeAllSpecs integrations
+# check runs all tests against the locally built gpupgrade binaries. Use -k to
+# continue after failures.
+check: check-ginkgo check-bats
+check-ginkgo check-bats: export PATH := $(CURDIR):$(PATH)
 
-# check runs all tests against the locally built gpupgrade binaries.
-.PHONY: check
-check: export PATH := $(CURDIR):$(PATH)
-check:
-		ginkgo -r -keepGoing -randomizeSuites -randomizeAllSpecs
-		bats -r ./test
+GINKGO_ARGS := -keepGoing -randomizeSuites -randomizeAllSpecs
+check-ginkgo:
+	ginkgo -r $(GINKGO_ARGS)
+
+check-bats:
+	bats -r ./test
+
+unit: GINKGO_ARGS += --skipPackage=integrations
+unit: check-ginkgo
+
+integration: GINKGO_ARGS += integrations
+integration: check-ginkgo
 
 test: lint unit integration
 

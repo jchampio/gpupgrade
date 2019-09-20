@@ -43,7 +43,7 @@ teardown() {
     gpupgrade config set --new-bindir /my/bin/dir
 
     kill_hub
-    gpupgrade_hub --daemonize
+    gpupgrade hub --daemonize
 
     run gpupgrade config show --new-bindir
     [ "$status" -eq 0 ]

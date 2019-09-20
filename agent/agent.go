@@ -23,10 +23,11 @@ func Command() *cobra.Command {
 	var shouldDaemonize bool
 
 	var cmd = &cobra.Command{
-		Use:   "agent",
-		Short: "Start the Command Listener (blocks)",
-		Long:  `Start the Command Listener (blocks)`,
-		Args:  cobra.MaximumNArgs(0), //no positional args allowed
+		Use:    "agent",
+		Hidden: true,
+		Short:  "Start the Command Listener (blocks)",
+		Long:   `Start the Command Listener (blocks)`,
+		Args:   cobra.MaximumNArgs(0), //no positional args allowed
 		RunE: func(cmd *cobra.Command, args []string) error {
 			gplog.SetLogger(nil)
 			gplog.InitializeLogging("gpupgrade_agent", logdir)

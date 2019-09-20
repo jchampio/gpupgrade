@@ -16,15 +16,15 @@ teardown() {
 }
 
 @test "hub daemonizes and prints the PID when passed the --daemonize option" {
-    run gpupgrade_hub --daemonize 3>&-
+    run gpupgrade hub --daemonize 3>&-
     [ "$status" -eq 0 ] || fail "$output"
 
     regex='pid ([[:digit:]]+)'
     [[ $output =~ $regex ]] || fail "actual output: $output"
 
     pid="${BASH_REMATCH[1]}"
-    procname=$(ps -o ucomm= $pid)
-    [ $procname = gpupgrade_hub ] || fail "actual process name: $procname"
+    procname=$(ps -o args= $pid)
+    [[ $procname = 'gpupgrade hub'* ]] || fail "actual process name: $procname"
 }
 
 @test "hub saves cluster configs to disk when initialized" {

@@ -13,8 +13,6 @@ import (
 	"testing"
 	"time"
 
-	multierror "github.com/hashicorp/go-multierror"
-
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
@@ -35,32 +33,25 @@ const (
 )
 
 var _ = BeforeSuite(func() {
-	// All gpupgrade binaries are expected to be on the path for integration
-	// tests. Be nice to developers and check up front; warn if the binaries
-	// being tested don't look like the ones that are built locally.
+	// The gpupgrade binary is expected to be on the path for integration tests.
+	// Be nice to developers and check up front; warn if the binary being tested
+	// doesn't look like the one that is built locally.
 	_, testPath, _, ok := runtime.Caller(0)
 	if !ok {
 		Fail("couldn't retrieve Caller() information")
 	}
 
-	var allErrs error
-	for _, bin := range []string{"gpupgrade", "gpupgrade_hub", "gpupgrade_agent"} {
-		binPath, err := exec.LookPath(bin)
-		if err != nil {
-			allErrs = multierror.Append(allErrs, err)
-			continue
-		}
-
-		dir := filepath.Dir(binPath)
-		if !strings.HasPrefix(testPath, dir) {
-			log.Printf("warning: tested binary %s doesn't appear to be locally built", binPath)
-		}
-	}
-	if allErrs != nil {
+	binPath, err := exec.LookPath("gpupgrade")
+	if err != nil {
 		Fail(fmt.Sprintf(
 			"Please put gpupgrade binaries on your PATH before running integration tests.\n%s",
-			multierror.Flatten(allErrs),
+			err,
 		))
+	}
+
+	dir := filepath.Dir(binPath)
+	if !strings.HasPrefix(testPath, dir) {
+		log.Printf("warning: tested binary %s doesn't appear to be locally built", binPath)
 	}
 })
 
@@ -84,7 +75,7 @@ var _ = AfterEach(func() {
 // XXX we should really use a PID file for this, and allow side-by-side hubs,
 // rather than blowing away developer state.
 func killHub() {
-	killCommand := exec.Command("pkill", "-9", "-x", "gpupgrade_hub")
+	killCommand := exec.Command("pkill", "-9", "-f", "gpupgrade hub")
 	err := killCommand.Run()
 
 	// pkill returns exit code 1 if no processes were matched, which is fine.
@@ -100,7 +91,7 @@ func killHub() {
 // killAll finds all running gpupupgrade processes and kills them.
 // XXX this is ridiculously heavy-handed
 func killAll() {
-	pkillCmd := exec.Command("pkill", "-9", "^gpupgrade_")
+	pkillCmd := exec.Command("pkill", "-9", "-x", "gpupgrade")
 	err := pkillCmd.Run()
 
 	// pkill returns exit code 1 if no processes were matched, which is fine.

@@ -130,10 +130,10 @@ func StartAgents(source *utils.Cluster, target *utils.Cluster) error {
 	// started, or do we just want to stop all of them and kick back to the
 	// user?
 	logStr := "start agents on master and hosts"
-	agentPath := filepath.Join(target.BinDir, "gpupgrade_agent")
-	runAgentCmd := func(contentID int) string { return agentPath + " --daemonize" }
+	agentPath := filepath.Join(target.BinDir, "gpupgrade")
+	runAgentCmd := func(contentID int) string { return agentPath + " agent --daemonize" }
 
-	errStr := "Failed to start all gpupgrade_agents"
+	errStr := "Failed to start all gpupgrade agents"
 
 	remoteOutput, err := source.ExecuteOnAllHosts(logStr, runAgentCmd)
 	if err != nil {
@@ -141,7 +141,7 @@ func StartAgents(source *utils.Cluster, target *utils.Cluster) error {
 	}
 
 	errMessage := func(contentID int) string {
-		return fmt.Sprintf("Could not start gpupgrade_agent on segment with contentID %d", contentID)
+		return fmt.Sprintf("Could not start gpupgrade agent on segment with contentID %d", contentID)
 	}
 	source.CheckClusterError(remoteOutput, errStr, errMessage, true)
 

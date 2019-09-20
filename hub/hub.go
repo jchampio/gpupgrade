@@ -25,10 +25,11 @@ func Command() *cobra.Command {
 	var shouldDaemonize bool
 
 	var cmd = &cobra.Command{
-		Use:   "hub",
-		Short: "Start the gpupgrade_hub (blocks)",
-		Long:  `Start the gpupgrade_hub (blocks)`,
-		Args:  cobra.MaximumNArgs(0), //no positional args allowed
+		Use:    "hub",
+		Hidden: true,
+		Short:  "Start the gpupgrade hub (blocks)",
+		Long:   `Start the gpupgrade hub (blocks)`,
+		Args:   cobra.MaximumNArgs(0), //no positional args allowed
 		RunE: func(cmd *cobra.Command, args []string) error {
 			gplog.SetLogger(nil)
 			gplog.InitializeLogging("gpupgrade_hub", logdir)
@@ -85,7 +86,7 @@ func Command() *cobra.Command {
 		},
 	}
 
-	cmd.PersistentFlags().StringVar(&logdir, "log-directory", "", "gpupgrade_hub log directory")
+	cmd.PersistentFlags().StringVar(&logdir, "log-directory", "", "gpupgrade hub log directory")
 
 	daemon.MakeDaemonizable(cmd, &shouldDaemonize)
 

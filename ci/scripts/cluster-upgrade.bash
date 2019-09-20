@@ -19,10 +19,9 @@ cd $GOPATH/src/github.com/greenplum-db/gpupgrade
 make depend
 make
 
-# Install the artifacts onto the cluster machines.
-artifacts='gpupgrade gpupgrade_hub gpupgrade_agent'
+# Install gpupgrade onto the cluster machines.
 for host in "${hosts[@]}"; do
-    scp $artifacts "gpadmin@$host:/usr/local/greenplum-db-devel/bin/"
+    scp gpupgrade "gpadmin@$host:/usr/local/greenplum-db-devel/bin/"
 done
 
 # Load the SQL dump into the cluster.

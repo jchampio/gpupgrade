@@ -7,7 +7,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("gpupgrade_hub", func() {
+var _ = Describe("gpupgrade hub", func() {
 
 	// XXX We should be testing the locally built artifacts, and killing only
 	// hubs that are started as part of this test. The current logic will break
@@ -21,7 +21,7 @@ var _ = Describe("gpupgrade_hub", func() {
 	})
 
 	It("does not daemonize unless explicitly told to", func() {
-		cmd := exec.Command("gpupgrade_hub")
+		cmd := exec.Command("gpupgrade", "hub")
 		err := make(chan error, 1)
 
 		go func() {

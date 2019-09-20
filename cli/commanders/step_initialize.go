@@ -3,8 +3,8 @@ package commanders
 import (
 	"context"
 	"fmt"
+	"os"
 	"os/exec"
-	"path"
 	"strconv"
 	"strings"
 
@@ -18,7 +18,6 @@ import (
 var execCommandHubStart = exec.Command
 var execCommandHubCount = exec.Command
 
-// TODO: how should we find the gpupgrade_hub executable?  Right now, it's via newBinDir
 func StartHub(newBinDir string) error {
 	countHubs, err := HowManyHubsRunning()
 	if err != nil {
@@ -26,12 +25,11 @@ func StartHub(newBinDir string) error {
 		return err
 	}
 	if countHubs >= 1 {
-		gplog.Error("gpupgrade_hub process already running")
-		return errors.New("gpupgrade_hub process already running")
+		gplog.Error("gpupgrade hub process already running")
+		return errors.New("gpupgrade hub process already running")
 	}
 
-	hub_path := path.Join(newBinDir, "gpupgrade_hub")
-	cmd := execCommandHubStart(hub_path, "--daemonize")
+	cmd := execCommandHubStart(os.Args[0], "hub", "--daemonize")
 	stdout, cmdErr := cmd.Output()
 	if cmdErr != nil {
 		err := fmt.Errorf("failed to start hub (%s)", cmdErr)
@@ -41,7 +39,7 @@ func StartHub(newBinDir string) error {
 		}
 		return err
 	}
-	gplog.Debug("gpupgrade_hub started successfully: %s", stdout)
+	gplog.Debug("gpupgrade hub started successfully: %s", stdout)
 	return nil
 }
 
@@ -60,7 +58,7 @@ func Initialize(client idl.CliToHubClient, oldBinDir, newBinDir string, oldPort 
 }
 
 func HowManyHubsRunning() (int, error) {
-	howToLookForHub := `ps -ef | grep -Gc "[g]pupgrade_hub$"` // use square brackets to avoid finding yourself in matches
+	howToLookForHub := `ps -ef | grep -Gc "[g]pupgrade hub$"` // use square brackets to avoid finding yourself in matches
 	output, err := execCommandHubCount("bash", "-c", howToLookForHub).Output()
 	value, convErr := strconv.Atoi(strings.TrimSpace(string(output)))
 	if convErr != nil {

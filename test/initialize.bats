@@ -30,8 +30,8 @@ teardown() {
     [[ "$output" = *"Unable to load target cluster configuration"* ]]
 }
 
-@test "initialize starts a daemonized gpupgrade_hub process" {
-    ps -ef | grep -Gq "[g]pupgrade_hub --daemon$"
+@test "initialize starts a daemonized gpupgrade hub process" {
+    ps -ef | grep -Gq "[g]pupgrade hub --daemon$"
 }
 
 @test "initialize returns an error when it is ran twice" {
@@ -40,13 +40,13 @@ teardown() {
     # TODO: check for a useful error message
 }
 
-@test "initialize does not return an error if an unrelated process has gpupgrade_hub in its name" {
-    # Create a long-running process with gpupgrade_hub in the name.
+@test "initialize does not return an error if an unrelated process has gpupgrade hub in its name" {
+    # Create a long-running process with gpupgrade hub in the name.
     exec -a gpupgrade_hub_test_log sleep 5 3>&- &
     bgproc=$! # save the PID to kill later
 
     # Wait a little bit for the background process to get its new name.
-    while ! ps -ef | grep -Gq "[g]pupgrade_hub"; do
+    while ! ps -ef | grep -Gq "[g]pupgrade hub"; do
         sleep .001
 
         # To avoid hanging forever if something goes terribly wrong, make sure
@@ -61,7 +61,7 @@ teardown() {
     kill -INT $bgproc
 }
 
-@test "start-hub returns an error if gpupgrade_hub isn't on the PATH" {
+@test "start-hub returns an error if gpupgrade hub isn't on the PATH" {
     # Save the path to gpupgrade, since Bash can't look it up once we clear PATH
     GPUPGRADE=`which gpupgrade`
 

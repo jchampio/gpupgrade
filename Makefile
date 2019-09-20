@@ -1,10 +1,6 @@
 all: build
 
 .DEFAULT_GOAL := all
-MODULE_NAME=gpupgrade
-AGENT=gpupgrade_agent
-CLI=gpupgrade
-HUB=gpupgrade_hub
 
 # TAGGING
 #   YOUR_BRANCH> make all of the changes you want for your tag
@@ -13,7 +9,7 @@ HUB=gpupgrade_hub
 #   YOUR_BRANCH> git tag -a TAGNAME -m "version 0.1.1: add version" GIT_HASH
 #   YOUR_BRANCH> git push origin TAGNAME
 GIT_VERSION := $(shell git describe --tags --long| perl -pe 's/(.*)-([0-9]*)-(g[0-9a-f]*)/\1+dev.\2.\3/')
-VERSION_LD_STR="-X github.com/greenplum-db/$(MODULE_NAME)/utils.UpgradeVersion=$(GIT_VERSION)"
+VERSION_LD_STR="-X github.com/greenplum-db/gpupgrade/utils.UpgradeVersion=$(GIT_VERSION)"
 
 BRANCH := $(shell git rev-parse --abbrev-ref HEAD)
 LINUX_PREFIX := env GOOS=linux GOARCH=amd64
@@ -76,45 +72,23 @@ coverage:
 sshd_build:
 		make -C integrations/sshd
 
-PACKAGES := $(addsuffix -package,agent cli hub)
 PREFIX = $($(OS)_PREFIX)
 POSTFIX = $($(OS)_POSTFIX)
 
-.PHONY: build build_linux build_mac $(PACKAGES)
+.PHONY: build build_linux build_mac gpupgrade install
 
-build: $(PACKAGES)
+build: gpupgrade
 	go generate ./cli/bash
 
 build_linux: OS := LINUX
 build_mac: OS := MAC
 build_linux build_mac: build
 
-agent-package: EXE_NAME := $(AGENT)
-cli-package: EXE_NAME := $(CLI)
-hub-package: EXE_NAME := $(HUB)
+gpupgrade: .Gopkg.updated
+	$(PREFIX) go build $(GOFLAGS) -o gpupgrade$(POSTFIX) -ldflags $(VERSION_LD_STR) github.com/greenplum-db/gpupgrade/cmd/gpupgrade
 
-$(PACKAGES): %-package: .Gopkg.updated
-	$(PREFIX) go build $(GOFLAGS) -o $(EXE_NAME)$(POSTFIX) -ldflags $(VERSION_LD_STR) github.com/greenplum-db/gpupgrade/$*
-
-install_agent: agent-package
-		@psql -t -d template1 -c 'SELECT DISTINCT hostname FROM gp_segment_configuration WHERE content != -1' > /tmp/seg_hosts 2>/dev/null; \
-		if [ $$? -eq 0 ]; then \
-			gpscp -f /tmp/seg_hosts $(AGENT) =:$(GPHOME)/bin/$(AGENT); \
-			if [ $$? -eq 0 ]; then \
-				echo 'Successfully copied gpupgrade_agent to $(GPHOME) on all segments'; \
-			else \
-				echo 'Failed to copy gpupgrade_agent to $(GPHOME)'; \
-				exit 1; \
-			fi; \
-		else \
-			echo 'Database is not running, please start the database and run this make target again'; \
-			exit 1; \
-		fi; \
-		rm /tmp/seg_hosts
-
-install: cli-package hub-package install_agent
-		cp -p $(CLI) $(GPHOME)/bin/$(CLI)
-		cp -p $(HUB) $(GPHOME)/bin/$(HUB)
+install: gpupgrade
+		cp -p gpupgrade $(GPHOME)/bin/
 
 # We intentionally do not depend on install here -- the point of installcheck is
 # to test whatever has already been installed.
@@ -125,9 +99,7 @@ installcheck:
 
 clean:
 		# Build artifacts
-		rm -f $(AGENT)
-		rm -f $(CLI)
-		rm -f $(HUB)
+		rm -f gpupgrade
 		# Test artifacts
 		rm -rf /tmp/go-build*
 		rm -rf /tmp/gexec_artifacts*

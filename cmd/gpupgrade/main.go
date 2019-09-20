@@ -7,8 +7,12 @@ import (
 	"runtime/debug"
 
 	"github.com/greenplum-db/gp-common-go-libs/gplog"
-	"github.com/greenplum-db/gpupgrade/cli/commands"
 	_ "github.com/lib/pq"
+
+	"github.com/greenplum-db/gpupgrade/agent"
+	"github.com/greenplum-db/gpupgrade/cli/commands"
+	"github.com/greenplum-db/gpupgrade/hub"
+	"github.com/greenplum-db/gpupgrade/utils/daemon"
 )
 
 func main() {
@@ -17,8 +21,11 @@ func main() {
 	confirmValidCommand()
 
 	root := commands.BuildRootCommand()
+	root.AddCommand(hub.Command())
+	root.AddCommand(agent.Command())
+
 	err := root.Execute()
-	if err != nil {
+	if err != nil && err != daemon.ErrSuccessfullyDaemonized {
 		// Use v to print the stack trace of an object errors.
 		fmt.Printf("%+v\n", err)
 		os.Exit(1)

@@ -1,4 +1,4 @@
-package main
+package hub
 
 import (
 	"fmt"
@@ -6,39 +6,34 @@ import (
 	"runtime/debug"
 
 	"github.com/greenplum-db/gp-common-go-libs/gplog"
+	"github.com/spf13/cobra"
+	"google.golang.org/grpc"
+
 	"github.com/greenplum-db/gpupgrade/hub/services"
 	"github.com/greenplum-db/gpupgrade/hub/upgradestatus"
 	"github.com/greenplum-db/gpupgrade/idl"
 	"github.com/greenplum-db/gpupgrade/utils"
 	"github.com/greenplum-db/gpupgrade/utils/daemon"
 	"github.com/greenplum-db/gpupgrade/utils/log"
-	"github.com/spf13/cobra"
-	"google.golang.org/grpc"
 )
 
 // This directory to have the implementation code for the gRPC server to serve
 // Minimal CLI command parsing to embrace that booting this binary to run the hub might have some flags like a log dir
 
-func main() {
+func Command() *cobra.Command {
 	var logdir string
 	var shouldDaemonize bool
-	var doLogVersionAndExit bool
 
-	var RootCmd = &cobra.Command{
-		Use:   os.Args[0],
+	var cmd = &cobra.Command{
+		Use:   "hub",
 		Short: "Start the gpupgrade_hub (blocks)",
 		Long:  `Start the gpupgrade_hub (blocks)`,
 		Args:  cobra.MaximumNArgs(0), //no positional args allowed
 		RunE: func(cmd *cobra.Command, args []string) error {
+			gplog.SetLogger(nil)
 			gplog.InitializeLogging("gpupgrade_hub", logdir)
 			debug.SetTraceback("all")
 			defer log.WritePanics()
-
-			if doLogVersionAndExit {
-				fmt.Println(utils.VersionString("gpupgrade_hub"))
-				gplog.Info(utils.VersionString("gpupgrade_hub"))
-				os.Exit(0)
-			}
 
 			conf := &services.HubConfig{
 				CliToHubPort:   7527,
@@ -90,22 +85,9 @@ func main() {
 		},
 	}
 
-	RootCmd.PersistentFlags().StringVar(&logdir, "log-directory", "", "gpupgrade_hub log directory")
+	cmd.PersistentFlags().StringVar(&logdir, "log-directory", "", "gpupgrade_hub log directory")
 
-	daemon.MakeDaemonizable(RootCmd, &shouldDaemonize)
-	utils.VersionAddCmdlineOption(RootCmd, &doLogVersionAndExit)
+	daemon.MakeDaemonizable(cmd, &shouldDaemonize)
 
-	err := RootCmd.Execute()
-	if err != nil && err != daemon.ErrSuccessfullyDaemonized {
-		if gplog.GetLogger() == nil {
-			// In case we didn't get through RootCmd.Execute(), set up logging
-			// here. Otherwise we crash.
-			// XXX it'd be really nice to have a "ReinitializeLogging" building
-			// block somewhere.
-			gplog.InitializeLogging("gpupgrade_hub", "")
-		}
-
-		gplog.Error(err.Error())
-		os.Exit(1)
-	}
+	return cmd
 }

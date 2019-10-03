@@ -25,7 +25,7 @@ make depend  # run this before the first build; it installs required Go utilitie
 
 make
 make check   # runs tests
-make install # installs under /usr/local by default; override with PREFIX=<path>
+make install # installs into $GOBIN
 ```
 
 ### Best Practices

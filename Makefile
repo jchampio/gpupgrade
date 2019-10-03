@@ -21,8 +21,6 @@ MAC_ENV := env GOOS=darwin GOARCH=amd64
 LINUX_EXTENSION := .linux.$(BRANCH)
 MAC_EXTENSION := .darwin.$(BRANCH)
 
-GOFLAGS := -gcflags="all=-N -l"
-
 .PHONY: depend depend-dev
 depend:
 		go get github.com/onsi/ginkgo/ginkgo
@@ -77,6 +75,7 @@ sshd_build:
 		make -C integrations/sshd
 
 PACKAGES := $(addsuffix -package,agent cli hub)
+INSTALLS := $(addprefix install-,$(PACKAGES))
 BUILD_ENV = $($(OS)_ENV)
 EXTENSION = $($(OS)_EXTENSION)
 
@@ -89,18 +88,20 @@ build_linux: OS := LINUX
 build_mac: OS := MAC
 build_linux build_mac: build
 
-agent-package: EXE_NAME := $(AGENT)
-cli-package: EXE_NAME := $(CLI)
-hub-package: EXE_NAME := $(HUB)
+agent-package install-agent-package: EXE_NAME := $(AGENT)
+cli-package install-cli-package: EXE_NAME := $(CLI)
+hub-package install-hub-package: EXE_NAME := $(HUB)
 
-$(PACKAGES): %-package: .Gopkg.updated
-	$(BUILD_ENV) go build $(GOFLAGS) -o $(EXE_NAME)$(EXTENSION) -ldflags $(VERSION_LD_STR) github.com/greenplum-db/gpupgrade/$*
+BUILD_FLAGS = -gcflags="all=-N -l"
+override BUILD_FLAGS += -ldflags $(VERSION_LD_STR)
 
-PREFIX ?= /usr/local
-install: cli-package hub-package agent-package
-	cp -p $(CLI) $(PREFIX)/bin/$(CLI)
-	cp -p $(HUB) $(PREFIX)/bin/$(HUB)
-	cp -p $(AGENT) $(PREFIX)/bin/$(AGENT)
+$(PACKAGES): .Gopkg.updated
+	$(BUILD_ENV) go build -o $(EXE_NAME)$(EXTENSION) $(BUILD_FLAGS) github.com/greenplum-db/gpupgrade/cmd/$(EXE_NAME)
+
+$(INSTALLS): .Gopkg.updated
+	go install $(BUILD_FLAGS) github.com/greenplum-db/gpupgrade/cmd/$(EXE_NAME)
+
+install: $(INSTALLS)
 
 # We intentionally do not depend on install here -- the point of installcheck is
 # to test whatever has already been installed.

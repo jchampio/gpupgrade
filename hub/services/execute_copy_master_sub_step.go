@@ -17,10 +17,10 @@ import (
 	"golang.org/x/net/context"
 )
 
-func (h *Hub) ExecuteCopyMasterSubStep() error {
+func (h *Hub) ExecuteCopyMasterSubStep(stream idl.CliToHub_ExecuteServer) error {
 	gplog.Info("starting %s", upgradestatus.COPY_MASTER)
 
-	step, err := h.InitializeStep(upgradestatus.COPY_MASTER)
+	step, err := h.InitializeStep(upgradestatus.COPY_MASTER, stream)
 	if err != nil {
 		gplog.Error(err.Error())
 		return err

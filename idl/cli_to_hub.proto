@@ -8,9 +8,9 @@ service CliToHub {
     rpc CheckObjectCount(CheckObjectCountRequest) returns (CheckObjectCountReply) {}
     rpc CheckVersion (CheckVersionRequest) returns (CheckVersionReply) {}
     rpc CheckDiskSpace (CheckDiskSpaceRequest) returns (CheckDiskSpaceReply) {}
-    rpc Initialize(InitializeRequest) returns (InitializeReply) {}
-    rpc Execute(ExecuteRequest) returns (stream Chunk) {}
-    rpc Finalize (FinalizeRequest) returns (FinalizeReply) {}
+    rpc Initialize(InitializeRequest) returns (stream Message) {}
+    rpc Execute(ExecuteRequest) returns (stream Message) {}
+    rpc Finalize(FinalizeRequest) returns (stream Message) {}
     rpc SetConfig (SetConfigRequest) returns (SetConfigReply) {}
     rpc GetConfig (GetConfigRequest) returns (GetConfigReply) {}
 }
@@ -20,12 +20,8 @@ message InitializeRequest {
     string newBinDir = 2;
     int32 oldPort = 3;
 }
-message InitializeReply {}
-
 message ExecuteRequest {}
-
 message FinalizeRequest {}
-message FinalizeReply {}
 
 message StatusConversionRequest {}
 
@@ -106,6 +102,13 @@ message Chunk {
     STDERR = 2;
   }
   Type type = 2;
+}
+
+message Message {
+  oneof contents {
+    Chunk chunk = 1;
+    UpgradeStepStatus status = 2;
+  }
 }
 
 message SetConfigRequest {

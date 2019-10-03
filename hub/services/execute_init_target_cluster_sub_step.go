@@ -19,10 +19,10 @@ import (
 	"golang.org/x/net/context"
 )
 
-func (h *Hub) ExecuteInitTargetClusterSubStep() error {
+func (h *Hub) ExecuteInitTargetClusterSubStep(stream idl.CliToHub_ExecuteServer) error {
 	gplog.Info("starting %s", upgradestatus.INIT_CLUSTER)
 
-	step, err := h.InitializeStep(upgradestatus.INIT_CLUSTER)
+	step, err := h.InitializeStep(upgradestatus.INIT_CLUSTER, stream)
 	if err != nil {
 		gplog.Error(err.Error())
 		return err

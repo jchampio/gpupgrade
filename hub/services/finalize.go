@@ -1,7 +1,6 @@
 package services
 
 import (
-	"context"
 	"database/sql"
 	"fmt"
 
@@ -13,9 +12,9 @@ import (
 	"github.com/greenplum-db/gpupgrade/idl"
 )
 
-func (h *Hub) Finalize(ctx context.Context, _ *idl.FinalizeRequest) (*idl.FinalizeReply, error) {
-	err := h.UpgradeReconfigurePortsSubStep()
-	return &idl.FinalizeReply{}, err
+func (h *Hub) Finalize(_ *idl.FinalizeRequest, stream idl.CliToHub_FinalizeServer) error {
+	err := h.UpgradeReconfigurePortsSubStep(stream)
+	return err
 }
 
 // ClonePortsFromCluster will modify the gp_segment_configuration of the passed

@@ -86,11 +86,17 @@ type MockStepWriter struct {
 	manager           *MockChecklistManager
 	ResetStateDirErr  error
 	MarkInProgressErr error
+	MarkCompleteErr   error
+	MarkFailedErr     error
+}
+
+func (w MockStepWriter) Code() idl.UpgradeSteps {
+	return w.manager.loadedCodes[w.step]
 }
 
 func (w MockStepWriter) MarkComplete() error {
 	w.manager.mapComplete[w.step] = true
-	return nil
+	return w.MarkCompleteErr
 }
 
 func (w MockStepWriter) MarkInProgress() error {
@@ -100,7 +106,7 @@ func (w MockStepWriter) MarkInProgress() error {
 
 func (w MockStepWriter) MarkFailed() error {
 	w.manager.mapFailed[w.step] = true
-	return nil
+	return w.MarkFailedErr
 }
 
 func (w MockStepWriter) ResetStateDir() error {

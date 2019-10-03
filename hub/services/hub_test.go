@@ -18,6 +18,16 @@ import (
 	"github.com/pkg/errors"
 )
 
+// msgStream is a mock server stream for InitializeStep().
+type msgStream struct {
+	LastStatus idl.StepStatus
+}
+
+func (m *msgStream) Send(msg *idl.Message) error {
+	m.LastStatus = msg.GetStatus().Status
+	return nil
+}
+
 var _ = Describe("Hub", func() {
 	var (
 		agentA         *testutils.MockAgentServer
@@ -27,11 +37,13 @@ var _ = Describe("Hub", func() {
 		target         *utils.Cluster
 		err            error
 		mockDialer     services.Dialer
+		mockStream     *msgStream
 	)
 
 	BeforeEach(func() {
 		agentA, mockDialer, hubToAgentPort = testutils.NewMockAgentServer()
 		source, target = testutils.CreateMultinodeSampleClusterPair("/tmp")
+		mockStream = &msgStream{}
 	})
 
 	AfterEach(func() {
@@ -196,9 +208,10 @@ var _ = Describe("Hub", func() {
 		}
 		mockChecklistManager := testutils.NewMockChecklistManager()
 		hub := services.NewHub(source, target, mockDialer, hubConfig, mockChecklistManager)
-		hub.InitializeStep("dub-step")
+		hub.InitializeStep("dub-step", mockStream)
 
 		Expect(mockChecklistManager.GetStepReader("dub-step").Status()).To(Equal(idl.StepStatus_RUNNING))
+		Expect(mockStream.LastStatus).To(Equal(idl.StepStatus_RUNNING))
 	})
 
 	It("returns an error when InitializeStep fails to reset state directory", func() {
@@ -209,10 +222,11 @@ var _ = Describe("Hub", func() {
 		mockChecklistManager.StepWriter.ResetStateDirErr = errors.New("permission denied")
 
 		hub := services.NewHub(source, target, mockDialer, hubConfig, mockChecklistManager)
-		_, err := hub.InitializeStep("dub-step")
+		_, err := hub.InitializeStep("dub-step", mockStream)
 
 		Expect(err).To(HaveOccurred())
 		Expect(err.Error()).To(Equal("failed to reset state directory: permission denied"))
+		Expect(mockStream.LastStatus).To(Equal(idl.StepStatus_UNKNOWN_STATUS))
 	})
 
 	It("returns an error when InitializeStep fails to mark step as in-progress", func() {
@@ -223,9 +237,63 @@ var _ = Describe("Hub", func() {
 		mockChecklistManager.StepWriter.MarkInProgressErr = errors.New("EAGAIN")
 
 		hub := services.NewHub(source, target, mockDialer, hubConfig, mockChecklistManager)
-		_, err := hub.InitializeStep("dub-step")
+		_, err := hub.InitializeStep("dub-step", mockStream)
 
 		Expect(err).To(HaveOccurred())
 		Expect(err.Error()).To(Equal("failed to set dub-step to in.progress: EAGAIN"))
+		Expect(mockStream.LastStatus).To(Equal(idl.StepStatus_UNKNOWN_STATUS))
+	})
+
+	It("returns an error when stepwriter MarkComplete fails to mark step as complete", func() {
+		hubConfig := &services.HubConfig{
+			CliToHubPort: cliToHubPort,
+		}
+		mockChecklistManager := testutils.NewMockChecklistManager()
+		mockChecklistManager.StepWriter.MarkCompleteErr = errors.New("ENOENT")
+
+		hub := services.NewHub(source, target, mockDialer, hubConfig, mockChecklistManager)
+		step, err := hub.InitializeStep("dub-step", mockStream)
+		Expect(err).ToNot(HaveOccurred())
+
+		err = step.MarkComplete()
+
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(Equal("ENOENT"))
+		Expect(mockStream.LastStatus).To(Equal(idl.StepStatus_RUNNING))
+	})
+
+	It("returns an error when stepwriter MarkFailed fails to mark step as failed", func() {
+		hubConfig := &services.HubConfig{
+			CliToHubPort: cliToHubPort,
+		}
+		mockChecklistManager := testutils.NewMockChecklistManager()
+		mockChecklistManager.StepWriter.MarkFailedErr = errors.New("EPERM")
+
+		hub := services.NewHub(source, target, mockDialer, hubConfig, mockChecklistManager)
+		step, err := hub.InitializeStep("dub-step", mockStream)
+		Expect(err).ToNot(HaveOccurred())
+
+		err = step.MarkFailed()
+
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(Equal("EPERM"))
+		Expect(mockStream.LastStatus).To(Equal(idl.StepStatus_RUNNING))
+	})
+
+	It("streams status updates from step transitions", func() {
+		hubConfig := &services.HubConfig{
+			CliToHubPort: cliToHubPort,
+		}
+		mockChecklistManager := testutils.NewMockChecklistManager()
+		hub := services.NewHub(source, target, mockDialer, hubConfig, mockChecklistManager)
+
+		step, err := hub.InitializeStep("dub-step", mockStream)
+		Expect(err).ToNot(HaveOccurred())
+
+		step.MarkComplete()
+		Expect(mockStream.LastStatus).To(Equal(idl.StepStatus_COMPLETE))
+
+		step.MarkFailed()
+		Expect(mockStream.LastStatus).To(Equal(idl.StepStatus_FAILED))
 	})
 })

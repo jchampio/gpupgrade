@@ -117,14 +117,14 @@ func (mr *MockCliToHubClientMockRecorder) Execute(arg0, arg1 interface{}, arg2 .
 }
 
 // Finalize mocks base method
-func (m *MockCliToHubClient) Finalize(arg0 context.Context, arg1 *idl.FinalizeRequest, arg2 ...grpc.CallOption) (*idl.FinalizeReply, error) {
+func (m *MockCliToHubClient) Finalize(arg0 context.Context, arg1 *idl.FinalizeRequest, arg2 ...grpc.CallOption) (idl.CliToHub_FinalizeClient, error) {
 	m.ctrl.T.Helper()
 	varargs := []interface{}{arg0, arg1}
 	for _, a := range arg2 {
 		varargs = append(varargs, a)
 	}
 	ret := m.ctrl.Call(m, "Finalize", varargs...)
-	ret0, _ := ret[0].(*idl.FinalizeReply)
+	ret0, _ := ret[0].(idl.CliToHub_FinalizeClient)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -157,14 +157,14 @@ func (mr *MockCliToHubClientMockRecorder) GetConfig(arg0, arg1 interface{}, arg2
 }
 
 // Initialize mocks base method
-func (m *MockCliToHubClient) Initialize(arg0 context.Context, arg1 *idl.InitializeRequest, arg2 ...grpc.CallOption) (*idl.InitializeReply, error) {
+func (m *MockCliToHubClient) Initialize(arg0 context.Context, arg1 *idl.InitializeRequest, arg2 ...grpc.CallOption) (idl.CliToHub_InitializeClient, error) {
 	m.ctrl.T.Helper()
 	varargs := []interface{}{arg0, arg1}
 	for _, a := range arg2 {
 		varargs = append(varargs, a)
 	}
 	ret := m.ctrl.Call(m, "Initialize", varargs...)
-	ret0, _ := ret[0].(*idl.InitializeReply)
+	ret0, _ := ret[0].(idl.CliToHub_InitializeClient)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -319,12 +319,11 @@ func (mr *MockCliToHubServerMockRecorder) Execute(arg0, arg1 interface{}) *gomoc
 }
 
 // Finalize mocks base method
-func (m *MockCliToHubServer) Finalize(arg0 context.Context, arg1 *idl.FinalizeRequest) (*idl.FinalizeReply, error) {
+func (m *MockCliToHubServer) Finalize(arg0 *idl.FinalizeRequest, arg1 idl.CliToHub_FinalizeServer) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Finalize", arg0, arg1)
-	ret0, _ := ret[0].(*idl.FinalizeReply)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
+	ret0, _ := ret[0].(error)
+	return ret0
 }
 
 // Finalize indicates an expected call of Finalize
@@ -349,12 +348,11 @@ func (mr *MockCliToHubServerMockRecorder) GetConfig(arg0, arg1 interface{}) *gom
 }
 
 // Initialize mocks base method
-func (m *MockCliToHubServer) Initialize(arg0 context.Context, arg1 *idl.InitializeRequest) (*idl.InitializeReply, error) {
+func (m *MockCliToHubServer) Initialize(arg0 *idl.InitializeRequest, arg1 idl.CliToHub_InitializeServer) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Initialize", arg0, arg1)
-	ret0, _ := ret[0].(*idl.InitializeReply)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
+	ret0, _ := ret[0].(error)
+	return ret0
 }
 
 // Initialize indicates an expected call of Initialize
@@ -460,7 +458,7 @@ func (mr *MockCliToHub_ExecuteServerMockRecorder) RecvMsg(arg0 interface{}) *gom
 }
 
 // Send mocks base method
-func (m *MockCliToHub_ExecuteServer) Send(arg0 *idl.Chunk) error {
+func (m *MockCliToHub_ExecuteServer) Send(arg0 *idl.Message) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Send", arg0)
 	ret0, _ := ret[0].(error)
@@ -594,10 +592,10 @@ func (mr *MockCliToHub_ExecuteClientMockRecorder) Header() *gomock.Call {
 }
 
 // Recv mocks base method
-func (m *MockCliToHub_ExecuteClient) Recv() (*idl.Chunk, error) {
+func (m *MockCliToHub_ExecuteClient) Recv() (*idl.Message, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Recv")
-	ret0, _ := ret[0].(*idl.Chunk)
+	ret0, _ := ret[0].(*idl.Message)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }

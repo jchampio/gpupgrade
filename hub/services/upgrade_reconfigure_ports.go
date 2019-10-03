@@ -12,10 +12,10 @@ import (
 	"github.com/greenplum-db/gpupgrade/hub/upgradestatus"
 )
 
-func (h *Hub) UpgradeReconfigurePortsSubStep() error {
+func (h *Hub) UpgradeReconfigurePortsSubStep(stream messageSender) error {
 	gplog.Info("starting %s", upgradestatus.RECONFIGURE_PORTS)
 
-	step, err := h.InitializeStep(upgradestatus.RECONFIGURE_PORTS)
+	step, err := h.InitializeStep(upgradestatus.RECONFIGURE_PORTS, stream)
 	if err != nil {
 		gplog.Error(err.Error())
 		return err

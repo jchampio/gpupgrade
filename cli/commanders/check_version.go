@@ -2,6 +2,8 @@ package commanders
 
 import (
 	"context"
+	"fmt"
+
 	"github.com/pkg/errors"
 
 	"github.com/greenplum-db/gpupgrade/idl"
@@ -17,7 +19,19 @@ func NewVersionChecker(client idl.CliToHubClient) VersionChecker {
 	}
 }
 
-func (req VersionChecker) Execute() error {
+func (req VersionChecker) Execute() (err error) {
+	description := "Checking version compatibility..."
+
+	fmt.Printf("%s\r", FormatCustom(description, idl.StepStatus_RUNNING))
+	defer func() {
+		status := idl.StepStatus_COMPLETE
+		if err != nil {
+			status = idl.StepStatus_FAILED
+		}
+
+		fmt.Printf("%s\n", FormatCustom(description, status))
+	}()
+
 	resp, err := req.client.CheckVersion(context.Background(), &idl.CheckVersionRequest{})
 	if err != nil {
 		return errors.Wrap(err, "gRPC call to hub failed")

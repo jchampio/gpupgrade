@@ -1,7 +1,6 @@
 package commanders
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -11,7 +10,6 @@ import (
 	"strings"
 
 	"github.com/greenplum-db/gp-common-go-libs/cluster"
-
 	"github.com/greenplum-db/gpupgrade/utils"
 
 	"github.com/pkg/errors"
@@ -26,9 +24,21 @@ var execCommandHubCount = exec.Command
 
 // we create the state directory in the cli to ensure that at most one gpupgrade is occuring
 // at the same time.
-func CreateStateDirAndClusterConfigs(sourceBinDir, targetBinDir string) error {
+func CreateStateDirAndClusterConfigs(sourceBinDir, targetBinDir string) (err error) {
+	description := "Creating directories..."
+
+	fmt.Printf("%s\r", FormatCustom(description, idl.StepStatus_RUNNING))
+	defer func() {
+		status := idl.StepStatus_COMPLETE
+		if err != nil {
+			status = idl.StepStatus_FAILED
+		}
+
+		fmt.Printf("%s\n", FormatCustom(description, status))
+	}()
+
 	stateDir := utils.GetStateDir()
-	err := os.Mkdir(stateDir, 0700)
+	err = os.Mkdir(stateDir, 0700)
 	if os.IsExist(err) {
 		return fmt.Errorf("gpupgrade state dir (%s) already exists. Did you already run gpupgrade initialize?", stateDir)
 	} else if err != nil {
@@ -64,7 +74,19 @@ func CreateStateDirAndClusterConfigs(sourceBinDir, targetBinDir string) error {
 }
 
 // TODO: how should we find the gpupgrade_hub executable?  Right now, it's via newBinDir
-func StartHub() error {
+func StartHub() (err error) {
+	description := "Starting hub..."
+
+	fmt.Printf("%s\r", FormatCustom(description, idl.StepStatus_RUNNING))
+	defer func() {
+		status := idl.StepStatus_COMPLETE
+		if err != nil {
+			status = idl.StepStatus_FAILED
+		}
+
+		fmt.Printf("%s\n", FormatCustom(description, status))
+	}()
+
 	countHubs, err := HowManyHubsRunning()
 	if err != nil {
 		gplog.Error("failed to determine if hub already running")
@@ -86,20 +108,6 @@ func StartHub() error {
 		return err
 	}
 	gplog.Debug("gpupgrade_hub started successfully: %s", stdout)
-	return nil
-}
-
-func Initialize(client idl.CliToHubClient, oldBinDir, newBinDir string, oldPort int) (err error) {
-	request := &idl.InitializeRequest{
-		OldBinDir: oldBinDir,
-		NewBinDir: newBinDir,
-		OldPort:   int32(oldPort),
-	}
-	_, err = client.Initialize(context.Background(), request)
-	if err != nil {
-		return errors.Wrap(err, "initializing hub")
-	}
-
 	return nil
 }
 

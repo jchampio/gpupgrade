@@ -1,16 +1,11 @@
 package commanders
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"os/exec"
 	"testing"
 
-	"github.com/greenplum-db/gpupgrade/idl"
-	"github.com/greenplum-db/gpupgrade/idl/mock_idl"
-
-	"github.com/golang/mock/gomock"
 	"github.com/greenplum-db/gpupgrade/testutils/exectest"
 	. "github.com/onsi/gomega"
 )
@@ -47,19 +42,16 @@ func init() {
 }
 
 var (
-	ctrl *gomock.Controller
-	g    *GomegaWithT
+	g *GomegaWithT
 )
 
 func setup(t *testing.T) {
-	ctrl = gomock.NewController(t)
 	g = NewGomegaWithT(t)
 	execCommandHubStart = nil
 	execCommandHubCount = nil
 }
 
 func teardown() {
-	ctrl.Finish()
 	execCommandHubStart = exec.Command
 	execCommandHubCount = exec.Command
 }
@@ -130,33 +122,5 @@ func TestStartHubBadExec(t *testing.T) {
 	execCommandHubCount = exectest.NewCommand(HowManyHubsRunning_0_Main)
 	execCommandHubStart = exectest.NewCommand(GpupgradeHub_bad_Main)
 	err := StartHub()
-	g.Expect(err).ToNot(BeNil())
-}
-
-func TestInitialize(t *testing.T) {
-	setup(t)
-	defer teardown()
-
-	client := mock_idl.NewMockCliToHubClient(ctrl)
-	client.EXPECT().Initialize(
-		gomock.Any(),
-		&idl.InitializeRequest{OldBinDir: "olddir", NewBinDir: "newdir", OldPort: 22},
-	).Return(&idl.InitializeReply{}, nil)
-
-	err := Initialize(client, "olddir", "newdir", 22)
-	g.Expect(err).To(BeNil())
-}
-
-func TestCannotInitialize(t *testing.T) {
-	setup(t)
-	defer teardown()
-
-	client := mock_idl.NewMockCliToHubClient(ctrl)
-	client.EXPECT().Initialize(
-		gomock.Any(),
-		&idl.InitializeRequest{OldBinDir: "olddir", NewBinDir: "newdir", OldPort: 22},
-	).Return(&idl.InitializeReply{}, errors.New("something failed with gRPC"))
-
-	err := Initialize(client, "olddir", "newdir", 22)
 	g.Expect(err).ToNot(BeNil())
 }

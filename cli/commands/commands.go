@@ -52,7 +52,7 @@ func BuildRootCommand() *cobra.Command {
 
 	root.AddCommand(config, status, check, version)
 	root.AddCommand(initialize())
-	root.AddCommand(execute)
+	root.AddCommand(execute())
 	root.AddCommand(finalize)
 
 	subConfigSet := createConfigSetSubcommand()
@@ -300,11 +300,18 @@ func initialize() *cobra.Command {
 	subInit := &cobra.Command{
 		Use:   "initialize",
 		Short: "prepare the system for upgrade",
-		Long:  `prepare the system for upgrade`,
+		Long: `
+Runs through pre-upgrade checks and prepares the old and new clusters for upgrade.
+This step can be reverted.
+`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// If we got here, the args are okay and the user doesn't need a usage
 			// dump on failure.
 			cmd.SilenceUsage = true
+
+			fmt.Println()
+			fmt.Println("Initialization in progress.")
+			fmt.Println()
 
 			err := commanders.CreateStateDirAndClusterConfigs(oldBinDir, newBinDir)
 			if err != nil {
@@ -323,8 +330,19 @@ func initialize() *cobra.Command {
 			}
 
 			// TODO: how do we rollback here?
-			return commanders.NewVersionChecker(client).Execute()
+			err = commanders.NewVersionChecker(client).Execute()
+			if err != nil {
+				return errors.Wrap(err, "checking version compatibility")
+			}
 
+			fmt.Println(`
+Run "gpupgrade execute" on the command line to proceed with the upgrade.
+
+After upgrading, you will need to finalize.
+
+If you would like to return the cluster to its original state, run
+"gpupgrade revert" on the command line.`)
+			return nil
 		},
 	}
 
@@ -338,24 +356,38 @@ func initialize() *cobra.Command {
 	return subInit
 }
 
-var execute = &cobra.Command{
-	Use:   "execute",
-	Short: "executes the upgrade",
-	Long:  "Executes the upgrade",
-	Run: func(cmd *cobra.Command, args []string) {
-		client := connectToHub()
-		err := commanders.Execute(client)
-		if err != nil {
-			gplog.Error(err.Error())
-			os.Exit(1)
-		}
-	},
+func execute() *cobra.Command {
+	var verbose bool
+
+	cmd := &cobra.Command{
+		Use:   "execute",
+		Short: "executes the upgrade",
+		Long: `
+Upgrades the master and primary segments over to the new cluster.
+This step can be reverted.
+`,
+		Run: func(cmd *cobra.Command, args []string) {
+			client := connectToHub()
+			err := commanders.Execute(client, verbose)
+			if err != nil {
+				gplog.Error(err.Error())
+				os.Exit(1)
+			}
+		},
+	}
+
+	cmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "print the output stream from all substeps")
+
+	return cmd
 }
 
 var finalize = &cobra.Command{
 	Use:   "finalize",
 	Short: "finalizes the cluster after upgrade execution",
-	Long:  "finalizes the cluster after upgrade execution",
+	Long: `
+Updates the port of the new cluster.
+This step can not be reverted.
+`,
 	Run: func(cmd *cobra.Command, args []string) {
 		client := connectToHub()
 		err := commanders.Finalize(client)

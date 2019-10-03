@@ -20,7 +20,7 @@ func NewMockHubClient() *MockHubClient {
 	return &MockHubClient{}
 }
 
-func (h *MockHubClient) Execute(ctx context.Context, in *idl.ExecuteRequest, opts ...grpc.CallOption) (idl.CliToHub_ExecuteClient, error) {
+func (m *MockHubClient) Execute(ctx context.Context, in *idl.ExecuteRequest, opts ...grpc.CallOption) (idl.CliToHub_ExecuteClient, error) {
 	return nil, nil
 }
 
@@ -48,7 +48,7 @@ func (m *MockHubClient) ExecuteInitClusterSubStep() error {
 	return nil
 }
 
-func (m *MockHubClient) Finalize(ctx context.Context, in *idl.FinalizeRequest, opts ...grpc.CallOption) (*idl.FinalizeReply, error) {
+func (m *MockHubClient) Finalize(ctx context.Context, in *idl.FinalizeRequest, opts ...grpc.CallOption) (idl.CliToHub_FinalizeClient, error) {
 	m.FinalizeRequest = in
 
 	return nil, m.Err
@@ -62,6 +62,6 @@ func (m *MockHubClient) GetConfig(ctx context.Context, in *idl.GetConfigRequest,
 	return nil, m.Err
 }
 
-func (m *MockHubClient) Initialize(ctx context.Context, in *idl.InitializeRequest, opts ...grpc.CallOption) (*idl.InitializeReply, error) {
+func (m *MockHubClient) Initialize(ctx context.Context, in *idl.InitializeRequest, opts ...grpc.CallOption) (idl.CliToHub_InitializeClient, error) {
 	return nil, nil
 }

@@ -5,13 +5,14 @@ import (
 
 	"github.com/greenplum-db/gp-common-go-libs/gplog"
 	"github.com/greenplum-db/gpupgrade/hub/upgradestatus"
+	"github.com/greenplum-db/gpupgrade/idl"
 	"github.com/pkg/errors"
 )
 
-func (h *Hub) ExecuteStartTargetClusterSubStep() error {
+func (h *Hub) ExecuteStartTargetClusterSubStep(stream idl.CliToHub_ExecuteServer) error {
 	gplog.Info("starting %s", upgradestatus.VALIDATE_START_CLUSTER)
 
-	step, err := h.InitializeStep(upgradestatus.VALIDATE_START_CLUSTER)
+	step, err := h.InitializeStep(upgradestatus.VALIDATE_START_CLUSTER, stream)
 	if err != nil {
 		gplog.Error(err.Error())
 		return err

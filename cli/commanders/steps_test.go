@@ -1,0 +1,313 @@
+package commanders_test
+
+import (
+	"io"
+	"io/ioutil"
+	"os"
+	"sync"
+	"testing"
+
+	"golang.org/x/xerrors"
+
+	"github.com/greenplum-db/gpupgrade/cli/commanders"
+	"github.com/greenplum-db/gpupgrade/idl"
+)
+
+type msgStream []*idl.Message
+
+func (m *msgStream) Recv() (*idl.Message, error) {
+	if len(*m) == 0 {
+		return nil, io.EOF
+	}
+
+	// This looks a little weird. It's just dequeuing from the front of the
+	// slice.
+	nextMsg := (*m)[0]
+	*m = (*m)[1:]
+
+	return nextMsg, nil
+}
+
+type errStream struct {
+	err error
+}
+
+func (m *errStream) Recv() (*idl.Message, error) {
+	return nil, m.err
+}
+
+func TestUILoop(t *testing.T) {
+	t.Run("writes STDOUT and STDERR chunks in the order they are received", func(t *testing.T) {
+		msgs := msgStream{
+			{Contents: &idl.Message_Chunk{&idl.Chunk{
+				Buffer: []byte("my string1"),
+				Type:   idl.Chunk_STDOUT,
+			}}},
+			{Contents: &idl.Message_Chunk{&idl.Chunk{
+				Buffer: []byte("my error"),
+				Type:   idl.Chunk_STDERR,
+			}}},
+			{Contents: &idl.Message_Chunk{&idl.Chunk{
+				Buffer: []byte("my string2"),
+				Type:   idl.Chunk_STDOUT,
+			}}},
+		}
+
+		d := bufferStandardDescriptors(t)
+		defer d.Close()
+
+		err := commanders.UILoop(&msgs, true)
+		if err != nil {
+			t.Errorf("UILoop() returned %#v", err)
+		}
+
+		actualOut, actualErr := d.Wait()
+
+		actual, expected := string(actualOut), "my string1my string2"
+		if actual != expected {
+			t.Errorf("stdout was %#v want %#v", actual, expected)
+		}
+
+		actual, expected = string(actualErr), "my error"
+		if actual != expected {
+			t.Errorf("stderr was %#v want %#v", actual, expected)
+		}
+	})
+
+	t.Run("returns an error when a non io.EOF error is encountered", func(t *testing.T) {
+		expected := xerrors.New("bengie")
+
+		err := commanders.UILoop(&errStream{expected}, true)
+		if err != expected {
+			t.Errorf("returned %#v want %#v", err, expected)
+		}
+	})
+
+	t.Run("writes status and stdout chunks serially in verbose mode", func(t *testing.T) {
+		msgs := msgStream{
+			{Contents: &idl.Message_Status{&idl.UpgradeStepStatus{
+				Step:   idl.UpgradeSteps_INIT_CLUSTER,
+				Status: idl.StepStatus_RUNNING,
+			}}},
+			{Contents: &idl.Message_Chunk{&idl.Chunk{
+				Buffer: []byte("my string\n"),
+				Type:   idl.Chunk_STDOUT,
+			}}},
+			{Contents: &idl.Message_Status{&idl.UpgradeStepStatus{
+				Step:   idl.UpgradeSteps_INIT_CLUSTER,
+				Status: idl.StepStatus_COMPLETE,
+			}}},
+			{Contents: &idl.Message_Status{&idl.UpgradeStepStatus{
+				Step:   idl.UpgradeSteps_CONVERT_MASTER,
+				Status: idl.StepStatus_FAILED,
+			}}},
+		}
+
+		expected := commanders.FormatStatus(msgs[0].GetStatus()) + "\n"
+		expected += "my string\n"
+		expected += commanders.FormatStatus(msgs[2].GetStatus()) + "\n"
+		expected += commanders.FormatStatus(msgs[3].GetStatus()) + "\n"
+
+		d := bufferStandardDescriptors(t)
+		defer d.Close()
+
+		err := commanders.UILoop(&msgs, true)
+		if err != nil {
+			t.Errorf("UILoop() returned %#v", err)
+		}
+
+		actualOut, actualErr := d.Wait()
+
+		if len(actualErr) != 0 {
+			t.Errorf("unexpected stderr %#v", string(actualErr))
+		}
+
+		actual := string(actualOut)
+		if actual != expected {
+			t.Errorf("output %#v want %#v", actual, expected)
+		}
+	})
+
+	t.Run("overwrites status lines and ignores chunks in non-verbose mode", func(t *testing.T) {
+		msgs := msgStream{
+			{Contents: &idl.Message_Status{&idl.UpgradeStepStatus{
+				Step:   idl.UpgradeSteps_INIT_CLUSTER,
+				Status: idl.StepStatus_RUNNING,
+			}}},
+			{Contents: &idl.Message_Chunk{&idl.Chunk{
+				Buffer: []byte("output ignored"),
+				Type:   idl.Chunk_STDOUT,
+			}}},
+			{Contents: &idl.Message_Status{&idl.UpgradeStepStatus{
+				Step:   idl.UpgradeSteps_INIT_CLUSTER,
+				Status: idl.StepStatus_COMPLETE,
+			}}},
+			{Contents: &idl.Message_Chunk{&idl.Chunk{
+				Buffer: []byte("error ignored"),
+				Type:   idl.Chunk_STDERR,
+			}}},
+			{Contents: &idl.Message_Status{&idl.UpgradeStepStatus{
+				Step:   idl.UpgradeSteps_CONVERT_MASTER,
+				Status: idl.StepStatus_FAILED,
+			}}},
+		}
+
+		// We expect output only from the status messages.
+		expected := commanders.FormatStatus(msgs[0].GetStatus()) + "\r"
+		expected += commanders.FormatStatus(msgs[2].GetStatus()) + "\n"
+		expected += commanders.FormatStatus(msgs[4].GetStatus()) + "\n"
+
+		d := bufferStandardDescriptors(t)
+		defer d.Close()
+
+		err := commanders.UILoop(&msgs, false)
+		if err != nil {
+			t.Errorf("UILoop() returned %#v", err)
+		}
+
+		actualOut, actualErr := d.Wait()
+
+		if len(actualErr) != 0 {
+			t.Errorf("unexpected stderr %#v", string(actualErr))
+		}
+
+		actual := string(actualOut)
+		if actual != expected {
+			t.Errorf("output %#v want %#v", actual, expected)
+		}
+	})
+
+	t.Run("panics with unexpected protobuf messages", func(t *testing.T) {
+		cases := []struct {
+			name string
+			msg  *idl.Message
+		}{{
+			"bad step",
+			&idl.Message{Contents: &idl.Message_Status{&idl.UpgradeStepStatus{
+				Step:   idl.UpgradeSteps_UNKNOWN_STEP,
+				Status: idl.StepStatus_COMPLETE,
+			}}},
+		}, {
+			"bad status",
+			&idl.Message{Contents: &idl.Message_Status{&idl.UpgradeStepStatus{
+				Step:   idl.UpgradeSteps_COPY_MASTER,
+				Status: idl.StepStatus_UNKNOWN_STATUS,
+			}}},
+		}, {
+			"bad message type",
+			&idl.Message{Contents: nil},
+		}}
+
+		for _, c := range cases {
+			t.Run(c.name, func(t *testing.T) {
+				defer func() {
+					if r := recover(); r == nil {
+						t.Errorf("did not panic")
+					}
+				}()
+
+				msgs := &msgStream{c.msg}
+				commanders.UILoop(msgs, false)
+			})
+		}
+	})
+}
+
+// descriptors is a helper to redirect os.Stdout and os.Stderr and buffer the
+// bytes that are written to them.
+//
+//    d := bufferStandardDescriptors(t)
+//    defer d.Close()
+//
+//    // write to os.Stdout and os.Stderr
+//
+//    bytesOut, bytesErr := d.Wait()
+//
+// All errors are handled through a t.Fatalf().
+type descriptors struct {
+	t                  *testing.T
+	wg                 sync.WaitGroup
+	stdout, stderr     *os.File
+	saveOut, saveErr   *os.File
+	outBytes, errBytes []byte
+}
+
+func bufferStandardDescriptors(t *testing.T) *descriptors {
+	d := &descriptors{t: t}
+
+	var err error
+	var rOut, rErr *os.File
+
+	rOut, d.stdout, err = os.Pipe()
+	if err != nil {
+		d.t.Fatalf("opening stdout pipe: %+v", err)
+	}
+
+	rErr, d.stderr, err = os.Pipe()
+	if err != nil {
+		d.t.Fatalf("opening stderr pipe: %+v", err)
+	}
+
+	// Switch out the streams; they are replaced by d.Close().
+	d.saveOut, d.saveErr = os.Stdout, os.Stderr
+	os.Stdout, os.Stderr = d.stdout, d.stderr
+
+	// Each stream must be read separately to avoid deadlock.
+	d.wg.Add(2)
+	go func() {
+		defer d.wg.Done()
+
+		d.outBytes, err = ioutil.ReadAll(rOut)
+		if err != nil {
+			d.t.Fatalf("reading from stdout pipe: %+v", err)
+		}
+	}()
+	go func() {
+		defer d.wg.Done()
+
+		d.errBytes, err = ioutil.ReadAll(rErr)
+		if err != nil {
+			d.t.Fatalf("reading from stderr pipe: %+v", err)
+		}
+	}()
+
+	return d
+}
+
+// Wait drains the pipes and returns the contents of stdout and stderr. It's
+// safe to call more than once.
+func (d *descriptors) Wait() ([]byte, []byte) {
+	// Close the write sides of the pipe so our goroutines will finish.
+	if d.stdout != nil {
+		err := d.stdout.Close()
+		if err != nil {
+			d.t.Fatalf("closing stdout pipe: %+v", err)
+		}
+
+		d.stdout = nil
+	}
+
+	if d.stderr != nil {
+		err := d.stderr.Close()
+		if err != nil {
+			d.t.Fatalf("closing stderr pipe: %+v", err)
+		}
+
+		d.stderr = nil
+	}
+
+	d.wg.Wait()
+
+	return d.outBytes, d.errBytes
+}
+
+// Close puts os.Stdout and os.Stderr back the way they were, after draining the
+// redirected pipes if necessary.
+func (d *descriptors) Close() {
+	// Always make sure we've waited on the pipe contents before closing. Wait()
+	// is safe to call more than once.
+	d.Wait()
+
+	os.Stdout = d.saveOut
+	os.Stderr = d.saveErr
+}

@@ -15,9 +15,22 @@ import (
 	"github.com/greenplum-db/gpupgrade/idl"
 )
 
-func (h *Hub) ExecuteUpgradePrimariesSubStep() error {
+func (h *Hub) ExecuteUpgradePrimariesSubStep(stream idl.CliToHub_ExecuteServer) error {
 	gplog.Info("starting %s", upgradestatus.CONVERT_PRIMARIES)
-	return h.convertPrimaries()
+	const step = idl.UpgradeSteps_CONVERT_PRIMARIES
+
+	// NOTE: this substep is special in that it handled differently by the
+	//   checklist_manager; this is why we stream directly here
+	sendStatus(stream, step, idl.StepStatus_RUNNING)
+
+	status := idl.StepStatus_COMPLETE
+	err := h.convertPrimaries()
+	if err != nil {
+		status = idl.StepStatus_FAILED
+	}
+
+	sendStatus(stream, step, status)
+	return err
 }
 
 func (h *Hub) convertPrimaries() error {

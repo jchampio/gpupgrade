@@ -21,7 +21,7 @@ var execCommand = exec.Command
 func (h *Hub) ExecuteUpgradeMasterSubStep(stream idl.CliToHub_ExecuteServer) error {
 	gplog.Info("starting %s", upgradestatus.CONVERT_MASTER)
 
-	step, err := h.InitializeStep(upgradestatus.CONVERT_MASTER)
+	step, err := h.InitializeStep(upgradestatus.CONVERT_MASTER, stream)
 	if err != nil {
 		gplog.Error(err.Error())
 		return err
@@ -101,9 +101,14 @@ func (w *streamWriter) Write(p []byte) (int, error) {
 		// Attempt to send the chunk to the client. Since the client may close
 		// the connection at any point, errors here are logged and otherwise
 		// ignored. After the first send error, no more attempts are made.
-		err = w.stream.Send(&idl.Chunk{
+
+		chunk := &idl.Chunk{
 			Buffer: p,
 			Type:   w.cType,
+		}
+
+		err = w.stream.Send(&idl.Message{
+			Contents: &idl.Message_Chunk{chunk},
 		})
 
 		if err != nil {

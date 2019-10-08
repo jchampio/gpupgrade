@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"os/exec"
 
+	"github.com/greenplum-db/gpupgrade/utils"
+
 	"github.com/greenplum-db/gp-common-go-libs/gplog"
 	multierror "github.com/hashicorp/go-multierror"
 	"golang.org/x/xerrors"
@@ -61,23 +63,9 @@ func (h *Hub) reconfigurePorts() (err error) {
 	}
 
 	// 3). rewrite gp_segment_configuration with the updated port number
-	connURI := fmt.Sprintf("postgresql://localhost:%d/template1?gp_session_role=utility&allow_system_table_mods=true&search_path=", h.target.MasterPort())
-	targetDB, err := sql.Open("pgx", connURI)
-	defer func() {
-		closeErr := targetDB.Close()
-		if closeErr != nil {
-			closeErr = xerrors.Errorf("closing connection to new master db: %w", closeErr)
-			err = multierror.Append(err, closeErr)
-		}
-	}()
+	err = updateSegmentConfiguration(h.source, h.target)
 	if err != nil {
-		return xerrors.Errorf("%s failed to open connection to utility master: %w",
-			upgradestatus.RECONFIGURE_PORTS, err)
-	}
-	err = ClonePortsFromCluster(targetDB, h.source.Cluster)
-	if err != nil {
-		return xerrors.Errorf("%s failed to clone ports: %w",
-			upgradestatus.RECONFIGURE_PORTS, err)
+		return err
 	}
 
 	// 4). bring down the master
@@ -115,5 +103,27 @@ func (h *Hub) reconfigurePorts() (err error) {
 			upgradestatus.RECONFIGURE_PORTS, err)
 	}
 
+	return nil
+}
+
+func updateSegmentConfiguration(source, target *utils.Cluster) error {
+	connURI := fmt.Sprintf("postgresql://localhost:%d/template1?gp_session_role=utility&allow_system_table_mods=true&search_path=", target.MasterPort())
+	targetDB, err := sql.Open("pgx", connURI)
+	defer func() {
+		closeErr := targetDB.Close()
+		if closeErr != nil {
+			closeErr = xerrors.Errorf("closing connection to new master db: %w", closeErr)
+			err = multierror.Append(err, closeErr)
+		}
+	}()
+	if err != nil {
+		return xerrors.Errorf("%s failed to open connection to utility master: %w",
+			upgradestatus.RECONFIGURE_PORTS, err)
+	}
+	err = ClonePortsFromCluster(targetDB, source.Cluster)
+	if err != nil {
+		return xerrors.Errorf("%s failed to clone ports: %w",
+			upgradestatus.RECONFIGURE_PORTS, err)
+	}
 	return nil
 }

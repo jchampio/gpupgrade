@@ -15,7 +15,6 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/greenplum-db/gp-common-go-libs/gplog"
-	"github.com/greenplum-db/gpupgrade/idl"
 )
 
 // introduce this variable to allow exec.Command to be mocked out in tests
@@ -25,17 +24,8 @@ var execCommandHubCount = exec.Command
 // we create the state directory in the cli to ensure that at most one gpupgrade is occuring
 // at the same time.
 func CreateStateDirAndClusterConfigs(sourceBinDir, targetBinDir string) (err error) {
-	description := "Creating directories..."
-
-	fmt.Printf("%s\r", FormatCustom(description, idl.StepStatus_RUNNING))
-	defer func() {
-		status := idl.StepStatus_COMPLETE
-		if err != nil {
-			status = idl.StepStatus_FAILED
-		}
-
-		fmt.Printf("%s\n", FormatCustom(description, status))
-	}()
+	s := Substep("Creating directories...")
+	defer s.Finish(&err)
 
 	stateDir := utils.GetStateDir()
 	err = os.Mkdir(stateDir, 0700)
@@ -75,17 +65,8 @@ func CreateStateDirAndClusterConfigs(sourceBinDir, targetBinDir string) (err err
 
 // TODO: how should we find the gpupgrade_hub executable?  Right now, it's via newBinDir
 func StartHub() (err error) {
-	description := "Starting hub..."
-
-	fmt.Printf("%s\r", FormatCustom(description, idl.StepStatus_RUNNING))
-	defer func() {
-		status := idl.StepStatus_COMPLETE
-		if err != nil {
-			status = idl.StepStatus_FAILED
-		}
-
-		fmt.Printf("%s\n", FormatCustom(description, status))
-	}()
+	s := Substep("Starting hub...")
+	defer s.Finish(&err)
 
 	countHubs, err := HowManyHubsRunning()
 	if err != nil {

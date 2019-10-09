@@ -61,7 +61,7 @@ func TestUILoop(t *testing.T) {
 			t.Errorf("UILoop() returned %#v", err)
 		}
 
-		actualOut, actualErr := d.Wait()
+		actualOut, actualErr := d.Collect()
 
 		actual, expected := string(actualOut), "my string1my string2"
 		if actual != expected {
@@ -116,7 +116,7 @@ func TestUILoop(t *testing.T) {
 			t.Errorf("UILoop() returned %#v", err)
 		}
 
-		actualOut, actualErr := d.Wait()
+		actualOut, actualErr := d.Collect()
 
 		if len(actualErr) != 0 {
 			t.Errorf("unexpected stderr %#v", string(actualErr))
@@ -165,7 +165,7 @@ func TestUILoop(t *testing.T) {
 			t.Errorf("UILoop() returned %#v", err)
 		}
 
-		actualOut, actualErr := d.Wait()
+		actualOut, actualErr := d.Collect()
 
 		if len(actualErr) != 0 {
 			t.Errorf("unexpected stderr %#v", string(actualErr))
@@ -213,6 +213,37 @@ func TestUILoop(t *testing.T) {
 	})
 }
 
+func TestSubstep(t *testing.T) {
+	d := bufferStandardDescriptors(t)
+	defer d.Close()
+
+	description := "my description"
+
+	var err error
+	s := commanders.Substep(description)
+	s.Finish(&err)
+
+	err = xerrors.New("error")
+	s = commanders.Substep(description)
+	s.Finish(&err)
+
+	stdout, stderr := d.Collect()
+
+	if len(stderr) != 0 {
+		t.Errorf("unexpected stderr %#v", string(stderr))
+	}
+
+	expected := commanders.Format(description, idl.StepStatus_RUNNING) + "\r"
+	expected += commanders.Format(description, idl.StepStatus_COMPLETE) + "\n"
+	expected += commanders.Format(description, idl.StepStatus_RUNNING) + "\r"
+	expected += commanders.Format(description, idl.StepStatus_FAILED) + "\n"
+
+	actual := string(stdout)
+	if actual != expected {
+		t.Errorf("output %#v want %#v", actual, expected)
+	}
+}
+
 // descriptors is a helper to redirect os.Stdout and os.Stderr and buffer the
 // bytes that are written to them.
 //
@@ -221,7 +252,7 @@ func TestUILoop(t *testing.T) {
 //
 //    // write to os.Stdout and os.Stderr
 //
-//    bytesOut, bytesErr := d.Wait()
+//    bytesOut, bytesErr := d.Collect()
 //
 // All errors are handled through a t.Fatalf().
 type descriptors struct {
@@ -274,9 +305,9 @@ func bufferStandardDescriptors(t *testing.T) *descriptors {
 	return d
 }
 
-// Wait drains the pipes and returns the contents of stdout and stderr. It's
+// Collect drains the pipes and returns the contents of stdout and stderr. It's
 // safe to call more than once.
-func (d *descriptors) Wait() ([]byte, []byte) {
+func (d *descriptors) Collect() ([]byte, []byte) {
 	// Close the write sides of the pipe so our goroutines will finish.
 	if d.stdout != nil {
 		err := d.stdout.Close()
@@ -304,9 +335,9 @@ func (d *descriptors) Wait() ([]byte, []byte) {
 // Close puts os.Stdout and os.Stderr back the way they were, after draining the
 // redirected pipes if necessary.
 func (d *descriptors) Close() {
-	// Always make sure we've waited on the pipe contents before closing. Wait()
-	// is safe to call more than once.
-	d.Wait()
+	// Always make sure we've waited on the pipe contents before closing.
+	// Collect() is safe to call more than once.
+	d.Collect()
 
 	os.Stdout = d.saveOut
 	os.Stderr = d.saveErr

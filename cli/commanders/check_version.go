@@ -2,7 +2,6 @@ package commanders
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/pkg/errors"
 
@@ -20,17 +19,8 @@ func NewVersionChecker(client idl.CliToHubClient) VersionChecker {
 }
 
 func (req VersionChecker) Execute() (err error) {
-	description := "Checking version compatibility..."
-
-	fmt.Printf("%s\r", FormatCustom(description, idl.StepStatus_RUNNING))
-	defer func() {
-		status := idl.StepStatus_COMPLETE
-		if err != nil {
-			status = idl.StepStatus_FAILED
-		}
-
-		fmt.Printf("%s\n", FormatCustom(description, status))
-	}()
+	s := Substep("Checking version compatibility...")
+	defer s.Finish(&err)
 
 	resp, err := req.client.CheckVersion(context.Background(), &idl.CheckVersionRequest{})
 	if err != nil {

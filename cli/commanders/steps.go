@@ -171,8 +171,6 @@ func UILoop(stream receiver, verbose bool) error {
 	return nil
 }
 
-const format = "%-67s%-13s" // 80-column output; used for FormatXxx()
-
 // FormatStatus returns a status string based on the upgrade status message.
 // It's exported for ease of testing.
 //
@@ -184,21 +182,48 @@ func FormatStatus(status *idl.UpgradeStepStatus) string {
 		panic(fmt.Sprintf("unexpected step %#v", status.Step))
 	}
 
-	indicator, ok := indicators[status.Status]
-	if !ok {
-		panic(fmt.Sprintf("unexpected status %#v", status.Status))
-	}
-
-	return fmt.Sprintf(format, line, indicator)
+	return Format(line, status.Status)
 }
 
-// FormatCustom is like FormatStatus but accepts an arbitrary string for the
-// step description.
-func FormatCustom(description string, status idl.StepStatus) string {
+// Format is also exported for ease of testing (see FormatStatus). Use Substep
+// instead.
+func Format(description string, status idl.StepStatus) string {
 	indicator, ok := indicators[status]
 	if !ok {
 		panic(fmt.Sprintf("unexpected status %#v", status))
 	}
 
-	return fmt.Sprintf(format, description, indicator)
+	return fmt.Sprintf("%-67s%-13s", description, indicator)
+}
+
+type substep struct {
+	description string
+}
+
+// Substep prints out an "in progress" marker for the given substep description,
+// and returns a struct that can be .Finish()d (in a defer statement) to print
+// the final complete/failed state.
+func Substep(description string) *substep {
+	fmt.Printf("%s\r", Format(description, idl.StepStatus_RUNNING))
+	return &substep{description}
+}
+
+// Finish prints out the final status of the substep; either COMPLETE or FAILED
+// depending on whether or not there is an error. The method takes a pointer to
+// error rather than error to make it possible to defer:
+//
+//    func runSubstep() (err error) {
+//        s := Substep("Doing something...")
+//        defer s.Finish(&err)
+//
+//        ...
+//    }
+//
+func (s *substep) Finish(err *error) {
+	status := idl.StepStatus_COMPLETE
+	if *err != nil {
+		status = idl.StepStatus_FAILED
+	}
+
+	fmt.Printf("%s\n", Format(s.description, status))
 }

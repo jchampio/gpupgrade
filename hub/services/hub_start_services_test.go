@@ -9,15 +9,14 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/greenplum-db/gp-common-go-libs/testhelper"
 	as "github.com/greenplum-db/gpupgrade/agent/services"
 	"github.com/greenplum-db/gpupgrade/idl"
 	"github.com/hashicorp/go-multierror"
-
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/test/bufconn"
 
-	"github.com/greenplum-db/gp-common-go-libs/testhelper"
 	"github.com/greenplum-db/gpupgrade/hub/services"
 	"github.com/greenplum-db/gpupgrade/testutils/exectest"
 )

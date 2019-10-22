@@ -10,13 +10,9 @@ setup() {
 
     gpupgrade kill-services
 
-    # XXX We use $PWD here instead of a real binary directory because
-    # `make check` is expected to test the locally built binaries, not the
-    # installation. This causes problems for tests that need to call GPDB
-    # executables...
     gpupgrade initialize \
-        --old-bindir="$PWD" \
-        --new-bindir="$PWD" \
+        --old-bindir="${GPHOME}/bin" \
+        --new-bindir="${GPHOME}/bin" \
         --old-port="${PGPORT}" 3>&-
 }
 
@@ -30,31 +26,20 @@ teardown() {
 
 @test "gpupgrade stop-services actually stops hub and agents" {
     # check that hub and agent are up
-    run is_process_running "[g]pupgrade_hub"
-    [ "$status" -eq 0 ]
-    run is_process_running "[g]pupgrade_agent"
-    [ "$status" -eq 0 ]
+    process_is_running "[g]pupgrade_hub"
+    process_is_running "[g]pupgrade_agent"
 
     # stop them
-    run gpupgrade kill-services
-    [ "$status" -eq 0 ]
+    gpupgrade kill-services
 
     # make sure that they are down
-    # check that hub and agent are up
-    run is_process_running "[g]pupgrade_hub"
-    [ "$status" -eq 1 ]
-    run is_process_running "[g]pupgrade_agent"
-    [ "$status" -eq 1 ]
+    ! process_is_running "[g]pupgrade_hub"
+    ! process_is_running "[g]pupgrade_agent"
 
-    run gpupgrade kill-services
-    [ "$status" -eq 0 ]
+    gpupgrade kill-services
 }
 
 @test "gpupgrade stop-services can be run multiple times without issue " {
-
-    run gpupgrade kill-services
-    [ "$status" -eq 0 ]
-
-    run gpupgrade kill-services
-    [ "$status" -eq 0 ]
+    gpupgrade kill-services
+    gpupgrade kill-services
 }

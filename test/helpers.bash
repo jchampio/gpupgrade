@@ -52,6 +52,6 @@ delete_cluster() {
     rm -rf "${datadir}"/*_upgrade
 }
 
-is_process_running() {
+process_is_running() {
     ps -ef | grep -wGc "$1"
 }

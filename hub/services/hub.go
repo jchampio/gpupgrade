@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/greenplum-db/gp-common-go-libs/gplog"
 	"github.com/hashicorp/go-multierror"
 	"github.com/pkg/errors"
 	"golang.org/x/xerrors"
@@ -19,7 +20,6 @@ import (
 	"google.golang.org/grpc/reflection"
 	grpcStatus "google.golang.org/grpc/status"
 
-	"github.com/greenplum-db/gp-common-go-libs/gplog"
 	"github.com/greenplum-db/gpupgrade/hub/upgradestatus"
 	"github.com/greenplum-db/gpupgrade/hub/upgradestatus/file"
 	"github.com/greenplum-db/gpupgrade/idl"
@@ -166,18 +166,17 @@ func (h *Hub) StopAgents() error {
 			defer wg.Done()
 
 			_, err := conn.AgentClient.StopAgent(context.Background(), &idl.StopAgentRequest{})
-			if err != nil {
-				errCode := grpcStatus.Code(err)
-				errMsg := grpcStatus.Convert(err).Message()
-				// XXX: "transport is closing" is not documented but is needed to uniquely interpret codes.Unavailable
-				// https://github.com/grpc/grpc/blob/v1.24.0/doc/statuscodes.md
-				if errCode != codes.Unavailable || errMsg != "transport is closing" {
-					errs <- xerrors.Errorf("failed to stop agent on host %s : %w", conn.Hostname, err)
-				}
+			if err == nil { // no error means the agent did not terminate as expected
+				errs <- errors.Errorf("failed to stop agent on host: %s", conn.Hostname)
 				return
 			}
 
-			errs <- errors.Errorf("failed to stop agent on host: %s", conn.Hostname)
+			// XXX: "transport is closing" is not documented but is needed to uniquely interpret codes.Unavailable
+			// https://github.com/grpc/grpc/blob/v1.24.0/doc/statuscodes.md
+			errStatus := grpcStatus.Convert(err)
+			if errStatus.Code() != codes.Unavailable || errStatus.Message() != "transport is closing" {
+				errs <- xerrors.Errorf("failed to stop agent on host %s : %w", conn.Hostname, err)
+			}
 		}()
 	}
 
@@ -192,12 +191,12 @@ func (h *Hub) StopAgents() error {
 	return multiErr.ErrorOrNil()
 }
 
-func (h *Hub) Stop(closeAgentCons bool) {
+func (h *Hub) Stop(closeAgentConns bool) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 
 	// StopServices calls Stop(false) because it has already closed the agentConns
-	if closeAgentCons {
+	if closeAgentConns {
 		h.closeAgentConns()
 	}
 
@@ -212,15 +211,10 @@ func (h *Hub) Stop(closeAgentCons bool) {
 }
 
 func (h *Hub) RestartAgents(ctx context.Context, in *idl.RestartAgentsRequest) (*idl.RestartAgentsReply, error) {
-	var dialer = func(ctx context.Context, address string) (net.Conn, error) {
-		d := net.Dialer{}
-		return d.DialContext(ctx, "tcp", address)
-	}
-	restartedHosts, err := RestartAgents(ctx, dialer, h.source.GetHostnames(), h.conf.HubToAgentPort, h.conf.StateDir)
+	restartedHosts, err := RestartAgents(ctx, nil, h.source.GetHostnames(), h.conf.HubToAgentPort, h.conf.StateDir)
 	return &idl.RestartAgentsReply{AgentHosts: restartedHosts}, err
 }
 
-// TODO: move this to hub.go
 func RestartAgents(ctx context.Context,
 	dialer func(context.Context, string) (net.Conn, error),
 	hostnames []string,
@@ -241,8 +235,10 @@ func RestartAgents(ctx context.Context,
 			opts := []grpc.DialOption{
 				grpc.WithBlock(),
 				grpc.WithInsecure(),
-				grpc.WithContextDialer(dialer),
 				grpc.FailOnNonTempDialError(true),
+			}
+			if dialer != nil {
+				opts = append(opts, grpc.WithContextDialer(dialer))
 			}
 			conn, err := grpc.DialContext(timeoutCtx, address, opts...)
 			cancelFunc()

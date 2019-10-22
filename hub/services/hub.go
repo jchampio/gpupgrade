@@ -167,7 +167,7 @@ func (h *Hub) StopAgents() error {
 
 			_, err := conn.AgentClient.StopAgent(context.Background(), &idl.StopAgentRequest{})
 			if err == nil { // no error means the agent did not terminate as expected
-				errs <- errors.Errorf("failed to stop agent on host: %s", conn.Hostname)
+				errs <- xerrors.Errorf("failed to stop agent on host: %s", conn.Hostname)
 				return
 			}
 

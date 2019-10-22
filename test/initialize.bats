@@ -104,10 +104,6 @@ teardown() {
 
     # Clean up. Use SIGINT rather than SIGTERM to avoid a nasty-gram from BATS.
     kill -INT $bgproc
-
-    # FIXME: this is required with "gpupgrade kill-services" in setup(); probably
-    #   we are finding the hub but it the gRPC is not set up yet.
-    sleep 3
 }
 
 outputContains() {

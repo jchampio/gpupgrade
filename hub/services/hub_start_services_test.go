@@ -1,8 +1,7 @@
 package services_test
 
 import (
-	"io"
-	"io/ioutil"
+	"errors"
 	"log"
 	"net"
 	"os"
@@ -10,14 +9,14 @@ import (
 	"testing"
 
 	"github.com/greenplum-db/gp-common-go-libs/testhelper"
-	as "github.com/greenplum-db/gpupgrade/agent/services"
-	"github.com/greenplum-db/gpupgrade/idl"
 	"github.com/hashicorp/go-multierror"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/test/bufconn"
 
+	as "github.com/greenplum-db/gpupgrade/agent/services"
 	"github.com/greenplum-db/gpupgrade/hub/services"
+	"github.com/greenplum-db/gpupgrade/idl"
 	"github.com/greenplum-db/gpupgrade/testutils/exectest"
 )
 
@@ -37,21 +36,16 @@ func init() {
 }
 
 func TestRestartAgent(t *testing.T) {
-	hasServerStarted := make(chan bool, 1)
 	listener := bufconn.Listen(1024 * 1024)
 	agentServer := grpc.NewServer()
-	//defer agentServer.Stop() // TODO: why does this hang
+	defer agentServer.Stop() // TODO: why does this hang
 
 	idl.RegisterAgentServer(agentServer, &as.AgentServer{})
 	go func() {
-		hasServerStarted <- true
 		if err := agentServer.Serve(listener); err != nil {
 			log.Fatalf("Server exited with error: %v", err)
 		}
 	}()
-
-	<-hasServerStarted
-	// TODO: how do we know if the agentServer is actually ready to listen here
 
 	ctx := context.Background()
 
@@ -81,12 +75,11 @@ func TestRestartAgent(t *testing.T) {
 		expectedHost := "host1"
 
 		dialer := func(ctx context.Context, address string) (net.Conn, error) {
-			conn, err := listener.Dial()
 			if strings.HasPrefix(address, expectedHost) { //fail connection attempts to expectedHost
-				_, err = io.Copy(ioutil.Discard, conn)
+				return nil, errors.New("ahhhhh")
 			}
 
-			return conn, err
+			return listener.Dial()
 		}
 
 		restartedHosts, err := services.RestartAgents(ctx, dialer, hostnames, port, stateDir)
@@ -109,9 +102,7 @@ func TestRestartAgent(t *testing.T) {
 		// we fail all connections here so that RestartAgents will run the
 		//  (error producing) gpupgrade_agent_Errors
 		dialer := func(ctx context.Context, address string) (net.Conn, error) {
-			conn, err := listener.Dial()
-			_, err = io.Copy(ioutil.Discard, conn) //fail all connection attempts
-			return conn, err
+			return nil, errors.New("ahhhh")
 		}
 
 		restartedHosts, err := services.RestartAgents(ctx, dialer, hostnames, port, stateDir)

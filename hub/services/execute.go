@@ -45,9 +45,12 @@ func (h *Hub) Execute(request *idl.ExecuteRequest, stream idl.CliToHub_ExecuteSe
 		return xerrors.Errorf("failed writing to execute log: %w", err)
 	}
 
+	var targetMasterPort int
 	err = h.ExecuteSubStep(executeStream, upgradestatus.CREATE_TARGET_CONFIG,
 		func(_ messageSender, _ io.Writer) error {
-			return h.GenerateInitsystemConfig()
+			var err error
+			targetMasterPort, err = h.GenerateInitsystemConfig(request.Ports)
+			return err
 		})
 	if err != nil {
 		return err
@@ -61,7 +64,10 @@ func (h *Hub) Execute(request *idl.ExecuteRequest, stream idl.CliToHub_ExecuteSe
 		return err
 	}
 
-	err = h.ExecuteSubStep(executeStream, upgradestatus.INIT_TARGET_CLUSTER, h.CreateTargetCluster)
+	err = h.ExecuteSubStep(executeStream, upgradestatus.INIT_TARGET_CLUSTER,
+		func(stream messageSender, log io.Writer) error {
+			return h.CreateTargetCluster(stream, log, targetMasterPort)
+		})
 	if err != nil {
 		return err
 	}

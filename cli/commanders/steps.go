@@ -57,12 +57,12 @@ func Initialize(client idl.CliToHubClient, oldBinDir, newBinDir string, oldPort 
 	return nil
 }
 
-func Execute(client idl.CliToHubClient, verbose bool) error {
+func Execute(client idl.CliToHubClient, verbose bool, ports []uint32) error {
 	fmt.Println()
 	fmt.Println("Execute in progress.")
 	fmt.Println()
 
-	stream, err := client.Execute(context.Background(), &idl.ExecuteRequest{})
+	stream, err := client.Execute(context.Background(), &idl.ExecuteRequest{Ports: ports})
 	if err != nil {
 		// TODO: Change the logging message?
 		gplog.Error("ERROR - Unable to connect to hub")

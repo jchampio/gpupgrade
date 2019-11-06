@@ -298,6 +298,8 @@ _gpupgrade_execute()
     flags_with_completion=()
     flags_completion=()
 
+    flags+=("--ports=")
+    local_nonpersistent_flags+=("--ports=")
     flags+=("--verbose")
     flags+=("-v")
     local_nonpersistent_flags+=("--verbose")

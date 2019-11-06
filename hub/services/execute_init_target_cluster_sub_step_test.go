@@ -4,9 +4,11 @@ import (
 	"bytes"
 	"database/sql/driver"
 	"errors"
+	"fmt"
 	"os"
 	"os/exec"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/golang/mock/gomock"
@@ -83,29 +85,145 @@ func TestGetCheckpointSegmentsAndEncoding(t *testing.T) {
 	})
 }
 
-func TestDeclareDataDirectories(t *testing.T) {
-	t.Run("successfully declares all directories", func(t *testing.T) {
-		cluster := cluster.NewCluster([]cluster.SegConfig{
-			cluster.SegConfig{ContentID: -1, DbID: 1, Port: 15432, Hostname: "localhost", DataDir: "/data/qddir/seg-1"},
-			cluster.SegConfig{ContentID: 0, DbID: 2, Port: 25432, Hostname: "host1", DataDir: "/data/dbfast1/seg1"},
-			cluster.SegConfig{ContentID: 1, DbID: 3, Port: 25433, Hostname: "host2", DataDir: "/data/dbfast2/seg2"},
-		})
-		sourceCluster := utils.Cluster{
-			Cluster:    cluster,
-			BinDir:     "/source/bindir",
-			ConfigPath: "my/config/path",
-			Version:    dbconn.GPDBVersion{},
+func TestWriteSegmentArray(t *testing.T) {
+	test := func(t *testing.T, cluster *utils.Cluster, ports []uint32, expected []string) {
+		t.Helper()
+
+		actual, masterPort, err := WriteSegmentArray([]string{}, cluster, ports)
+		if err != nil {
+			t.Errorf("got %#v", err)
 		}
 
-		actualConfig := DeclareDataDirectories([]string{}, sourceCluster)
-		expectedConfig := []string{
-			"QD_PRIMARY_ARRAY=localhost~15433~/data/qddir_upgrade/seg-1~1~-1~0",
-			`declare -a PRIMARY_ARRAY=(
-	host1~29432~/data/dbfast1_upgrade/seg1~2~0~0
-	host2~29433~/data/dbfast2_upgrade/seg2~3~1~0
-)`}
-		if !reflect.DeepEqual(actualConfig, expectedConfig) {
-			t.Errorf("got %v, want %v", actualConfig, expectedConfig)
+		expectedPort := uint32(50432)
+		if len(ports) > 0 {
+			expectedPort = ports[0]
+		}
+
+		if uint32(masterPort) != expectedPort {
+			t.Errorf("returned master port %d, want %d", masterPort, expectedPort)
+		}
+
+		if !reflect.DeepEqual(actual, expected) {
+			// Help developers see differences between the lines.
+			pretty := func(lines []string) string {
+				b := new(strings.Builder)
+
+				fmt.Fprintln(b, "[")
+				for _, l := range lines {
+					fmt.Fprintf(b, "  %q\n", l)
+				}
+				fmt.Fprint(b, "]")
+
+				return b.String()
+			}
+			t.Errorf("got %v, want %v", pretty(actual), pretty(expected))
+		}
+	}
+
+	t.Run("correctly chooses ports when the master and segments are all on different hosts", func(t *testing.T) {
+		cluster := &utils.Cluster{
+			Cluster: cluster.NewCluster([]cluster.SegConfig{
+				cluster.SegConfig{ContentID: -1, DbID: 1, Hostname: "mdw", DataDir: "/data/qddir/seg-1"},
+				cluster.SegConfig{ContentID: 0, DbID: 2, Hostname: "sdw1", DataDir: "/data/dbfast1/seg1"},
+				cluster.SegConfig{ContentID: 1, DbID: 3, Hostname: "sdw2", DataDir: "/data/dbfast2/seg2"},
+			}),
+		}
+		ports := []uint32{15433}
+
+		test(t, cluster, ports, []string{
+			"QD_PRIMARY_ARRAY=mdw~15433~/data/qddir_upgrade/seg-1~1~-1~0",
+			"declare -a PRIMARY_ARRAY=(",
+			"\tsdw1~15433~/data/dbfast1_upgrade/seg1~2~0~0",
+			"\tsdw2~15433~/data/dbfast2_upgrade/seg2~3~1~0",
+			")",
+		})
+	})
+
+	t.Run("correctly chooses ports when the master is on one host and segments on another", func(t *testing.T) {
+		cluster := &utils.Cluster{
+			Cluster: cluster.NewCluster([]cluster.SegConfig{
+				cluster.SegConfig{ContentID: -1, DbID: 1, Hostname: "mdw", DataDir: "/data/qddir/seg-1"},
+				cluster.SegConfig{ContentID: 0, DbID: 2, Hostname: "sdw1", DataDir: "/data/dbfast1/seg1"},
+				cluster.SegConfig{ContentID: 1, DbID: 3, Hostname: "sdw1", DataDir: "/data/dbfast2/seg2"},
+			}),
+		}
+		ports := []uint32{15433, 25432}
+
+		test(t, cluster, ports, []string{
+			"QD_PRIMARY_ARRAY=mdw~15433~/data/qddir_upgrade/seg-1~1~-1~0",
+			"declare -a PRIMARY_ARRAY=(",
+			"\tsdw1~15433~/data/dbfast1_upgrade/seg1~2~0~0",
+			"\tsdw1~25432~/data/dbfast2_upgrade/seg2~3~1~0",
+			")",
+		})
+	})
+
+	t.Run("sorts and deduplicates provided port range", func(t *testing.T) {
+		cluster := &utils.Cluster{
+			Cluster: cluster.NewCluster([]cluster.SegConfig{
+				cluster.SegConfig{ContentID: -1, DbID: 1, Hostname: "mdw", DataDir: "/data/qddir/seg-1"},
+				cluster.SegConfig{ContentID: 0, DbID: 2, Hostname: "mdw", DataDir: "/data/dbfast1/seg1"},
+				cluster.SegConfig{ContentID: 1, DbID: 3, Hostname: "mdw", DataDir: "/data/dbfast2/seg2"},
+			}),
+		}
+		ports := []uint32{10, 9, 10, 9, 10, 8}
+
+		test(t, cluster, ports, []string{
+			"QD_PRIMARY_ARRAY=mdw~8~/data/qddir_upgrade/seg-1~1~-1~0",
+			"declare -a PRIMARY_ARRAY=(",
+			"\tmdw~9~/data/dbfast1_upgrade/seg1~2~0~0",
+			"\tmdw~10~/data/dbfast2_upgrade/seg2~3~1~0",
+			")",
+		})
+	})
+
+	t.Run("uses default port range when port list is empty", func(t *testing.T) {
+		cluster := &utils.Cluster{
+			Cluster: cluster.NewCluster([]cluster.SegConfig{
+				cluster.SegConfig{ContentID: -1, DbID: 1, Hostname: "mdw", DataDir: "/data/qddir/seg-1"},
+				cluster.SegConfig{ContentID: 0, DbID: 2, Hostname: "mdw", DataDir: "/data/dbfast1/seg1"},
+				cluster.SegConfig{ContentID: 1, DbID: 3, Hostname: "mdw", DataDir: "/data/dbfast2/seg2"},
+				cluster.SegConfig{ContentID: 2, DbID: 4, Hostname: "sdw1", DataDir: "/data/dbfast3/seg3"},
+			}),
+		}
+
+		test(t, cluster, []uint32{}, []string{
+			"QD_PRIMARY_ARRAY=mdw~50432~/data/qddir_upgrade/seg-1~1~-1~0",
+			"declare -a PRIMARY_ARRAY=(",
+			"\tmdw~50433~/data/dbfast1_upgrade/seg1~2~0~0",
+			"\tmdw~50434~/data/dbfast2_upgrade/seg2~3~1~0",
+			"\tsdw1~50432~/data/dbfast3_upgrade/seg3~4~2~0",
+			")",
+		})
+	})
+
+	t.Run("errors when old cluster contains no master segment", func(t *testing.T) {
+		cluster := &utils.Cluster{
+			Cluster: cluster.NewCluster([]cluster.SegConfig{
+				cluster.SegConfig{ContentID: 0, DbID: 2, Hostname: "sdw1", DataDir: "/data/dbfast1/seg1"},
+			}),
+		}
+		ports := []uint32{15433}
+
+		_, _, err := WriteSegmentArray([]string{}, cluster, ports)
+		if err == nil {
+			t.Errorf("expected error got nil")
+		}
+	})
+
+	t.Run("errors when not given enough ports", func(t *testing.T) {
+		cluster := &utils.Cluster{
+			Cluster: cluster.NewCluster([]cluster.SegConfig{
+				cluster.SegConfig{ContentID: -1, DbID: 1, Hostname: "mdw", DataDir: "/data/qddir/seg-1"},
+				cluster.SegConfig{ContentID: 0, DbID: 2, Hostname: "mdw", DataDir: "/data/dbfast1/seg1"},
+				cluster.SegConfig{ContentID: 1, DbID: 3, Hostname: "mdw", DataDir: "/data/dbfast2/seg2"},
+			}),
+		}
+		ports := []uint32{15433}
+
+		_, _, err := WriteSegmentArray([]string{}, cluster, ports)
+		if err == nil {
+			t.Errorf("expected error got nil")
 		}
 	})
 }
@@ -229,12 +347,12 @@ func TestRunInitsystemForTargetCluster(t *testing.T) {
 		AnyTimes()
 
 	cluster6X := &utils.Cluster{
-		BinDir: "/target/bin",
+		BinDir:  "/target/bin",
 		Version: dbconn.NewVersion("6.0.0"),
 	}
 
 	cluster7X := &utils.Cluster{
-		BinDir: "/target/bin",
+		BinDir:  "/target/bin",
 		Version: dbconn.NewVersion("7.0.0"),
 	}
 

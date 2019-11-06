@@ -37,7 +37,7 @@ func (m *UpgradePrimariesRequest) Reset()         { *m = UpgradePrimariesRequest
 func (m *UpgradePrimariesRequest) String() string { return proto.CompactTextString(m) }
 func (*UpgradePrimariesRequest) ProtoMessage()    {}
 func (*UpgradePrimariesRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_hub_to_agent_2dd4879384d9ec0b, []int{0}
+	return fileDescriptor_hub_to_agent_1dd42e198120ce04, []int{0}
 }
 func (m *UpgradePrimariesRequest) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_UpgradePrimariesRequest.Unmarshal(m, b)
@@ -100,7 +100,7 @@ func (m *DataDirPair) Reset()         { *m = DataDirPair{} }
 func (m *DataDirPair) String() string { return proto.CompactTextString(m) }
 func (*DataDirPair) ProtoMessage()    {}
 func (*DataDirPair) Descriptor() ([]byte, []int) {
-	return fileDescriptor_hub_to_agent_2dd4879384d9ec0b, []int{1}
+	return fileDescriptor_hub_to_agent_1dd42e198120ce04, []int{1}
 }
 func (m *DataDirPair) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_DataDirPair.Unmarshal(m, b)
@@ -165,7 +165,7 @@ func (m *UpgradePrimariesReply) Reset()         { *m = UpgradePrimariesReply{} }
 func (m *UpgradePrimariesReply) String() string { return proto.CompactTextString(m) }
 func (*UpgradePrimariesReply) ProtoMessage()    {}
 func (*UpgradePrimariesReply) Descriptor() ([]byte, []int) {
-	return fileDescriptor_hub_to_agent_2dd4879384d9ec0b, []int{2}
+	return fileDescriptor_hub_to_agent_1dd42e198120ce04, []int{2}
 }
 func (m *UpgradePrimariesReply) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_UpgradePrimariesReply.Unmarshal(m, b)
@@ -196,7 +196,7 @@ func (m *CreateSegmentDataDirRequest) Reset()         { *m = CreateSegmentDataDi
 func (m *CreateSegmentDataDirRequest) String() string { return proto.CompactTextString(m) }
 func (*CreateSegmentDataDirRequest) ProtoMessage()    {}
 func (*CreateSegmentDataDirRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_hub_to_agent_2dd4879384d9ec0b, []int{3}
+	return fileDescriptor_hub_to_agent_1dd42e198120ce04, []int{3}
 }
 func (m *CreateSegmentDataDirRequest) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_CreateSegmentDataDirRequest.Unmarshal(m, b)
@@ -233,7 +233,7 @@ func (m *CreateSegmentDataDirReply) Reset()         { *m = CreateSegmentDataDirR
 func (m *CreateSegmentDataDirReply) String() string { return proto.CompactTextString(m) }
 func (*CreateSegmentDataDirReply) ProtoMessage()    {}
 func (*CreateSegmentDataDirReply) Descriptor() ([]byte, []int) {
-	return fileDescriptor_hub_to_agent_2dd4879384d9ec0b, []int{4}
+	return fileDescriptor_hub_to_agent_1dd42e198120ce04, []int{4}
 }
 func (m *CreateSegmentDataDirReply) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_CreateSegmentDataDirReply.Unmarshal(m, b)
@@ -265,7 +265,7 @@ func (m *CopyMasterDirRequest) Reset()         { *m = CopyMasterDirRequest{} }
 func (m *CopyMasterDirRequest) String() string { return proto.CompactTextString(m) }
 func (*CopyMasterDirRequest) ProtoMessage()    {}
 func (*CopyMasterDirRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_hub_to_agent_2dd4879384d9ec0b, []int{5}
+	return fileDescriptor_hub_to_agent_1dd42e198120ce04, []int{5}
 }
 func (m *CopyMasterDirRequest) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_CopyMasterDirRequest.Unmarshal(m, b)
@@ -309,7 +309,7 @@ func (m *CopyMasterDirReply) Reset()         { *m = CopyMasterDirReply{} }
 func (m *CopyMasterDirReply) String() string { return proto.CompactTextString(m) }
 func (*CopyMasterDirReply) ProtoMessage()    {}
 func (*CopyMasterDirReply) Descriptor() ([]byte, []int) {
-	return fileDescriptor_hub_to_agent_2dd4879384d9ec0b, []int{6}
+	return fileDescriptor_hub_to_agent_1dd42e198120ce04, []int{6}
 }
 func (m *CopyMasterDirReply) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_CopyMasterDirReply.Unmarshal(m, b)
@@ -339,7 +339,7 @@ func (m *StopAgentRequest) Reset()         { *m = StopAgentRequest{} }
 func (m *StopAgentRequest) String() string { return proto.CompactTextString(m) }
 func (*StopAgentRequest) ProtoMessage()    {}
 func (*StopAgentRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_hub_to_agent_2dd4879384d9ec0b, []int{7}
+	return fileDescriptor_hub_to_agent_1dd42e198120ce04, []int{7}
 }
 func (m *StopAgentRequest) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_StopAgentRequest.Unmarshal(m, b)
@@ -369,7 +369,7 @@ func (m *StopAgentReply) Reset()         { *m = StopAgentReply{} }
 func (m *StopAgentReply) String() string { return proto.CompactTextString(m) }
 func (*StopAgentReply) ProtoMessage()    {}
 func (*StopAgentReply) Descriptor() ([]byte, []int) {
-	return fileDescriptor_hub_to_agent_2dd4879384d9ec0b, []int{8}
+	return fileDescriptor_hub_to_agent_1dd42e198120ce04, []int{8}
 }
 func (m *StopAgentReply) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_StopAgentReply.Unmarshal(m, b)
@@ -401,7 +401,7 @@ func (m *CheckSegmentDiskSpaceRequest) Reset()         { *m = CheckSegmentDiskSp
 func (m *CheckSegmentDiskSpaceRequest) String() string { return proto.CompactTextString(m) }
 func (*CheckSegmentDiskSpaceRequest) ProtoMessage()    {}
 func (*CheckSegmentDiskSpaceRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_hub_to_agent_2dd4879384d9ec0b, []int{9}
+	return fileDescriptor_hub_to_agent_1dd42e198120ce04, []int{9}
 }
 func (m *CheckSegmentDiskSpaceRequest) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_CheckSegmentDiskSpaceRequest.Unmarshal(m, b)
@@ -652,9 +652,9 @@ var _Agent_serviceDesc = grpc.ServiceDesc{
 	Metadata: "hub_to_agent.proto",
 }
 
-func init() { proto.RegisterFile("hub_to_agent.proto", fileDescriptor_hub_to_agent_2dd4879384d9ec0b) }
+func init() { proto.RegisterFile("hub_to_agent.proto", fileDescriptor_hub_to_agent_1dd42e198120ce04) }
 
-var fileDescriptor_hub_to_agent_2dd4879384d9ec0b = []byte{
+var fileDescriptor_hub_to_agent_1dd42e198120ce04 = []byte{
 	// 501 bytes of a gzipped FileDescriptorProto
 	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x7c, 0x54, 0xc1, 0x6e, 0xda, 0x40,
 	0x10, 0x2d, 0x10, 0x9a, 0x32, 0x54, 0x11, 0xda, 0x26, 0xc2, 0x71, 0x50, 0x44, 0xdd, 0x43, 0x39,

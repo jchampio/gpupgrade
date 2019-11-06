@@ -32,6 +32,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/greenplum-db/gp-common-go-libs/gplog"
@@ -313,8 +314,51 @@ If you would like to return the cluster to its original state, run
 	return subInit
 }
 
+func parsePorts(val string) ([]uint32, error) {
+	var ports []uint32
+
+	if val == "" {
+		return ports, nil
+	}
+
+	for _, p := range strings.Split(val, ",") {
+		parts := strings.Split(p, "-")
+		switch {
+		case len(parts) == 2: // this is a range
+			low, err := strconv.ParseUint(parts[0], 10, 16)
+			if err != nil {
+				return nil, xerrors.Errorf("failed to parse port range %s", p)
+			}
+
+			high, err := strconv.ParseUint(parts[1], 10, 16)
+			if err != nil {
+				return nil, xerrors.Errorf("failed to parse port range %s", p)
+			}
+
+			if low > high {
+				return nil, xerrors.Errorf("invalid port range %s", p)
+			}
+
+			for i := low; i <= high; i++ {
+				ports = append(ports, uint32(i))
+			}
+
+		default: // single port
+			port, err := strconv.ParseUint(p, 10, 16)
+			if err != nil {
+				return nil, xerrors.Errorf("failed to parse port %s", p)
+			}
+
+			ports = append(ports, uint32(port))
+		}
+	}
+
+	return ports, nil
+}
+
 func execute() *cobra.Command {
 	var verbose bool
+	var ports string
 
 	cmd := &cobra.Command{
 		Use:   "execute",
@@ -323,16 +367,20 @@ func execute() *cobra.Command {
 Upgrades the master and primary segments over to the new cluster.
 This step can be reverted.
 `,
-		Run: func(cmd *cobra.Command, args []string) {
-			client := connectToHub()
-			err := commanders.Execute(client, verbose)
+		RunE: func(cmd *cobra.Command, args []string) error {
+			ports, err := parsePorts(ports)
 			if err != nil {
-				gplog.Error(err.Error())
-				os.Exit(1)
+				return err
 			}
+
+			cmd.SilenceUsage = true
+
+			client := connectToHub()
+			return commanders.Execute(client, verbose, ports)
 		},
 	}
 
+	cmd.Flags().StringVar(&ports, "ports", "", "set of ports to use when initializing the new cluster")
 	cmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "print the output stream from all substeps")
 
 	return cmd

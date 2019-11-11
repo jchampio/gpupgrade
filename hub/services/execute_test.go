@@ -261,9 +261,9 @@ func TestExecuteSubStep(t *testing.T) {
 		Send(gomock.Any()).
 		AnyTimes()
 
-	stream := &ExecuteStream{
+	stream := &multiplexedStream{
 		stream: sender,
-		log:    new(bytes.Buffer),
+		writer: new(bytes.Buffer),
 	}
 
 	expected := errors.New("ahhhh")

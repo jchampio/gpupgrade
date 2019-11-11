@@ -20,11 +20,6 @@ import (
 	"github.com/greenplum-db/gpupgrade/utils"
 )
 
-type InitializeStream struct {
-	stream messageSender
-	log    *os.File
-}
-
 func (h *Hub) Initialize(in *idl.InitializeRequest, stream idl.CliToHub_InitializeServer) (err error) {
 	log, err := utils.System.OpenFile(
 		filepath.Join(utils.GetStateDir(), "initialize.log"),
@@ -41,7 +36,7 @@ func (h *Hub) Initialize(in *idl.InitializeRequest, stream idl.CliToHub_Initiali
 		}
 	}()
 
-	initializeStream := &InitializeStream{stream: stream, log: log}
+	initializeStream := newMultiplexedStream(stream, log)
 
 	_, err = log.WriteString("\nInitialize in progress.\n")
 	if err != nil {
@@ -81,7 +76,7 @@ func (h *Hub) InitializeCreateCluster(in *idl.InitializeCreateClusterRequest, st
 		}
 	}()
 
-	initializeStream := &InitializeStream{stream: stream, log: log}
+	initializeStream := newMultiplexedStream(stream, log)
 
 	_, err = log.WriteString("\nInitialize hub in progress.\n")
 	if err != nil {
@@ -130,11 +125,11 @@ func (h *Hub) InitializeCreateCluster(in *idl.InitializeCreateClusterRequest, st
 	return err
 }
 
-func (h *Hub) InitializeSubStep(initializeStream *InitializeStream, subStep string,
+func (h *Hub) InitializeSubStep(initializeStream *multiplexedStream, subStep string,
 	subStepFunc func(stream messageSender, log io.Writer) error) error {
 
 	gplog.Info("starting %s", subStep)
-	_, err := initializeStream.log.WriteString(fmt.Sprintf("\nStarting %s...\n\n", subStep))
+	_, err := fmt.Fprintf(initializeStream.writer, "\nStarting %s...\n\n", subStep)
 	if err != nil {
 		return xerrors.Errorf("failed writing to initialize log: %w", err)
 	}

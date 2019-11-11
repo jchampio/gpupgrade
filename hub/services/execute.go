@@ -17,11 +17,6 @@ import (
 	"github.com/greenplum-db/gpupgrade/utils"
 )
 
-type ExecuteStream struct {
-	stream messageSender
-	log    io.Writer
-}
-
 func (h *Hub) Execute(request *idl.ExecuteRequest, stream idl.CliToHub_ExecuteServer) (err error) {
 	// Create a log file to contain execute output.
 	log, err := utils.System.OpenFile(
@@ -39,7 +34,7 @@ func (h *Hub) Execute(request *idl.ExecuteRequest, stream idl.CliToHub_ExecuteSe
 		}
 	}()
 
-	executeStream := &ExecuteStream{stream: stream, log: log}
+	executeStream := newMultiplexedStream(stream, log)
 
 	_, err = log.WriteString("\nExecute in progress.\n")
 	if err != nil {
@@ -76,7 +71,7 @@ func (h *Hub) Execute(request *idl.ExecuteRequest, stream idl.CliToHub_ExecuteSe
 func (h *Hub) ExecuteSubStep(executeStream *ExecuteStream, subStep string,
 	subStepFunc func(stream messageSender, log io.Writer) error) error {
 	gplog.Info("starting %s", subStep)
-	_, err := executeStream.log.Write([]byte(fmt.Sprintf("\nStarting %s...\n\n", subStep)))
+	_, err := fmt.Fprintf(executeStream.writer, "\nStarting %s...\n\n", subStep)
 	if err != nil {
 		return xerrors.Errorf("failed writing to execute log: %w", err)
 	}

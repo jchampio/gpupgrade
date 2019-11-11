@@ -70,8 +70,7 @@ setup_newmasterdir() {
         --new-bindir "$GPHOME/bin" \
         --old-port "$PGPORT" \
         --disk-free-ratio=0 3>&-
-
-    [ "$status" -eq 1 ]
+    [ "$status" -eq 1 ] || fail "$output"
 
     NEW_CLUSTER="$newmasterdir"
 

@@ -2,7 +2,6 @@ package services
 
 import (
 	"fmt"
-	"io"
 	"io/ioutil"
 	"os"
 	"path"
@@ -57,8 +56,8 @@ func (h *Hub) writeConf(sourceDBConn *dbconn.DBConn, ports []uint32) (int, error
 	return masterPort, WriteInitsystemFile(gpinitsystemConfig, h.initsystemConfPath())
 }
 
-func (h *Hub) CreateTargetCluster(stream messageSender, log io.Writer, masterPort int) error {
-	err := h.InitTargetCluster(stream, log)
+func (h *Hub) CreateTargetCluster(stream OutStreams, masterPort int) error {
+	err := h.InitTargetCluster(stream)
 	if err != nil {
 		return err
 	}
@@ -67,7 +66,7 @@ func (h *Hub) CreateTargetCluster(stream messageSender, log io.Writer, masterPor
 	return ReloadAndCommitCluster(h.target, targetDBConn)
 }
 
-func (h *Hub) InitTargetCluster(stream messageSender, log io.Writer) error {
+func (h *Hub) InitTargetCluster(stream OutStreams) error {
 	agentConns, err := h.AgentConns()
 	if err != nil {
 		return errors.Wrap(err, "Could not get/create agents")
@@ -78,7 +77,7 @@ func (h *Hub) InitTargetCluster(stream messageSender, log io.Writer) error {
 		return err
 	}
 
-	return RunInitsystemForTargetCluster(stream, log, h.target, h.initsystemConfPath())
+	return RunInitsystemForTargetCluster(stream, h.target, h.initsystemConfPath())
 }
 
 func GetCheckpointSegmentsAndEncoding(gpinitsystemConfig []string, dbConnector *dbconn.DBConn) ([]string, error) {
@@ -252,7 +251,7 @@ func CreateAllDataDirectories(agentConns []*Connection, source *utils.Cluster) e
 	return nil
 }
 
-func RunInitsystemForTargetCluster(stream messageSender, log io.Writer, target *utils.Cluster, gpinitsystemFilepath string) error {
+func RunInitsystemForTargetCluster(stream OutStreams, target *utils.Cluster, gpinitsystemFilepath string) error {
 	gphome := filepath.Dir(path.Clean(target.BinDir)) //works around https://github.com/golang/go/issues/4837 in go10.4
 
 	args := "-a -I " + gpinitsystemFilepath
@@ -268,7 +267,8 @@ func RunInitsystemForTargetCluster(stream messageSender, log io.Writer, target *
 	)
 	cmd := execCommand("bash", "-c", script)
 
-	attachMultiplexedStreamToCmd(cmd, stream, log)
+	cmd.Stdout = stream.Stdout()
+	cmd.Stderr = stream.Stderr()
 
 	err := cmd.Run()
 	if err != nil {

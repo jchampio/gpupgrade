@@ -2,7 +2,6 @@ package services
 
 import (
 	"fmt"
-	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -14,8 +13,7 @@ import (
 // Allow exec.Command to be mocked out by exectest.NewCommand.
 var execCommand = exec.Command
 
-func (h *Hub) UpgradeMaster(stream messageSender, log io.Writer, checkOnly bool) error {
-	// Make sure our working directory exists.
+func (h *Hub) UpgradeMaster(stream OutStreams, checkOnly bool) error {
 	wd := utils.MasterPGUpgradeDirectory(h.conf.StateDir)
 	err := utils.System.MkdirAll(wd, 0700)
 	if err != nil {
@@ -23,7 +21,7 @@ func (h *Hub) UpgradeMaster(stream messageSender, log io.Writer, checkOnly bool)
 	}
 
 	pair := clusterPair{h.source, h.target}
-	return pair.ConvertMaster(stream, log, wd, checkOnly)
+	return pair.ConvertMaster(stream, wd, checkOnly)
 }
 
 // clusterPair simply holds the source and target clusters.
@@ -40,7 +38,7 @@ type clusterPair struct {
 // Errors when writing to the io.Writer are fatal, but errors encountered during
 // gRPC streaming are logged and otherwise ignored. The pg_upgrade execution
 // will continue even if the client disconnects.
-func (c clusterPair) ConvertMaster(stream messageSender, out io.Writer, wd string, checkOnly bool) error {
+func (c clusterPair) ConvertMaster(stream OutStreams, wd string, checkOnly bool) error {
 	path := filepath.Join(c.Target.BinDir, "pg_upgrade")
 	args := []string{
 		"--old-bindir", c.Source.BinDir,
@@ -58,7 +56,8 @@ func (c clusterPair) ConvertMaster(stream messageSender, out io.Writer, wd strin
 	}
 	cmd := execCommand(path, args...)
 
-	attachMultiplexedStreamToCmd(cmd, stream, out)
+	cmd.Stdout = stream.Stdout()
+	cmd.Stderr = stream.Stderr()
 	cmd.Dir = wd
 
 	// Explicitly clear the child environment. pg_upgrade shouldn't need things

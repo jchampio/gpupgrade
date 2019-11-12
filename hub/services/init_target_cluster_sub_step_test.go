@@ -1,7 +1,6 @@
 package services
 
 import (
-	"bytes"
 	"database/sql/driver"
 	"errors"
 	"fmt"
@@ -22,8 +21,6 @@ import (
 	"github.com/greenplum-db/gpupgrade/idl/mock_idl"
 	"github.com/greenplum-db/gpupgrade/testutils/exectest"
 	"github.com/greenplum-db/gpupgrade/utils"
-
-	. "github.com/onsi/ginkgo"
 )
 
 func gpinitsystem() {}
@@ -354,14 +351,6 @@ func TestCreateSegmentDataDirectories(t *testing.T) {
 }
 
 func TestRunInitsystemForTargetCluster(t *testing.T) {
-	ctrl := gomock.NewController(GinkgoT())
-	defer ctrl.Finish()
-
-	mockStream := mock_idl.NewMockCliToHub_ExecuteServer(ctrl)
-	mockStream.EXPECT().
-		Send(gomock.Any()).
-		AnyTimes()
-
 	cluster6X := &utils.Cluster{
 		BinDir:  "/target/bin",
 		Version: dbconn.NewVersion("6.0.0"),
@@ -393,8 +382,7 @@ func TestRunInitsystemForTargetCluster(t *testing.T) {
 				}
 			})
 
-		var buf bytes.Buffer
-		err := RunInitsystemForTargetCluster(mockStream, &buf, cluster7X, gpinitsystemConfigPath)
+		err := RunInitsystemForTargetCluster(DevNull, cluster7X, gpinitsystemConfigPath)
 		if err != nil {
 			t.Error("gpinitsystem failed")
 		}
@@ -414,8 +402,7 @@ func TestRunInitsystemForTargetCluster(t *testing.T) {
 				}
 			})
 
-		var buf bytes.Buffer
-		err := RunInitsystemForTargetCluster(mockStream, &buf, cluster6X, gpinitsystemConfigPath)
+		err := RunInitsystemForTargetCluster(DevNull, cluster6X, gpinitsystemConfigPath)
 		if err != nil {
 			t.Error("gpinitsystem failed")
 		}
@@ -436,8 +423,7 @@ func TestRunInitsystemForTargetCluster(t *testing.T) {
 			})
 
 		cluster7X.BinDir += "/"
-		var buf bytes.Buffer
-		err := RunInitsystemForTargetCluster(mockStream, &buf, cluster7X, gpinitsystemConfigPath)
+		err := RunInitsystemForTargetCluster(DevNull, cluster7X, gpinitsystemConfigPath)
 		if err != nil {
 			t.Error("gpinitsystem failed")
 		}
@@ -446,8 +432,7 @@ func TestRunInitsystemForTargetCluster(t *testing.T) {
 	t.Run("returns an error when gpinitsystem fails with --ignore-warnings when upgrading to GPDB6", func(t *testing.T) {
 		execCommand = exectest.NewCommand(gpinitsystem_Exits1)
 
-		var buf bytes.Buffer
-		err := RunInitsystemForTargetCluster(mockStream, &buf, cluster6X, gpinitsystemConfigPath)
+		err := RunInitsystemForTargetCluster(DevNull, cluster6X, gpinitsystemConfigPath)
 
 		var actual *exec.ExitError
 		if !xerrors.As(err, &actual) {
@@ -462,8 +447,7 @@ func TestRunInitsystemForTargetCluster(t *testing.T) {
 	t.Run("returns an error when gpinitsystem errors when upgrading to GPDB7 or higher", func(t *testing.T) {
 		execCommand = exectest.NewCommand(gpinitsystem_Exits1)
 
-		var buf bytes.Buffer
-		err := RunInitsystemForTargetCluster(mockStream, &buf, cluster7X, gpinitsystemConfigPath)
+		err := RunInitsystemForTargetCluster(DevNull, cluster7X, gpinitsystemConfigPath)
 
 		var actual *exec.ExitError
 		if !xerrors.As(err, &actual) {

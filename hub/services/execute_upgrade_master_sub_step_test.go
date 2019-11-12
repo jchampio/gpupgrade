@@ -2,17 +2,14 @@ package services
 
 import (
 	"bufio"
-	"bytes"
 	"flag"
 	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
 
-	"github.com/golang/mock/gomock"
 	"github.com/greenplum-db/gp-common-go-libs/cluster"
 
-	"github.com/greenplum-db/gpupgrade/idl/mock_idl"
 	"github.com/greenplum-db/gpupgrade/testutils/exectest"
 	"github.com/greenplum-db/gpupgrade/utils"
 
@@ -87,14 +84,7 @@ func TestUpgradeMaster(t *testing.T) {
 
 	t.Run("sets the working directory", func(t *testing.T) {
 		g := NewGomegaWithT(t)
-
-		ctrl := gomock.NewController(t)
-		defer ctrl.Finish()
-
-		mockStream := mock_idl.NewMockCliToHub_ExecuteServer(ctrl)
-		mockStream.EXPECT().
-			Send(gomock.Any()).
-			AnyTimes()
+		stream := new(bufferedStreams)
 
 		// Print the working directory of the command.
 		execCommand = exectest.NewCommand(WorkingDirectoryMain)
@@ -102,24 +92,16 @@ func TestUpgradeMaster(t *testing.T) {
 		// NOTE: avoid testing paths that might be symlinks, such as /tmp, as
 		// the "actual" working directory might look different to the
 		// subprocess.
-		var buf bytes.Buffer
-		err := pair.ConvertMaster(mockStream, &buf, "/", false)
+		err := pair.ConvertMaster(stream, "/", false)
 		g.Expect(err).NotTo(HaveOccurred())
 
-		wd := buf.String()
+		wd := stream.stdout.String()
 		g.Expect(wd).To(Equal("/"))
 	})
 
 	t.Run("unsets PGPORT and PGHOST", func(t *testing.T) {
 		g := NewGomegaWithT(t)
-
-		ctrl := gomock.NewController(t)
-		defer ctrl.Finish()
-
-		mockStream := mock_idl.NewMockCliToHub_ExecuteServer(ctrl)
-		mockStream.EXPECT().
-			Send(gomock.Any()).
-			AnyTimes()
+		stream := new(bufferedStreams)
 
 		// Set our environment.
 		os.Setenv("PGPORT", "5432")
@@ -132,11 +114,10 @@ func TestUpgradeMaster(t *testing.T) {
 		// Echo the environment to stdout.
 		execCommand = exectest.NewCommand(EnvironmentMain)
 
-		var buf bytes.Buffer
-		err := pair.ConvertMaster(mockStream, &buf, "", false)
+		err := pair.ConvertMaster(stream, "", false)
 		g.Expect(err).NotTo(HaveOccurred())
 
-		scanner := bufio.NewScanner(&buf)
+		scanner := bufio.NewScanner(&stream.stdout)
 		for scanner.Scan() {
 			g.Expect(scanner.Text()).NotTo(HavePrefix("PGPORT="),
 				"PGPORT was not stripped from the child environment")
@@ -148,11 +129,8 @@ func TestUpgradeMaster(t *testing.T) {
 
 	t.Run("calls pg_upgrade with the expected options with no check", func(t *testing.T) {
 		g := NewGomegaWithT(t)
+		stream := new(bufferedStreams)
 
-		ctrl := gomock.NewController(t)
-		defer ctrl.Finish()
-
-		mockStream := mock_idl.NewMockCliToHub_ExecuteServer(ctrl)
 		execCommand = exectest.NewCommandWithVerifier(EmptyMain,
 			func(path string, args ...string) {
 				// pg_upgrade should be run from the target installation.
@@ -190,18 +168,14 @@ func TestUpgradeMaster(t *testing.T) {
 				g.Expect(fs.Args()).To(BeEmpty())
 			})
 
-		var buf bytes.Buffer
-		err := pair.ConvertMaster(mockStream, &buf, "", false)
+		err := pair.ConvertMaster(stream, "", false)
 		g.Expect(err).NotTo(HaveOccurred())
 	})
 
 	t.Run("calls pg_upgrade with the expected options with no check", func(t *testing.T) {
 		g := NewGomegaWithT(t)
+		stream := new(bufferedStreams)
 
-		ctrl := gomock.NewController(t)
-		defer ctrl.Finish()
-
-		mockStream := mock_idl.NewMockCliToHub_ExecuteServer(ctrl)
 		execCommand = exectest.NewCommandWithVerifier(EmptyMain,
 			func(path string, args ...string) {
 				// pg_upgrade should be run from the target installation.
@@ -241,8 +215,7 @@ func TestUpgradeMaster(t *testing.T) {
 				g.Expect(fs.Args()).To(BeEmpty())
 			})
 
-		var buf bytes.Buffer
-		err := pair.ConvertMaster(mockStream, &buf, "", true)
+		err := pair.ConvertMaster(stream, "", true)
 		g.Expect(err).NotTo(HaveOccurred())
 	})
 }

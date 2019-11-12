@@ -1,13 +1,12 @@
 package services
 
 import (
-	"io"
 	"sync"
 
 	"github.com/hashicorp/go-multierror"
 )
 
-func (h *Hub) CheckUpgrade(stream messageSender, log io.Writer) error {
+func (h *Hub) CheckUpgrade(stream OutStreams) error {
 	var wg sync.WaitGroup
 	checkErrs := make(chan error, 2)
 
@@ -15,7 +14,7 @@ func (h *Hub) CheckUpgrade(stream messageSender, log io.Writer) error {
 	go func() {
 		defer wg.Done()
 
-		err := h.UpgradeMaster(stream, log, true)
+		err := h.UpgradeMaster(stream, true)
 		if err != nil {
 			checkErrs <- err
 		}

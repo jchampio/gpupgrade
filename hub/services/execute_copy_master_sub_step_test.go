@@ -1,7 +1,8 @@
 package services
 
 import (
-	"bytes"
+	"io"
+	"io/ioutil"
 	"testing"
 
 	"github.com/golang/mock/gomock"
@@ -24,8 +25,6 @@ func TestCopyMaster(t *testing.T) {
 
 	testhelper.SetupTestLogger() // initialize gplog
 
-	var buf bytes.Buffer
-
 	sourceNodes := cluster.NewCluster([]cluster.SegConfig{
 		cluster.SegConfig{ContentID: -1, DbID: 1, Port: 15432, Hostname: "localhost", DataDir: "/data/qddir/seg-1"},
 		cluster.SegConfig{ContentID: 0, DbID: 2, Port: 25432, Hostname: "host1", DataDir: "/data/dbfast1/seg1"},
@@ -42,7 +41,6 @@ func TestCopyMaster(t *testing.T) {
 		cluster.SegConfig{ContentID: -1, DbID: 1, Port: 15432, Hostname: "localhost", DataDir: "/data/qddir/seg-1"},
 		cluster.SegConfig{ContentID: 0, DbID: 2, Port: 25432, Hostname: "host1", DataDir: "/data/dbfast1/seg1"},
 		cluster.SegConfig{ContentID: 1, DbID: 3, Port: 25433, Hostname: "host2", DataDir: "/data/dbfast2/seg2"},
-
 	})
 	targetCluster := utils.Cluster{
 		Cluster:    targetNodes,
@@ -56,11 +54,6 @@ func TestCopyMaster(t *testing.T) {
 	t.Run("copies the master data directory to each primary host", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
-
-		mockStream := mock_idl.NewMockCliToHub_ExecuteServer(ctrl)
-		mockStream.EXPECT().
-			Send(gomock.Any()).
-			AnyTimes()
 
 		testExecutor := &testhelper.TestExecutor{}
 		mockOutput := &cluster.RemoteOutput{}
@@ -79,7 +72,7 @@ func TestCopyMaster(t *testing.T) {
 
 		hub.agentConns = agentConns
 
-		err := hub.CopyMasterDataDir(mockStream, &buf)
+		err := hub.CopyMasterDataDir(DevNull)
 		g.Expect(err).ToNot(HaveOccurred())
 
 		g.Eventually(func() int { return testExecutor.NumExecutions }).Should(Equal(1))
@@ -94,11 +87,6 @@ func TestCopyMaster(t *testing.T) {
 	t.Run("copies the master data directory only once per host", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
-
-		mockStream := mock_idl.NewMockCliToHub_ExecuteServer(ctrl)
-		mockStream.EXPECT().
-			Send(gomock.Any()).
-			AnyTimes()
 
 		testExecutor := &testhelper.TestExecutor{}
 		mockOutput := &cluster.RemoteOutput{}
@@ -123,7 +111,7 @@ func TestCopyMaster(t *testing.T) {
 			targetCluster.Segments[content] = segment
 		}
 
-		err := hub.CopyMasterDataDir(mockStream, &buf)
+		err := hub.CopyMasterDataDir(DevNull)
 		g.Expect(err).ToNot(HaveOccurred())
 
 		g.Eventually(func() int { return testExecutor.NumExecutions }).Should(Equal(1))
@@ -132,4 +120,17 @@ func TestCopyMaster(t *testing.T) {
 		g.Expect(expectedCmd).To(HaveLen(1))
 		g.Expect(expectedCmd).To(ContainElement([]string{"rsync", "-rzpogt", "/data/qddir/seg-1/", "localhost:/tmp/masterDirCopy"}))
 	})
+}
+
+// DevNull implements OutStreams by just discarding all writes.
+var DevNull = devNull{}
+
+type devNull struct{}
+
+func (_ devNull) Stdout() io.Writer {
+	return ioutil.Discard
+}
+
+func (_ devNull) Stderr() io.Writer {
+	return ioutil.Discard
 }

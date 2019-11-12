@@ -3,6 +3,8 @@ package services
 import (
 	"database/sql"
 	"fmt"
+	"os"
+	"path/filepath"
 
 	"github.com/greenplum-db/gp-common-go-libs/cluster"
 	multierror "github.com/hashicorp/go-multierror"
@@ -10,10 +12,28 @@ import (
 	"golang.org/x/xerrors"
 
 	"github.com/greenplum-db/gpupgrade/idl"
+	"github.com/greenplum-db/gpupgrade/utils"
 )
 
-func (h *Hub) Finalize(_ *idl.FinalizeRequest, stream idl.CliToHub_FinalizeServer) error {
-	err := h.UpgradeReconfigurePortsSubStep(stream)
+func (h *Hub) Finalize(_ *idl.FinalizeRequest, stream idl.CliToHub_FinalizeServer) (err error) {
+	log, err := utils.System.OpenFile(
+		filepath.Join(utils.GetStateDir(), "finalize.log"),
+		os.O_WRONLY|os.O_CREATE,
+		0600,
+	)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if closeErr := log.Close(); closeErr != nil {
+			err = multierror.Append(err,
+				xerrors.Errorf("failed to close finalize log: %w", closeErr))
+		}
+	}()
+
+	finalizeStream := newMultiplexedStream(stream, log)
+
+	err = h.UpgradeReconfigurePortsSubStep(finalizeStream)
 	return err
 }
 

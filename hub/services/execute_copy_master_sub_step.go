@@ -2,13 +2,13 @@ package services
 
 import (
 	"fmt"
-	"io"
 	"path/filepath"
 	"sync"
 
+	"github.com/pkg/errors"
+
 	"github.com/greenplum-db/gpupgrade/idl"
 	"github.com/greenplum-db/gpupgrade/utils"
-	"github.com/pkg/errors"
 
 	"github.com/greenplum-db/gp-common-go-libs/cluster"
 	"github.com/greenplum-db/gp-common-go-libs/gplog"
@@ -16,7 +16,7 @@ import (
 	"golang.org/x/net/context"
 )
 
-func (h *Hub) CopyMasterDataDir(stream messageSender, log io.Writer) error {
+func (h *Hub) CopyMasterDataDir(_ OutStreams) error {
 	var err error
 	rsyncFlags := "-rzpogt"
 

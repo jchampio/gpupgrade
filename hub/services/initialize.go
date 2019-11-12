@@ -2,7 +2,6 @@ package services
 
 import (
 	"fmt"
-	"io"
 	"os"
 	"path"
 	"path/filepath"
@@ -43,16 +42,15 @@ func (h *Hub) Initialize(in *idl.InitializeRequest, stream idl.CliToHub_Initiali
 		return xerrors.Errorf("failed writing to initialize log: %w", err)
 	}
 
-	err = h.InitializeSubStep(initializeStream, upgradestatus.CONFIG, func(stream messageSender, log io.Writer) error {
-		return h.fillClusterConfigsSubStep(stream, log, in.OldBinDir, in.NewBinDir, int(in.OldPort))
-	})
+	err = h.Substep(initializeStream, upgradestatus.CONFIG,
+		func(stream OutStreams) error {
+			return h.fillClusterConfigsSubStep(stream, in.OldBinDir, in.NewBinDir, int(in.OldPort))
+		})
 	if err != nil {
 		return err
 	}
 
-	err = h.InitializeSubStep(initializeStream, upgradestatus.START_AGENTS, func(stream messageSender, log io.Writer) error {
-		return startAgentsSubStep(h.source, h.conf.StateDir)
-	})
+	err = h.Substep(initializeStream, upgradestatus.START_AGENTS, h.startAgentsSubStep)
 	if err != nil {
 		return err
 	}
@@ -84,8 +82,8 @@ func (h *Hub) InitializeCreateCluster(in *idl.InitializeCreateClusterRequest, st
 	}
 
 	var targetMasterPort int
-	err = h.InitializeSubStep(initializeStream, upgradestatus.CREATE_TARGET_CONFIG,
-		func(_ messageSender, _ io.Writer) error {
+	err = h.Substep(initializeStream, upgradestatus.CREATE_TARGET_CONFIG,
+		func(_ OutStreams) error {
 			var err error
 			targetMasterPort, err = h.GenerateInitsystemConfig(in.Ports)
 			return err
@@ -94,66 +92,35 @@ func (h *Hub) InitializeCreateCluster(in *idl.InitializeCreateClusterRequest, st
 		return err
 	}
 
-	err = h.InitializeSubStep(initializeStream, upgradestatus.SHUTDOWN_SOURCE_CLUSTER,
-		func(stream messageSender, log io.Writer) error {
-			return StopCluster(stream, log, h.source)
+	err = h.Substep(initializeStream, upgradestatus.SHUTDOWN_SOURCE_CLUSTER,
+		func(stream OutStreams) error {
+			return StopCluster(stream, h.source)
 		})
 	if err != nil {
 		return err
 	}
 
-	err = h.InitializeSubStep(initializeStream, upgradestatus.INIT_TARGET_CLUSTER,
-		func(stream messageSender, log io.Writer) error {
-			return h.CreateTargetCluster(stream, log, targetMasterPort)
+	err = h.Substep(initializeStream, upgradestatus.INIT_TARGET_CLUSTER,
+		func(stream OutStreams) error {
+			return h.CreateTargetCluster(stream, targetMasterPort)
 		})
 	if err != nil {
 		return err
 	}
 
-	err = h.InitializeSubStep(initializeStream, upgradestatus.SHUTDOWN_TARGET_CLUSTER, func(stream messageSender, log io.Writer) error {
-		return h.ShutdownCluster(stream, log, false)
-	})
-
+	err = h.Substep(initializeStream, upgradestatus.SHUTDOWN_TARGET_CLUSTER,
+		func(stream OutStreams) error {
+			return h.ShutdownCluster(stream, false)
+		})
 	if err != nil {
 		return err
 	}
 
-	err = h.InitializeSubStep(initializeStream, upgradestatus.CHECK_UPGRADE, func(stream messageSender, log io.Writer) error {
-		return h.CheckUpgrade(stream, log)
-	})
-
-	return err
-}
-
-func (h *Hub) InitializeSubStep(initializeStream *multiplexedStream, subStep string,
-	subStepFunc func(stream messageSender, log io.Writer) error) error {
-
-	gplog.Info("starting %s", subStep)
-	_, err := fmt.Fprintf(initializeStream.writer, "\nStarting %s...\n\n", subStep)
-	if err != nil {
-		return xerrors.Errorf("failed writing to initialize log: %w", err)
-	}
-
-	step, err := h.InitializeStep(subStep, initializeStream.stream)
-	if err != nil {
-		gplog.Error(err.Error())
-		return err
-	}
-
-	err = subStepFunc(initializeStream.stream, initializeStream.log)
-	if err != nil {
-		gplog.Error(err.Error())
-		step.MarkFailed()
-	} else {
-		step.MarkComplete()
-	}
-
-	return err
+	return h.Substep(initializeStream, upgradestatus.CHECK_UPGRADE, h.CheckUpgrade)
 }
 
 // create old/new clusters, write to disk and re-read from disk to make sure it is "durable"
-func (h *Hub) fillClusterConfigsSubStep(stream messageSender, log io.Writer, oldBinDir string, newBinDir string, oldPort int) error {
-
+func (h *Hub) fillClusterConfigsSubStep(_ OutStreams, oldBinDir, newBinDir string, oldPort int) error {
 	source := &utils.Cluster{BinDir: path.Clean(oldBinDir), ConfigPath: filepath.Join(h.conf.StateDir, utils.SOURCE_CONFIG_FILENAME)}
 	dbConn := db.NewDBConn("localhost", oldPort, "template1")
 	defer dbConn.Close()
@@ -216,7 +183,10 @@ func getAgentPath() (string, error) {
 }
 
 // TODO: use the implementation in RestartAgents() for this function and combine them
-func startAgentsSubStep(source *utils.Cluster, stateDir string) error {
+func (h *Hub) startAgentsSubStep(stream OutStreams) error {
+	source := h.source
+	stateDir := h.conf.StateDir
+
 	// XXX If there are failures, does it matter what agents have successfully
 	// started, or do we just want to stop all of them and kick back to the
 	// user?

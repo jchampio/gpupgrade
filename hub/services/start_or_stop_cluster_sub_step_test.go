@@ -1,21 +1,16 @@
 package services
 
 import (
-	"bytes"
 	"os"
 	"os/exec"
 	"testing"
 
-	"github.com/golang/mock/gomock"
-
 	"github.com/greenplum-db/gp-common-go-libs/cluster"
 	"github.com/greenplum-db/gp-common-go-libs/dbconn"
 
-	"github.com/greenplum-db/gpupgrade/idl/mock_idl"
 	"github.com/greenplum-db/gpupgrade/testutils/exectest"
 	"github.com/greenplum-db/gpupgrade/utils"
 
-	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
 
@@ -38,15 +33,7 @@ func init() {
 
 func TestStartOrStopCluster(t *testing.T) {
 	g := NewGomegaWithT(t)
-	ctrl := gomock.NewController(GinkgoT())
-	defer ctrl.Finish()
 
-	mockStream := mock_idl.NewMockCliToHub_ExecuteServer(ctrl)
-	mockStream.EXPECT().
-		Send(gomock.Any()).
-		AnyTimes()
-
-	var buf bytes.Buffer
 	var source *utils.Cluster
 	cluster := cluster.NewCluster([]cluster.SegConfig{cluster.SegConfig{ContentID: -1, DbID: 1, Port: 15432, Hostname: "localhost", DataDir: "basedir/seg-1"}})
 	source = &utils.Cluster{
@@ -73,14 +60,14 @@ func TestStartOrStopCluster(t *testing.T) {
 				g.Expect(args).To(Equal([]string{"-c", "pgrep -F basedir/seg-1/postmaster.pid"}))
 			})
 
-		err := IsPostmasterRunning(mockStream, &buf, source)
+		err := IsPostmasterRunning(DevNull, source)
 		g.Expect(err).ToNot(HaveOccurred())
 	})
 
 	t.Run("isPostmasterRunning fails", func(t *testing.T) {
 		isPostmasterRunningCmd = exectest.NewCommand(IsPostmasterRunningCmd_Errors)
 
-		err := IsPostmasterRunning(mockStream, &buf, source)
+		err := IsPostmasterRunning(DevNull, source)
 		g.Expect(err).To(HaveOccurred())
 	})
 
@@ -98,7 +85,7 @@ func TestStartOrStopCluster(t *testing.T) {
 					"&& /source/bindir/gpstop -a -d basedir/seg-1"}))
 			})
 
-		err := StopCluster(mockStream, &buf, source)
+		err := StopCluster(DevNull, source)
 		g.Expect(err).ToNot(HaveOccurred())
 	})
 
@@ -111,7 +98,7 @@ func TestStartOrStopCluster(t *testing.T) {
 				skippedStopClusterCommand = false
 			})
 
-		err := StopCluster(mockStream, &buf, source)
+		err := StopCluster(DevNull, source)
 		g.Expect(err).To(HaveOccurred())
 		g.Expect(skippedStopClusterCommand).To(Equal(true))
 	})
@@ -124,7 +111,7 @@ func TestStartOrStopCluster(t *testing.T) {
 					"&& /source/bindir/gpstart -a -d basedir/seg-1"}))
 			})
 
-		err := StartCluster(mockStream, &buf, source)
+		err := StartCluster(DevNull, source)
 		g.Expect(err).ToNot(HaveOccurred())
 	})
 }

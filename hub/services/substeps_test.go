@@ -16,68 +16,40 @@ import (
 	"github.com/greenplum-db/gpupgrade/idl/mock_idl"
 	"github.com/greenplum-db/gpupgrade/testutils"
 
-	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
 
 func TestMultiplexedStream(t *testing.T) {
-	var log *gbytes.Buffer // contains gplog output
-
 	// Store gplog output.
-	_, _, log = testhelper.SetupTestLogger()
+	_, _, log := testhelper.SetupTestLogger()
 
 	t.Run("forwards stdout and stderr to the stream", func(t *testing.T) {
-		g := NewGomegaWithT(t)
-
-		// We can't rely on each write from the subprocess to result in exactly
-		// one call to stream.Send(). Instead, concatenate the byte buffers as
-		// they are sent and compare them at the end.
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
-
-		mockStream := mock_idl.NewMockCliToHub_ExecuteServer(ctrl)
-		var stdout bytes.Buffer
-		var stderr bytes.Buffer
-
-		mockStream.EXPECT().
-			Send(gomock.Any()).
-			AnyTimes(). // Send will be called an indeterminate number of times
-
-			DoAndReturn(func(msg *idl.Message) error {
-				defer GinkgoRecover()
-
-				var buf *bytes.Buffer
-				c := msg.GetChunk()
-
-				switch c.Type {
-				case idl.Chunk_STDOUT:
-					buf = &stdout
-				case idl.Chunk_STDERR:
-					buf = &stderr
-				default:
-					Fail("unexpected chunk type")
-				}
-
-				buf.Write(c.Buffer)
-				return nil
-			})
-
-		stream := newMultiplexedStream(mockStream, ioutil.Discard)
 
 		const (
 			expectedStdout = "expected\nstdout\n"
 			expectedStderr = "process\nstderr\n"
 		)
+
+		mockStream := mock_idl.NewMockCliToHub_ExecuteServer(ctrl)
+		mockStream.EXPECT().
+			Send(&idl.Message{Contents: &idl.Message_Chunk{&idl.Chunk{
+				Buffer: []byte(expectedStdout),
+				Type:   idl.Chunk_STDOUT,
+			}}})
+		mockStream.EXPECT().
+			Send(&idl.Message{Contents: &idl.Message_Chunk{&idl.Chunk{
+				Buffer: []byte(expectedStderr),
+				Type:   idl.Chunk_STDERR,
+			}}})
+
+		stream := newMultiplexedStream(mockStream, ioutil.Discard)
 		fmt.Fprint(stream.Stdout(), expectedStdout)
 		fmt.Fprint(stream.Stderr(), expectedStderr)
-
-		g.Expect(stdout.String()).To(Equal(expectedStdout))
-		g.Expect(stderr.String()).To(Equal(expectedStderr))
 	})
 
 	t.Run("also writes all data to a local io.Writer", func(t *testing.T) {
-		g := NewGomegaWithT(t)
-
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 
@@ -95,24 +67,10 @@ func TestMultiplexedStream(t *testing.T) {
 			stream.Stderr().Write([]byte{'E'})
 		}
 
-		// Stdout and stderr are not guaranteed to interleave in any particular
-		// order. Just count the number of bytes in each that we see (there
-		// should be exactly ten).
-		numO := 0
-		numE := 0
-		for _, b := range buf.Bytes() {
-			switch b {
-			case 'O':
-				numO++
-			case 'E':
-				numE++
-			default:
-				Fail(fmt.Sprintf("unexpected byte %#v in output %#v", b, buf.String()))
-			}
+		expected := "OEOEOEOEOEOEOEOEOEOE"
+		if buf.String() != expected {
+			t.Errorf("writer got %q, want %q", buf.String(), expected)
 		}
-
-		g.Expect(numO).To(Equal(10))
-		g.Expect(numE).To(Equal(10))
 	})
 
 	t.Run("continues writing to the local io.Writer even if Send fails", func(t *testing.T) {
@@ -141,34 +99,115 @@ func TestMultiplexedStream(t *testing.T) {
 		g.Expect(buf.Bytes()).To(HaveLen(20))
 		g.Expect(log).To(gbytes.Say("halting client stream: error during send"))
 	})
+
+	t.Run("bubbles up underlying io.Writer failures before streaming", func(t *testing.T) {
+		expected := errors.New("ahhhh")
+
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+
+		mockStream := mock_idl.NewMockCliToHub_ExecuteServer(ctrl)
+		// we expect no calls on the stream
+
+		stream := newMultiplexedStream(mockStream, &failingWriter{expected})
+
+		_, err := stream.Stdout().Write([]byte{'x'})
+		if !xerrors.Is(err, expected) {
+			t.Errorf("Stdout().Write() returned %#v, want %#v", err, expected)
+		}
+
+		_, err = stream.Stderr().Write([]byte{'x'})
+		if !xerrors.Is(err, expected) {
+			t.Errorf("Stderr().Write() returned %#v, want %#v", err, expected)
+		}
+	})
 }
 
 func TestSubstep(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
 	testhelper.SetupTestLogger()
 
 	cm := testutils.NewMockChecklistManager()
 	hub := NewHub(nil, nil, nil, nil, cm)
 
-	sender := mock_idl.NewMockCliToHub_ExecuteServer(ctrl)
-	sender.EXPECT().
-		Send(gomock.Any()).
-		AnyTimes()
+	t.Run("sends execution status to checklist and client", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
 
-	stream := &multiplexedStream{
-		stream: sender,
-		writer: new(bytes.Buffer),
-	}
+		sender := mock_idl.NewMockCliToHub_ExecuteServer(ctrl)
+		stream := newMultiplexedStream(sender, ioutil.Discard)
 
-	expected := errors.New("ahhhh")
-	err := hub.Substep(stream, "my substep",
-		func(_ OutStreams) error {
-			return expected
-		})
+		sender.EXPECT().
+			Send(&idl.Message{Contents: &idl.Message_Status{&idl.UpgradeStepStatus{
+				Step:   idl.UpgradeSteps_UNKNOWN_STEP,
+				Status: idl.StepStatus_RUNNING,
+			}}})
+		sender.EXPECT().
+			Send(&idl.Message{Contents: &idl.Message_Status{&idl.UpgradeStepStatus{
+				Step:   idl.UpgradeSteps_UNKNOWN_STEP,
+				Status: idl.StepStatus_COMPLETE,
+			}}})
 
-	if !xerrors.Is(err, expected) {
-		t.Errorf("returned %#v, want %#v", err, expected)
-	}
+		var called bool
+		step := "mystep"
+
+		err := hub.Substep(stream, step,
+			func(_ OutStreams) error {
+				called = true
+
+				// We shouldn't be marked complete until this returns.
+				actual := cm.GetStepReader(step).Status()
+				if actual != idl.StepStatus_RUNNING {
+					t.Errorf("step was marked %s, want %s", actual, idl.StepStatus_RUNNING)
+				}
+
+				return nil
+			})
+
+		if err != nil {
+			t.Errorf("returned error %#v", err)
+		}
+		if !called {
+			t.Error("substep callback was not executed")
+		}
+
+		actual := cm.GetStepReader(step).Status()
+		if actual != idl.StepStatus_COMPLETE {
+			t.Errorf("step was marked %s, want %s", actual, idl.StepStatus_COMPLETE)
+		}
+	})
+
+	t.Run("bubbles up errors from substep callbacks", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+
+		sender := mock_idl.NewMockCliToHub_ExecuteServer(ctrl)
+		stream := newMultiplexedStream(sender, ioutil.Discard)
+
+		sender.EXPECT().
+			Send(&idl.Message{Contents: &idl.Message_Status{&idl.UpgradeStepStatus{
+				Step:   idl.UpgradeSteps_UNKNOWN_STEP,
+				Status: idl.StepStatus_RUNNING,
+			}}})
+		sender.EXPECT().
+			Send(&idl.Message{Contents: &idl.Message_Status{&idl.UpgradeStepStatus{
+				Step:   idl.UpgradeSteps_UNKNOWN_STEP,
+				Status: idl.StepStatus_FAILED,
+			}}})
+
+		step := "mystep"
+		expected := errors.New("ahhhh")
+		err := hub.Substep(stream, step,
+			func(_ OutStreams) error {
+				return expected
+			})
+
+		if !xerrors.Is(err, expected) {
+			t.Errorf("returned %#v, want %#v", err, expected)
+		}
+
+		actual := cm.GetStepReader(step).Status()
+		if actual != idl.StepStatus_FAILED {
+			t.Errorf("step was marked %s, want %s", actual, idl.StepStatus_FAILED)
+		}
+	})
 }

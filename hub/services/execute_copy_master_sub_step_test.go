@@ -1,8 +1,6 @@
 package services
 
 import (
-	"io"
-	"io/ioutil"
 	"testing"
 
 	"github.com/golang/mock/gomock"
@@ -120,17 +118,4 @@ func TestCopyMaster(t *testing.T) {
 		g.Expect(expectedCmd).To(HaveLen(1))
 		g.Expect(expectedCmd).To(ContainElement([]string{"rsync", "-rzpogt", "/data/qddir/seg-1/", "localhost:/tmp/masterDirCopy"}))
 	})
-}
-
-// DevNull implements OutStreams by just discarding all writes.
-var DevNull = devNull{}
-
-type devNull struct{}
-
-func (_ devNull) Stdout() io.Writer {
-	return ioutil.Discard
-}
-
-func (_ devNull) Stderr() io.Writer {
-	return ioutil.Discard
 }

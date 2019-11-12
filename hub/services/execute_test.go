@@ -141,11 +141,3 @@ func (f failingStreams) Stdout() io.Writer {
 func (f failingStreams) Stderr() io.Writer {
 	return &failingWriter{f.err}
 }
-
-type failingWriter struct {
-	err error
-}
-
-func (f *failingWriter) Write(_ []byte) (int, error) {
-	return 0, f.err
-}

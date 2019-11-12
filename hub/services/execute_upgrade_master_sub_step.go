@@ -2,13 +2,14 @@ package services
 
 import (
 	"fmt"
-	"github.com/greenplum-db/gpupgrade/idl"
-	"github.com/greenplum-db/gpupgrade/utils"
 	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strconv"
+
+	"github.com/greenplum-db/gpupgrade/idl"
+	"github.com/greenplum-db/gpupgrade/utils"
 )
 
 // Allow exec.Command to be mocked out by exectest.NewCommand.
@@ -52,6 +53,7 @@ func (c clusterPair) ConvertMaster(stream messageSender, out io.Writer, wd strin
 		"--new-datadir", c.Target.MasterDataDir(),
 		"--new-port", strconv.Itoa(c.Target.MasterPort()),
 		"--mode=dispatcher",
+		"--link",
 	)
 
 	cmd.Stdout = mux.NewStreamWriter(idl.Chunk_STDOUT)

@@ -36,7 +36,7 @@ func init() {
 
 var _ = Describe("UpgradeSegments", func() {
 	var (
-		segments []Segment
+		segments     []Segment
 		sourceBinDir string
 		targetBinDir string
 	)
@@ -82,6 +82,7 @@ var _ = Describe("UpgradeSegments", func() {
 				oldPort := fs.Int("old-port", -1, "")
 				newPort := fs.Int("new-port", -1, "")
 				mode := fs.String("mode", "", "")
+				link := fs.Bool("link", false, "")
 
 				err := fs.Parse(args)
 				Expect(err).NotTo(HaveOccurred())
@@ -93,6 +94,7 @@ var _ = Describe("UpgradeSegments", func() {
 				Expect(*oldPort).To(Equal(int(segments[0].OldPort)))
 				Expect(*newPort).To(Equal(int(segments[0].NewPort)))
 				Expect(*mode).To(Equal("segment"))
+				Expect(*link).To(BeTrue())
 
 				// No other arguments should be passed.
 				Expect(fs.Args()).To(BeEmpty())

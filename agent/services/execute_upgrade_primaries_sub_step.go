@@ -77,6 +77,7 @@ func UpgradeSegments(sourceBinDir string, targetBinDir string, segments []Segmen
 			"--new-datadir", segment.NewDataDir,
 			"--new-port", strconv.Itoa(int(segment.NewPort)),
 			"--mode=segment",
+			"--link",
 		)
 
 		cmd.Dir = segment.UpgradeDir

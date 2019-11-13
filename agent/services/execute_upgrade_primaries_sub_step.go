@@ -9,11 +9,10 @@ import (
 	"strconv"
 	"sync"
 
-	"golang.org/x/xerrors"
-
 	"github.com/greenplum-db/gp-common-go-libs/gplog"
 	"github.com/hashicorp/go-multierror"
 	"github.com/pkg/errors"
+	"golang.org/x/xerrors"
 
 	"github.com/greenplum-db/gpupgrade/hub/upgradestatus"
 	"github.com/greenplum-db/gpupgrade/idl"
@@ -45,10 +44,19 @@ func UpgradePrimaries(sourceBinDir string, targetBinDir string, dataDirPairs []*
 			return err
 		}
 
-		segments = append(segments, Segment{DataDirPair: dataPair, UpgradeDir: dataPair.NewDataDir})
+		workdir := utils.SegmentPGUpgradeDirectory(stateDir, int(dataPair.Content))
+		err = utils.System.MkdirAll(workdir, 0700)
+		if err != nil {
+			return xerrors.Errorf("upgrading primaries: %w", err)
+		}
+
+		segments = append(segments, Segment{
+			DataDirPair: dataPair,
+			UpgradeDir:  workdir,
+		})
 	}
 
-	err := UpgradeSegments(sourceBinDir, targetBinDir, segments, stateDir, checkOnly)
+	err := UpgradeSegments(sourceBinDir, targetBinDir, segments, checkOnly)
 	if err != nil {
 		return errors.Wrap(err, "failed to upgrade segments")
 	}
@@ -56,7 +64,7 @@ func UpgradePrimaries(sourceBinDir string, targetBinDir string, dataDirPairs []*
 	return nil
 }
 
-func UpgradeSegments(sourceBinDir string, targetBinDir string, segments []Segment, stateDir string, checkOnly bool) (err error) {
+func UpgradeSegments(sourceBinDir string, targetBinDir string, segments []Segment, checkOnly bool) (err error) {
 	// TODO: consolidate this logic with Hub.ConvertMaster().
 
 	host, err := os.Hostname()
@@ -66,11 +74,9 @@ func UpgradeSegments(sourceBinDir string, targetBinDir string, segments []Segmen
 
 	wg := sync.WaitGroup{}
 	agentErrs := make(chan error, len(segments))
+	path := filepath.Join(targetBinDir, "pg_upgrade")
 
 	for _, segment := range segments {
-		wg.Add(1)
-
-		path := filepath.Join(targetBinDir, "pg_upgrade")
 		dbid := strconv.Itoa(int(segment.DBID))
 		args := []string{
 			"--old-bindir", sourceBinDir,
@@ -82,6 +88,7 @@ func UpgradeSegments(sourceBinDir string, targetBinDir string, segments []Segmen
 			"--new-port", strconv.Itoa(int(segment.NewPort)),
 			"--new-gp-dbid", dbid,
 			"--mode=segment",
+			"--retain",
 		}
 		if checkOnly {
 			args = append(args, "--check")
@@ -102,45 +109,11 @@ func UpgradeSegments(sourceBinDir string, targetBinDir string, segments []Segmen
 		}
 
 		content := segment.Content
+		wg.Add(1)
 		go func() {
 			defer wg.Done()
 
-			if checkOnly {
-				//TODO: put this in the "official" segment dir location
-				stdout, err := utils.System.OpenFile(
-					filepath.Join(stateDir, fmt.Sprintf("pg_upgrade_check_stdout_seg_%d.log", content)),
-					os.O_WRONLY|os.O_CREATE,
-					0600,
-				)
-				if err != nil {
-					agentErrs <- errors.Wrap(err, "could not open stdout log file")
-					return
-				}
-				stderr, err := utils.System.OpenFile(
-					filepath.Join(stateDir, fmt.Sprintf("pg_upgrade_check_stderr_seg_%d.log", content)),
-					os.O_WRONLY|os.O_CREATE,
-					0600,
-				)
-				if err != nil {
-					agentErrs <- errors.Wrap(err, "could not open stderr log file")
-					return
-				}
-				defer func() {
-					if closeErr := stdout.Close(); closeErr != nil {
-						err = multierror.Append(err,
-							xerrors.Errorf("failed to close pg_upgrade_check_stdout log: %w", closeErr))
-					}
-					if closeErr := stderr.Close(); closeErr != nil {
-						err = multierror.Append(err,
-							xerrors.Errorf("failed to close pg_upgrade_check_stderr log: %w", closeErr))
-					}
-				}()
-
-				cmd.Stdout = stdout
-				cmd.Stderr = stderr
-			}
-
-			err = cmd.Run()
+			_, err := cmd.Output()
 			if err != nil {
 				failedAction := "upgrade"
 				if checkOnly {

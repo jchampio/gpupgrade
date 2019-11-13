@@ -99,21 +99,13 @@ setup_newmasterdir() {
 
     grep "Clusters are compatible" "$GPUPGRADE_HOME"/initialize.log
 
-    [ -e "$GPUPGRADE_HOME"/pg_upgrade_check_stdout_seg_0.log ]
-    [ -e "$GPUPGRADE_HOME"/pg_upgrade_check_stdout_seg_1.log ]
-    [ -e "$GPUPGRADE_HOME"/pg_upgrade_check_stdout_seg_2.log ]
+    [ -e "$GPUPGRADE_HOME"/pg_upgrade/seg0/pg_upgrade_internal.log ]
+    [ -e "$GPUPGRADE_HOME"/pg_upgrade/seg1/pg_upgrade_internal.log ]
+    [ -e "$GPUPGRADE_HOME"/pg_upgrade/seg2/pg_upgrade_internal.log ]
 
-    grep "Clusters are compatible" "$GPUPGRADE_HOME"/pg_upgrade_check_stdout_seg_0.log
-    grep "Clusters are compatible" "$GPUPGRADE_HOME"/pg_upgrade_check_stdout_seg_1.log
-    grep "Clusters are compatible" "$GPUPGRADE_HOME"/pg_upgrade_check_stdout_seg_2.log
-
-    [ -e "$GPUPGRADE_HOME"/pg_upgrade_check_stderr_seg_0.log ]
-    [ -e "$GPUPGRADE_HOME"/pg_upgrade_check_stderr_seg_1.log ]
-    [ -e "$GPUPGRADE_HOME"/pg_upgrade_check_stderr_seg_2.log ]
-
-    [ ! -s "$GPUPGRADE_HOME"/pg_upgrade_check_stderr_seg_0.log ]
-    [ ! -s "$GPUPGRADE_HOME"/pg_upgrade_check_stderr_seg_1.log ]
-    [ ! -s "$GPUPGRADE_HOME"/pg_upgrade_check_stderr_seg_2.log ]
+    grep -c "Clusters are compatible" "$GPUPGRADE_HOME"/pg_upgrade/seg0/pg_upgrade_internal.log
+    grep -c "Clusters are compatible" "$GPUPGRADE_HOME"/pg_upgrade/seg1/pg_upgrade_internal.log
+    grep -c "Clusters are compatible" "$GPUPGRADE_HOME"/pg_upgrade/seg2/pg_upgrade_internal.log
 
     KEEP_STATE_DIR=0
 }

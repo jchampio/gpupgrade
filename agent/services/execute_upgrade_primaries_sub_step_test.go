@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -44,21 +45,29 @@ var _ = Describe("UpgradeSegments", func() {
 		segments     []Segment
 		sourceBinDir string
 		targetBinDir string
+		tmpDir       string
 	)
 
 	BeforeEach(func() {
 		sourceBinDir = "/old/bin"
 		targetBinDir = "/new/bin"
 
+		var err error
+		tmpDir, err = ioutil.TempDir("", "agenttest")
+		Expect(err).ToNot(HaveOccurred())
+
 		segments = []Segment{
-			{UpgradeDir: "", DataDirPair: &idl.DataDirPair{
-				OldDataDir: "old/datadir1",
-				NewDataDir: "new/datadir1",
-				Content:    0,
-				OldPort:    1,
-				NewPort:    11,
-				DBID:       2,
-			}},
+			{
+				UpgradeDir: tmpDir,
+				DataDirPair: &idl.DataDirPair{
+					OldDataDir: "old/datadir1",
+					NewDataDir: "new/datadir1",
+					Content:    0,
+					OldPort:    1,
+					NewPort:    11,
+					DBID:       2,
+				},
+			},
 			// TODO: Add a way to test multiple calls to execCommand.
 			//{UpgradeDir: "", DataDirPair: &idl.DataDirPair{OldDataDir: "old/datadir2", NewDataDir: "new/datadir2", Content: 1, OldPort: 2, NewPort: 22}},
 		}
@@ -74,6 +83,9 @@ var _ = Describe("UpgradeSegments", func() {
 
 	AfterEach(func() {
 		execCommand = exec.Command
+
+		err := os.RemoveAll(tmpDir)
+		Expect(err).ToNot(HaveOccurred())
 	})
 
 	It("calls pg_upgrade with the expected options with no check", func() {
@@ -96,6 +108,8 @@ var _ = Describe("UpgradeSegments", func() {
 				mode := fs.String("mode", "", "")
 				oldDBID := fs.Int("old-gp-dbid", -1, "")
 				newDBID := fs.Int("new-gp-dbid", -1, "")
+				checkOnly := fs.Bool("check", false, "")
+				retain := fs.Bool("retain", false, "")
 
 				err := fs.Parse(args)
 				Expect(err).NotTo(HaveOccurred())
@@ -109,12 +123,14 @@ var _ = Describe("UpgradeSegments", func() {
 				Expect(*mode).To(Equal("segment"))
 				Expect(*oldDBID).To(Equal(int(segments[0].DBID)))
 				Expect(*newDBID).To(Equal(int(segments[0].DBID)))
+				Expect(*checkOnly).To(Equal(false))
+				Expect(*retain).To(Equal(true))
 
 				// No other arguments should be passed.
 				Expect(fs.Args()).To(BeEmpty())
 			})
 
-		err := UpgradeSegments("/old/bin", "/new/bin", segments, "/tmp", false)
+		err := UpgradeSegments("/old/bin", "/new/bin", segments, false)
 		Expect(err).NotTo(HaveOccurred())
 	})
 
@@ -139,6 +155,7 @@ var _ = Describe("UpgradeSegments", func() {
 				checkOnly := fs.Bool("check", false, "")
 				oldDBID := fs.Int("old-gp-dbid", -1, "")
 				newDBID := fs.Int("new-gp-dbid", -1, "")
+				retain := fs.Bool("retain", false, "")
 
 				err := fs.Parse(args)
 				Expect(err).NotTo(HaveOccurred())
@@ -153,19 +170,20 @@ var _ = Describe("UpgradeSegments", func() {
 				Expect(*checkOnly).To(Equal(true))
 				Expect(*oldDBID).To(Equal(int(segments[0].DBID)))
 				Expect(*newDBID).To(Equal(int(segments[0].DBID)))
+				Expect(*retain).To(Equal(true))
 
 				// No other arguments should be passed.
 				Expect(fs.Args()).To(BeEmpty())
 			})
 
-		err := UpgradeSegments("/old/bin", "/new/bin", segments, "/tmp", true)
+		err := UpgradeSegments("/old/bin", "/new/bin", segments, true)
 		Expect(err).NotTo(HaveOccurred())
 	})
 
 	It("when pg_upgrade --check fails it returns an error", func() {
 		execCommand = exectest.NewCommand(FailedMain)
 
-		err := UpgradeSegments("/old/bin", "/new/bin", segments, "/tmp", true)
+		err := UpgradeSegments("/old/bin", "/new/bin", segments, true)
 		Expect(err).To(HaveOccurred())
 		Expect(err.Error()).To(ContainSubstring("failed to check primary on host"))
 		Expect(err.Error()).To(ContainSubstring("with content 0"))
@@ -174,12 +192,14 @@ var _ = Describe("UpgradeSegments", func() {
 	It("when pg_upgrade with no check fails it returns an error", func() {
 		execCommand = exectest.NewCommand(FailedMain)
 
-		err := UpgradeSegments("/old/bin", "/new/bin", segments, "/tmp", false)
+		err := UpgradeSegments("/old/bin", "/new/bin", segments, false)
 		Expect(err).To(HaveOccurred())
 		Expect(err.Error()).To(ContainSubstring("failed to upgrade primary on host"))
 		Expect(err.Error()).To(ContainSubstring("with content 0"))
 	})
 
+	// FIXME this test doesn't test anything; the system under test isn't
+	// visible to the test implementation.
 	It("unsets PGPORT and PGHOST", func() {
 		// Set our environment.
 		os.Setenv("PGPORT", "5432")
@@ -193,7 +213,7 @@ var _ = Describe("UpgradeSegments", func() {
 		execCommand = exectest.NewCommand(EnvironmentMain)
 
 		var buf bytes.Buffer
-		err := UpgradeSegments("/old/bin", "/new/bin", segments, "/tmp", false)
+		err := UpgradeSegments("/old/bin", "/new/bin", segments, false)
 		Expect(err).NotTo(HaveOccurred())
 
 		scanner := bufio.NewScanner(&buf)

@@ -1,4 +1,4 @@
-package exectest
+package exectest_test
 
 import (
 	"fmt"
@@ -6,6 +6,8 @@ import (
 	"os/exec"
 	"reflect"
 	"testing"
+
+	. "github.com/greenplum-db/gpupgrade/testutils/exectest"
 )
 
 const successfulStdout = "stdout for SuccessfulMain"
@@ -79,13 +81,13 @@ func TestNewCommand(t *testing.T) {
 	t.Run("panics if not called from Run()", func(t *testing.T) {
 		// We're obviously being called from Run() inside this test, so fake the
 		// situation by unsetting the flag that tracks it.
-		runCalled = false
+		SetRunCalled(false)
 
 		defer func() {
 			if r := recover(); r == nil {
 				t.Errorf("did not panic")
 			}
-			runCalled = true // reset the flag
+			SetRunCalled(true) // reset the flag
 		}()
 
 		NewCommand(SuccessfulMain)

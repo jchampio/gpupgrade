@@ -19,23 +19,6 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-func StartClusterCmd()        {}
-func StopClusterCmd()         {}
-func IsPostmasterRunningCmd() {}
-func IsPostmasterRunningCmd_Errors() {
-	os.Stderr.WriteString("exit status 2")
-	os.Exit(2)
-}
-
-func init() {
-	exectest.RegisterMains(
-		StartClusterCmd,
-		StopClusterCmd,
-		IsPostmasterRunningCmd,
-		IsPostmasterRunningCmd_Errors,
-	)
-}
-
 func TestStartOrStopCluster(t *testing.T) {
 	g := NewGomegaWithT(t)
 	ctrl := gomock.NewController(GinkgoT())
@@ -67,7 +50,7 @@ func TestStartOrStopCluster(t *testing.T) {
 	}()
 
 	t.Run("isPostmasterRunning succeeds", func(t *testing.T) {
-		isPostmasterRunningCmd = exectest.NewCommandWithVerifier(IsPostmasterRunningCmd,
+		isPostmasterRunningCmd = exectest.NewCommandWithVerifier(exectest.Success,
 			func(path string, args ...string) {
 				g.Expect(path).To(Equal("bash"))
 				g.Expect(args).To(Equal([]string{"-c", "pgrep -F basedir/seg-1/postmaster.pid"}))
@@ -78,20 +61,20 @@ func TestStartOrStopCluster(t *testing.T) {
 	})
 
 	t.Run("isPostmasterRunning fails", func(t *testing.T) {
-		isPostmasterRunningCmd = exectest.NewCommand(IsPostmasterRunningCmd_Errors)
+		isPostmasterRunningCmd = exectest.NewCommand(exectest.Failure)
 
 		err := IsPostmasterRunning(mockStream, &buf, source)
 		g.Expect(err).To(HaveOccurred())
 	})
 
 	t.Run("stopCluster successfully shuts down cluster", func(t *testing.T) {
-		isPostmasterRunningCmd = exectest.NewCommandWithVerifier(IsPostmasterRunningCmd,
+		isPostmasterRunningCmd = exectest.NewCommandWithVerifier(exectest.Success,
 			func(path string, args ...string) {
 				g.Expect(path).To(Equal("bash"))
 				g.Expect(args).To(Equal([]string{"-c", "pgrep -F basedir/seg-1/postmaster.pid"}))
 			})
 
-		startStopClusterCmd = exectest.NewCommandWithVerifier(StopClusterCmd,
+		startStopClusterCmd = exectest.NewCommandWithVerifier(exectest.Success,
 			func(path string, args ...string) {
 				g.Expect(path).To(Equal("bash"))
 				g.Expect(args).To(Equal([]string{"-c", "source /source/bindir/../greenplum_path.sh " +
@@ -103,10 +86,10 @@ func TestStartOrStopCluster(t *testing.T) {
 	})
 
 	t.Run("stopCluster detects that cluster is already shutdown", func(t *testing.T) {
-		isPostmasterRunningCmd = exectest.NewCommand(IsPostmasterRunningCmd_Errors)
+		isPostmasterRunningCmd = exectest.NewCommand(exectest.Failure)
 
 		var skippedStopClusterCommand = true
-		startStopClusterCmd = exectest.NewCommandWithVerifier(IsPostmasterRunningCmd,
+		startStopClusterCmd = exectest.NewCommandWithVerifier(exectest.Success,
 			func(path string, args ...string) {
 				skippedStopClusterCommand = false
 			})
@@ -117,7 +100,7 @@ func TestStartOrStopCluster(t *testing.T) {
 	})
 
 	t.Run("startCluster successfully starts up cluster", func(t *testing.T) {
-		startStopClusterCmd = exectest.NewCommandWithVerifier(StartClusterCmd,
+		startStopClusterCmd = exectest.NewCommandWithVerifier(exectest.Success,
 			func(path string, args ...string) {
 				g.Expect(path).To(Equal("bash"))
 				g.Expect(args).To(Equal([]string{"-c", "source /source/bindir/../greenplum_path.sh " +

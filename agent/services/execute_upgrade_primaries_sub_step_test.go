@@ -17,9 +17,6 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-// Does nothing.
-func EmptyMain() {}
-
 // Prints the environment, one variable per line, in NAME=VALUE format.
 func EnvironmentMain() {
 	for _, e := range os.Environ() {
@@ -27,15 +24,9 @@ func EnvironmentMain() {
 	}
 }
 
-func FailedMain() {
-	os.Exit(1)
-}
-
 func init() {
 	exectest.RegisterMains(
-		EmptyMain,
 		EnvironmentMain,
-		FailedMain,
 	)
 }
 
@@ -70,7 +61,7 @@ var _ = Describe("UpgradeSegments", func() {
 	})
 
 	It("calls pg_upgrade with the expected options with no check", func() {
-		execCommand = exectest.NewCommandWithVerifier(EmptyMain,
+		execCommand = exectest.NewCommandWithVerifier(exectest.Success,
 			func(path string, args ...string) {
 				// pg_upgrade should be run from the target installation.
 				expectedPath := filepath.Join(targetBinDir, "pg_upgrade")
@@ -108,7 +99,7 @@ var _ = Describe("UpgradeSegments", func() {
 	})
 
 	It("calls pg_upgrade with the expected options with check", func() {
-		execCommand = exectest.NewCommandWithVerifier(EmptyMain,
+		execCommand = exectest.NewCommandWithVerifier(exectest.Success,
 			func(path string, args ...string) {
 				// pg_upgrade should be run from the target installation.
 				expectedPath := filepath.Join(targetBinDir, "pg_upgrade")
@@ -148,7 +139,7 @@ var _ = Describe("UpgradeSegments", func() {
 	})
 
 	It("when pg_upgrade --check fails it returns an error", func() {
-		execCommand = exectest.NewCommand(FailedMain)
+		execCommand = exectest.NewCommand(exectest.Failure)
 
 		err := UpgradeSegments("/old/bin", "/new/bin", segments, "/tmp", true)
 		Expect(err).To(HaveOccurred())
@@ -157,7 +148,7 @@ var _ = Describe("UpgradeSegments", func() {
 	})
 
 	It("when pg_upgrade with no check fails it returns an error", func() {
-		execCommand = exectest.NewCommand(FailedMain)
+		execCommand = exectest.NewCommand(exectest.Failure)
 
 		err := UpgradeSegments("/old/bin", "/new/bin", segments, "/tmp", false)
 		Expect(err).To(HaveOccurred())

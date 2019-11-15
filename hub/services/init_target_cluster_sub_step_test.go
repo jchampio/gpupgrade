@@ -24,20 +24,6 @@ import (
 	. "github.com/onsi/ginkgo"
 )
 
-func gpinitsystem() {}
-
-func gpinitsystem_Exits1() {
-	os.Stdout.WriteString("[WARN]:-Master open file limit is 256 should be >= 65535")
-	os.Exit(1)
-}
-
-func init() {
-	exectest.RegisterMains(
-		gpinitsystem,
-		gpinitsystem_Exits1,
-	)
-}
-
 func TestCreateInitialInitsystemConfig(t *testing.T) {
 	testhelper.SetupTestLogger() // initialize gplog
 
@@ -229,12 +215,12 @@ func TestRunInitsystemForTargetCluster(t *testing.T) {
 		AnyTimes()
 
 	cluster6X := &utils.Cluster{
-		BinDir: "/target/bin",
+		BinDir:  "/target/bin",
 		Version: dbconn.NewVersion("6.0.0"),
 	}
 
 	cluster7X := &utils.Cluster{
-		BinDir: "/target/bin",
+		BinDir:  "/target/bin",
 		Version: dbconn.NewVersion("7.0.0"),
 	}
 
@@ -246,7 +232,7 @@ func TestRunInitsystemForTargetCluster(t *testing.T) {
 	}()
 
 	t.Run("does not use --ignore-warnings when upgrading to GPDB7 or higher", func(t *testing.T) {
-		execCommand = exectest.NewCommandWithVerifier(gpinitsystem,
+		execCommand = exectest.NewCommandWithVerifier(exectest.Success,
 			func(path string, args ...string) {
 				if path != "bash" {
 					t.Errorf("executed %q, want bash", path)
@@ -267,7 +253,7 @@ func TestRunInitsystemForTargetCluster(t *testing.T) {
 	})
 
 	t.Run("only uses --ignore-warnings when upgrading to GPDB6", func(t *testing.T) {
-		execCommand = exectest.NewCommandWithVerifier(gpinitsystem,
+		execCommand = exectest.NewCommandWithVerifier(exectest.Success,
 			func(path string, args ...string) {
 				if path != "bash" {
 					t.Errorf("executed %q, want bash", path)
@@ -288,7 +274,7 @@ func TestRunInitsystemForTargetCluster(t *testing.T) {
 	})
 
 	t.Run("should use executables in the source's bindir even if bindir has a trailing slash", func(t *testing.T) {
-		execCommand = exectest.NewCommandWithVerifier(gpinitsystem,
+		execCommand = exectest.NewCommandWithVerifier(exectest.Success,
 			func(path string, args ...string) {
 				if path != "bash" {
 					t.Errorf("executed %q, want bash", path)
@@ -310,7 +296,7 @@ func TestRunInitsystemForTargetCluster(t *testing.T) {
 	})
 
 	t.Run("returns an error when gpinitsystem fails with --ignore-warnings when upgrading to GPDB6", func(t *testing.T) {
-		execCommand = exectest.NewCommand(gpinitsystem_Exits1)
+		execCommand = exectest.NewCommand(exectest.Failure)
 
 		var buf bytes.Buffer
 		err := RunInitsystemForTargetCluster(mockStream, &buf, cluster6X, gpinitsystemConfigPath)
@@ -326,7 +312,7 @@ func TestRunInitsystemForTargetCluster(t *testing.T) {
 	})
 
 	t.Run("returns an error when gpinitsystem errors when upgrading to GPDB7 or higher", func(t *testing.T) {
-		execCommand = exectest.NewCommand(gpinitsystem_Exits1)
+		execCommand = exectest.NewCommand(exectest.Failure)
 
 		var buf bytes.Buffer
 		err := RunInitsystemForTargetCluster(mockStream, &buf, cluster7X, gpinitsystemConfigPath)

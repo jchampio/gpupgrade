@@ -4,7 +4,6 @@ import (
 	"errors"
 	"log"
 	"net"
-	"os"
 	"os/exec"
 	"strings"
 	"testing"
@@ -21,21 +20,6 @@ import (
 	"github.com/greenplum-db/gpupgrade/idl"
 	"github.com/greenplum-db/gpupgrade/testutils/exectest"
 )
-
-func gpupgrade_agent() {
-}
-
-func gpupgrade_agent_Errors() {
-	os.Stderr.WriteString("could not find state-directory")
-	os.Exit(1)
-}
-
-func init() {
-	exectest.RegisterMains(
-		gpupgrade_agent,
-		gpupgrade_agent_Errors,
-	)
-}
 
 func TestRestartAgent(t *testing.T) {
 	testhelper.SetupTestLogger()
@@ -55,7 +39,7 @@ func TestRestartAgent(t *testing.T) {
 	stateDir := "/not/existent/directory"
 	ctx := context.Background()
 
-	services.SetExecCommand(exectest.NewCommand(gpupgrade_agent))
+	services.SetExecCommand(exectest.NewCommand(exectest.Success))
 	defer services.ResetExecCommand()
 
 	t.Run("does not start running agents", func(t *testing.T) {
@@ -98,7 +82,7 @@ func TestRestartAgent(t *testing.T) {
 	})
 
 	t.Run("returns an error when gpupgrade_agent fails", func(t *testing.T) {
-		services.SetExecCommand(exectest.NewCommand(gpupgrade_agent_Errors))
+		services.SetExecCommand(exectest.NewCommand(exectest.Failure))
 
 		// we fail all connections here so that RestartAgents will run the
 		//  (error producing) gpupgrade_agent_Errors

@@ -186,3 +186,39 @@ func indexOf(m Main, list []Main) int {
 	}
 	return -1 // not found
 }
+
+// Select allows a test to dynamically choose which Command to execute at
+// runtime, based on a selector function:
+//
+//    grep := exectest.NewCommand(GrepMain)
+//    bash := exectest.NewCommandWithVerifier(BashMain, ...)
+//    bashFailure := exectest.NewCommand(exectest.Failed)
+//
+//    execCommand = exectest.Select(func(path string, args ...string) exectest.Command {
+//        switch path {
+//        case "grep":
+//            return grep
+//
+//        case "bash":
+//            if len(args) > 0 && args[0] == "--help" {
+//                return bashFailure
+//            }
+//            return bash
+//        }
+//
+//        default:
+//            panic("unexpected command") // or t.Fatalf(), etc.
+//    })
+//
+// Note that the commands are created outside the selector callback. This is not
+// strictly necessary, but it allows any Main registration errors (see
+// RegisterMains) to result in immediate panics. (If the Commands were created
+// inside the selector, any registration panic would not occur until the code
+// under test invoked the Command, and it's possible that the code under test
+// could recover and ignore that panic.)
+func Select(selector func(string, ...string) Command) Command {
+	return func(path string, args ...string) *exec.Cmd {
+		cmdf := selector(path, args...)
+		return cmdf(path, args...)
+	}
+}

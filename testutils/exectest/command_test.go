@@ -7,6 +7,8 @@ import (
 	"reflect"
 	"testing"
 
+	"golang.org/x/xerrors"
+
 	. "github.com/greenplum-db/gpupgrade/testutils/exectest"
 )
 
@@ -221,4 +223,50 @@ func TestRegisterMains(t *testing.T) {
 
 		RegisterMains()
 	})
+}
+
+func TestSelect(t *testing.T) {
+	success := NewCommand(Success)
+	failure := NewCommand(Failure)
+
+	expectedArgs := []string{"one", "two"}
+
+	cmdFunc := Select(func(path string, args ...string) Command {
+		if !reflect.DeepEqual(args, expectedArgs) {
+			t.Errorf("args were %q, want %q", args, expectedArgs)
+		}
+
+		// Running a command with "success" as the path will result in exit code
+		// 0; a path of "failure" results in exit code 1.
+		switch path {
+		case "success":
+			return success
+		case "failure":
+			return failure
+		}
+
+		t.Fatalf("unexpected path %q", path)
+		panic("unreachable")
+	})
+
+	successCmd := cmdFunc("success", expectedArgs...)
+	err := successCmd.Run()
+	if err != nil {
+		t.Errorf("success case gave unexpected error %#v", err)
+	}
+
+	failureCmd := cmdFunc("failure", expectedArgs...)
+	err = failureCmd.Run()
+	if err == nil {
+		t.Fatalf("failure case did not return an error")
+	}
+
+	var exitErr *exec.ExitError
+	if !xerrors.As(err, &exitErr) {
+		t.Fatalf("unexpected error %#v", err)
+	}
+
+	if exitErr.ExitCode() != 1 {
+		t.Errorf("exit code was %d, want %d", exitErr.ExitCode(), 1)
+	}
 }

@@ -1,9 +1,9 @@
-package services
+package services_test
 
 import (
 	"bytes"
 	"os"
-	"os/exec"
+	"strings"
 	"testing"
 
 	"github.com/golang/mock/gomock"
@@ -17,6 +17,8 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+
+	. "github.com/greenplum-db/gpupgrade/hub/services"
 )
 
 func TestStartOrStopCluster(t *testing.T) {
@@ -41,71 +43,84 @@ func TestStartOrStopCluster(t *testing.T) {
 	utils.System.RemoveAll = func(s string) error { return nil }
 	utils.System.MkdirAll = func(s string, perm os.FileMode) error { return nil }
 
-	startStopClusterCmd = nil
-	isPostmasterRunningCmd = nil
-
-	defer func() {
-		startStopClusterCmd = exec.Command
-		isPostmasterRunningCmd = exec.Command
-	}()
-
 	t.Run("isPostmasterRunning succeeds", func(t *testing.T) {
-		isPostmasterRunningCmd = exectest.NewCommandWithVerifier(exectest.Success,
+		SetExecCommand(exectest.NewCommandWithVerifier(exectest.Success,
 			func(path string, args ...string) {
 				g.Expect(path).To(Equal("bash"))
 				g.Expect(args).To(Equal([]string{"-c", "pgrep -F basedir/seg-1/postmaster.pid"}))
-			})
+			}))
+		defer ResetExecCommand()
 
 		err := IsPostmasterRunning(mockStream, &buf, source)
 		g.Expect(err).ToNot(HaveOccurred())
 	})
 
 	t.Run("isPostmasterRunning fails", func(t *testing.T) {
-		isPostmasterRunningCmd = exectest.NewCommand(exectest.Failure)
+		SetExecCommand(exectest.NewCommand(exectest.Failure))
+		defer ResetExecCommand()
 
 		err := IsPostmasterRunning(mockStream, &buf, source)
 		g.Expect(err).To(HaveOccurred())
 	})
 
 	t.Run("stopCluster successfully shuts down cluster", func(t *testing.T) {
-		isPostmasterRunningCmd = exectest.NewCommandWithVerifier(exectest.Success,
+		pgrep := exectest.NewCommandWithVerifier(exectest.Success,
 			func(path string, args ...string) {
 				g.Expect(path).To(Equal("bash"))
 				g.Expect(args).To(Equal([]string{"-c", "pgrep -F basedir/seg-1/postmaster.pid"}))
 			})
 
-		startStopClusterCmd = exectest.NewCommandWithVerifier(exectest.Success,
+		gpstop := exectest.NewCommandWithVerifier(exectest.Success,
 			func(path string, args ...string) {
 				g.Expect(path).To(Equal("bash"))
 				g.Expect(args).To(Equal([]string{"-c", "source /source/bindir/../greenplum_path.sh " +
 					"&& /source/bindir/gpstop -a -d basedir/seg-1"}))
 			})
 
+		SetExecCommand(exectest.Select(func(path string, args ...string) exectest.Command {
+			if len(args) < 2 {
+				goto unexpected
+			}
+
+			switch {
+			case strings.Contains(args[1], "pgrep"):
+				return pgrep
+			case strings.Contains(args[1], "gpstop"):
+				return gpstop
+			}
+
+		unexpected:
+			t.Fatalf("unexpected command: path %q, args %q", path, args)
+			panic("unreachable")
+		}))
+		defer ResetExecCommand()
+
 		err := StopCluster(mockStream, &buf, source)
 		g.Expect(err).ToNot(HaveOccurred())
 	})
 
 	t.Run("stopCluster detects that cluster is already shutdown", func(t *testing.T) {
-		isPostmasterRunningCmd = exectest.NewCommand(exectest.Failure)
-
-		var skippedStopClusterCommand = true
-		startStopClusterCmd = exectest.NewCommandWithVerifier(exectest.Success,
+		// Since the pgrep fails, we expect no call to gpstop. If one is made,
+		// we rely on the verifier here to catch it.
+		SetExecCommand(exectest.NewCommandWithVerifier(exectest.Failure,
 			func(path string, args ...string) {
-				skippedStopClusterCommand = false
-			})
+				g.Expect(path).To(Equal("bash"))
+				g.Expect(args).To(Equal([]string{"-c", "pgrep -F basedir/seg-1/postmaster.pid"}))
+			}))
+		defer ResetExecCommand()
 
 		err := StopCluster(mockStream, &buf, source)
 		g.Expect(err).To(HaveOccurred())
-		g.Expect(skippedStopClusterCommand).To(Equal(true))
 	})
 
 	t.Run("startCluster successfully starts up cluster", func(t *testing.T) {
-		startStopClusterCmd = exectest.NewCommandWithVerifier(exectest.Success,
+		SetExecCommand(exectest.NewCommandWithVerifier(exectest.Success,
 			func(path string, args ...string) {
 				g.Expect(path).To(Equal("bash"))
 				g.Expect(args).To(Equal([]string{"-c", "source /source/bindir/../greenplum_path.sh " +
 					"&& /source/bindir/gpstart -a -d basedir/seg-1"}))
-			})
+			}))
+		defer ResetExecCommand()
 
 		err := StartCluster(mockStream, &buf, source)
 		g.Expect(err).ToNot(HaveOccurred())

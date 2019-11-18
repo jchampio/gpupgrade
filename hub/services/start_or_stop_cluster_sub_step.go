@@ -3,14 +3,11 @@ package services
 import (
 	"fmt"
 	"io"
-	"os/exec"
+
+	"github.com/pkg/errors"
 
 	"github.com/greenplum-db/gpupgrade/utils"
-	"github.com/pkg/errors"
 )
-
-var isPostmasterRunningCmd = exec.Command
-var startStopClusterCmd = exec.Command
 
 func (h *Hub) ShutdownCluster(stream messageSender, log io.Writer, isSource bool) error {
 	if isSource {
@@ -50,7 +47,7 @@ func startStopCluster(stream messageSender, log io.Writer, cluster *utils.Cluste
 		}
 	}
 
-	cmd := startStopClusterCmd("bash", "-c",
+	cmd := execCommand("bash", "-c",
 		fmt.Sprintf("source %[1]s/../greenplum_path.sh && %[1]s/%[2]s -a -d %[3]s",
 			cluster.BinDir,
 			cmdName,
@@ -63,7 +60,7 @@ func startStopCluster(stream messageSender, log io.Writer, cluster *utils.Cluste
 }
 
 func IsPostmasterRunning(stream messageSender, log io.Writer, cluster *utils.Cluster) error {
-	cmd := isPostmasterRunningCmd("bash", "-c",
+	cmd := execCommand("bash", "-c",
 		fmt.Sprintf("pgrep -F %s/postmaster.pid",
 			cluster.MasterDataDir(),
 		))

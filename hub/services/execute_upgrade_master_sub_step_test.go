@@ -45,10 +45,6 @@ func init() {
 func TestUpgradeMaster(t *testing.T) {
 	g := NewGomegaWithT(t)
 
-	// Disable exec.Command. This way, if a test forgets to mock it out, we
-	// crash the test instead of executing code on a dev system.
-	execCommand = nil
-
 	// Initialize the sample cluster pair.
 	pair := clusterPair{
 		Source: &utils.Cluster{
@@ -87,7 +83,8 @@ func TestUpgradeMaster(t *testing.T) {
 			AnyTimes()
 
 		// Print the working directory of the command.
-		execCommand = exectest.NewCommand(WorkingDirectoryMain)
+		SetExecCommand(exectest.NewCommand(WorkingDirectoryMain))
+		defer ResetExecCommand()
 
 		// NOTE: avoid testing paths that might be symlinks, such as /tmp, as
 		// the "actual" working directory might look different to the
@@ -118,7 +115,8 @@ func TestUpgradeMaster(t *testing.T) {
 		}()
 
 		// Echo the environment to stdout.
-		execCommand = exectest.NewCommand(EnvironmentMain)
+		SetExecCommand(exectest.NewCommand(EnvironmentMain))
+		defer ResetExecCommand()
 
 		var buf bytes.Buffer
 		err := pair.ConvertMaster(mockStream, &buf, "", false)

@@ -91,10 +91,6 @@ func TestStreaming(t *testing.T) {
 	var pair clusterPair   // the unit under test
 	var log *gbytes.Buffer // contains gplog output
 
-	// Disable exec.Command. This way, if a test forgets to mock it out, we
-	// crash the test instead of executing code on a dev system.
-	execCommand = nil
-
 	// Store gplog output.
 	_, _, log = testhelper.SetupTestLogger()
 
@@ -160,7 +156,8 @@ func TestStreaming(t *testing.T) {
 				return nil
 			})
 
-		execCommand = exectest.NewCommand(StreamingMain)
+		SetExecCommand(exectest.NewCommand(StreamingMain))
+		defer ResetExecCommand()
 
 		err := pair.ConvertMaster(mockStream, ioutil.Discard, "", false)
 		g.Expect(err).NotTo(HaveOccurred())
@@ -179,7 +176,8 @@ func TestStreaming(t *testing.T) {
 			AnyTimes()
 
 		// Write ten bytes each to stdout/err.
-		execCommand = exectest.NewCommand(TenByteMain)
+		SetExecCommand(exectest.NewCommand(TenByteMain))
+		defer ResetExecCommand()
 
 		var buf bytes.Buffer
 		err := pair.ConvertMaster(mockStream, &buf, "", false)
@@ -215,7 +213,8 @@ func TestStreaming(t *testing.T) {
 			AnyTimes()
 
 		// Don't fail in the subprocess even when the stdout stream is closed.
-		execCommand = exectest.NewCommand(BlindlyWritingMain)
+		SetExecCommand(exectest.NewCommand(BlindlyWritingMain))
+		defer ResetExecCommand()
 
 		expectedErr := errors.New("write failed!")
 		err := pair.ConvertMaster(mockStream, NewFailingWriter(expectedErr), "", false)
@@ -235,7 +234,8 @@ func TestStreaming(t *testing.T) {
 			Times(1) // we expect only one failed attempt to Send
 
 		// Write ten bytes each to stdout/err.
-		execCommand = exectest.NewCommand(TenByteMain)
+		SetExecCommand(exectest.NewCommand(TenByteMain))
+		defer ResetExecCommand()
 
 		var buf bytes.Buffer
 		err := pair.ConvertMaster(mockStream, &buf, "", false)

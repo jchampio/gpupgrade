@@ -1,4 +1,4 @@
-package services
+package services_test
 
 import (
 	"bytes"
@@ -22,6 +22,8 @@ import (
 	"github.com/greenplum-db/gpupgrade/utils"
 
 	. "github.com/onsi/ginkgo"
+
+	. "github.com/greenplum-db/gpupgrade/hub/services"
 )
 
 func TestCreateInitialInitsystemConfig(t *testing.T) {
@@ -226,13 +228,8 @@ func TestRunInitsystemForTargetCluster(t *testing.T) {
 
 	gpinitsystemConfigPath := "/dir/.gpupgrade/gpinitsystem_config"
 
-	execCommand = nil
-	defer func() {
-		execCommand = nil
-	}()
-
 	t.Run("does not use --ignore-warnings when upgrading to GPDB7 or higher", func(t *testing.T) {
-		execCommand = exectest.NewCommandWithVerifier(exectest.Success,
+		SetExecCommand(exectest.NewCommandWithVerifier(exectest.Success,
 			func(path string, args ...string) {
 				if path != "bash" {
 					t.Errorf("executed %q, want bash", path)
@@ -243,7 +240,8 @@ func TestRunInitsystemForTargetCluster(t *testing.T) {
 				if !reflect.DeepEqual(args, expected) {
 					t.Errorf("args %q, want %q", args, expected)
 				}
-			})
+			}))
+		defer ResetExecCommand()
 
 		var buf bytes.Buffer
 		err := RunInitsystemForTargetCluster(mockStream, &buf, cluster7X, gpinitsystemConfigPath)
@@ -253,7 +251,7 @@ func TestRunInitsystemForTargetCluster(t *testing.T) {
 	})
 
 	t.Run("only uses --ignore-warnings when upgrading to GPDB6", func(t *testing.T) {
-		execCommand = exectest.NewCommandWithVerifier(exectest.Success,
+		SetExecCommand(exectest.NewCommandWithVerifier(exectest.Success,
 			func(path string, args ...string) {
 				if path != "bash" {
 					t.Errorf("executed %q, want bash", path)
@@ -264,7 +262,8 @@ func TestRunInitsystemForTargetCluster(t *testing.T) {
 				if !reflect.DeepEqual(args, expected) {
 					t.Errorf("args %q, want %q", args, expected)
 				}
-			})
+			}))
+		defer ResetExecCommand()
 
 		var buf bytes.Buffer
 		err := RunInitsystemForTargetCluster(mockStream, &buf, cluster6X, gpinitsystemConfigPath)
@@ -274,7 +273,7 @@ func TestRunInitsystemForTargetCluster(t *testing.T) {
 	})
 
 	t.Run("should use executables in the source's bindir even if bindir has a trailing slash", func(t *testing.T) {
-		execCommand = exectest.NewCommandWithVerifier(exectest.Success,
+		SetExecCommand(exectest.NewCommandWithVerifier(exectest.Success,
 			func(path string, args ...string) {
 				if path != "bash" {
 					t.Errorf("executed %q, want bash", path)
@@ -285,7 +284,8 @@ func TestRunInitsystemForTargetCluster(t *testing.T) {
 				if !reflect.DeepEqual(args, expected) {
 					t.Errorf("args %q, want %q", args, expected)
 				}
-			})
+			}))
+		defer ResetExecCommand()
 
 		cluster7X.BinDir += "/"
 		var buf bytes.Buffer
@@ -296,7 +296,8 @@ func TestRunInitsystemForTargetCluster(t *testing.T) {
 	})
 
 	t.Run("returns an error when gpinitsystem fails with --ignore-warnings when upgrading to GPDB6", func(t *testing.T) {
-		execCommand = exectest.NewCommand(exectest.Failure)
+		SetExecCommand(exectest.NewCommand(exectest.Failure))
+		defer ResetExecCommand()
 
 		var buf bytes.Buffer
 		err := RunInitsystemForTargetCluster(mockStream, &buf, cluster6X, gpinitsystemConfigPath)
@@ -312,7 +313,8 @@ func TestRunInitsystemForTargetCluster(t *testing.T) {
 	})
 
 	t.Run("returns an error when gpinitsystem errors when upgrading to GPDB7 or higher", func(t *testing.T) {
-		execCommand = exectest.NewCommand(exectest.Failure)
+		SetExecCommand(exectest.NewCommand(exectest.Failure))
+		defer ResetExecCommand()
 
 		var buf bytes.Buffer
 		err := RunInitsystemForTargetCluster(mockStream, &buf, cluster7X, gpinitsystemConfigPath)

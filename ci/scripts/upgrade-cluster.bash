@@ -146,11 +146,12 @@ time ssh mdw GPHOME_OLD="${GPHOME_OLD}" GPHOME_NEW="${GPHOME_NEW}" bash <<"EOF"
     dump_sql 5432 /tmp/old.sql
 
     gpupgrade initialize \
+              --verbose \
               --new-bindir ${GPHOME_NEW}/fake-bin \
               --old-bindir ${GPHOME_OLD}/fake-bin \
               --old-port 5432
 
-    gpupgrade execute
+    gpupgrade execute --verbose
     gpupgrade finalize
 
     dump_sql 5432 /tmp/new.sql

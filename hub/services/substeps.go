@@ -3,6 +3,9 @@ package services
 import (
 	"fmt"
 	"io"
+	"os"
+	"path/filepath"
+	"strings"
 	"sync"
 
 	"github.com/greenplum-db/gp-common-go-libs/gplog"
@@ -12,7 +15,80 @@ import (
 	"github.com/greenplum-db/gpupgrade/hub/upgradestatus"
 	"github.com/greenplum-db/gpupgrade/hub/upgradestatus/file"
 	"github.com/greenplum-db/gpupgrade/idl"
+	"github.com/greenplum-db/gpupgrade/utils"
 )
+
+func (h *Hub) BeginStep(name string, stream messageSender) (*SubstepChain, error) {
+	// Create a log file to contain step output.
+	path := filepath.Join(h.conf.StateDir, fmt.Sprintf("%s.log", name))
+	log, err := utils.System.OpenFile(path, os.O_WRONLY|os.O_CREATE, 0600)
+	if err != nil {
+		return nil, xerrors.Errorf(`step "%s": %w`, name, err)
+	}
+
+	_, err = fmt.Fprintf(log, "\n%s in progress.\n", strings.Title(name))
+	if err != nil {
+		log.Close()
+		return nil, xerrors.Errorf(`logging step "%s": %w`, name, err)
+	}
+
+	return &SubstepChain{
+		name:   name,
+		stream: newMultiplexedStream(stream, log),
+		log:    log,
+		hub:    h,
+	}, nil
+}
+
+type SubstepChain struct {
+	name   string
+	stream *multiplexedStream
+	log    io.WriteCloser
+	hub    *Hub // XXX only needed for InitializeStep
+	err    error
+}
+
+func (c *SubstepChain) Run(name string, f func(OutStreams) error) {
+	if c.err != nil {
+		// Short-circuit remaining elements in the chain.
+		return
+	}
+
+	_, err := fmt.Fprintf(c.stream.writer, "\nStarting %s...\n\n", name)
+	if err != nil {
+		c.err = xerrors.Errorf(`logging substep "%s": %w`, name, err)
+		return
+	}
+
+	substep, err := c.hub.InitializeStep(name, c.stream.stream)
+	if err != nil {
+		c.err = xerrors.Errorf(`initializing substep "%s": %w`, name, err)
+		return
+	}
+
+	err = f(c.stream)
+	if err != nil {
+		substep.MarkFailed()
+
+		// Prevent future substeps from running.
+		c.err = err
+		return
+	}
+
+	substep.MarkComplete()
+}
+
+func (c *SubstepChain) Err() error {
+	return c.err
+}
+
+func (c *SubstepChain) Finish() error {
+	if err := c.log.Close(); err != nil {
+		return xerrors.Errorf(`step "%s": %w`, c.name, err)
+	}
+
+	return nil
+}
 
 // OutStreams collects the conceptual output and error streams into a single
 // interface.

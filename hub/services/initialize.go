@@ -11,112 +11,75 @@ import (
 	"github.com/greenplum-db/gp-common-go-libs/gplog"
 	"github.com/hashicorp/go-multierror"
 	"github.com/pkg/errors"
-	"golang.org/x/xerrors"
 
 	"github.com/greenplum-db/gpupgrade/db"
-	"github.com/greenplum-db/gpupgrade/hub/upgradestatus"
 	"github.com/greenplum-db/gpupgrade/idl"
 	"github.com/greenplum-db/gpupgrade/utils"
 )
 
 func (h *Hub) Initialize(in *idl.InitializeRequest, stream idl.CliToHub_InitializeServer) (err error) {
-	log, err := utils.System.OpenFile(
-		filepath.Join(utils.GetStateDir(), "initialize.log"),
-		os.O_WRONLY|os.O_CREATE,
-		0600,
-	)
+	substeps, err := h.BeginStep("initialize", stream)
 	if err != nil {
 		return err
 	}
+
 	defer func() {
-		if closeErr := log.Close(); closeErr != nil {
-			err = multierror.Append(err,
-				xerrors.Errorf("failed to close initialize log: %w", closeErr))
+		if ferr := substeps.Finish(); ferr != nil {
+			err = multierror.Append(err, ferr).ErrorOrNil()
+		}
+
+		if err != nil {
+			gplog.Error(fmt.Sprintf("initialize: %s", err))
 		}
 	}()
 
-	initializeStream := newMultiplexedStream(stream, log)
+	substeps.Run(idl.UpgradeSteps_CONFIG, func(streams OutStreams) error {
+		return h.fillClusterConfigsSubStep(streams, in.OldBinDir, in.NewBinDir, int(in.OldPort))
+	})
+	substeps.Run(idl.UpgradeSteps_START_AGENTS,
+		h.startAgentsSubStep,
+	)
 
-	_, err = log.WriteString("\nInitialize in progress.\n")
-	if err != nil {
-		return xerrors.Errorf("failed writing to initialize log: %w", err)
-	}
-
-	err = h.Substep(initializeStream, upgradestatus.CONFIG,
-		func(stream OutStreams) error {
-			return h.fillClusterConfigsSubStep(stream, in.OldBinDir, in.NewBinDir, int(in.OldPort))
-		})
-	if err != nil {
-		return err
-	}
-
-	err = h.Substep(initializeStream, upgradestatus.START_AGENTS, h.startAgentsSubStep)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return substeps.Err()
 }
 
 func (h *Hub) InitializeCreateCluster(in *idl.InitializeCreateClusterRequest, stream idl.CliToHub_InitializeCreateClusterServer) (err error) {
-	log, err := utils.System.OpenFile(
-		filepath.Join(utils.GetStateDir(), "initialize.log"),
-		os.O_WRONLY|os.O_APPEND,
-		0600,
-	)
+	substeps, err := h.BeginStep("initialize", stream)
 	if err != nil {
 		return err
 	}
+
 	defer func() {
-		if closeErr := log.Close(); closeErr != nil {
-			err = multierror.Append(err,
-				xerrors.Errorf("failed to close initialize log: %w", closeErr))
+		if ferr := substeps.Finish(); ferr != nil {
+			err = multierror.Append(err, ferr).ErrorOrNil()
+		}
+
+		if err != nil {
+			gplog.Error(fmt.Sprintf("initialize: %s", err))
 		}
 	}()
 
-	initializeStream := newMultiplexedStream(stream, log)
-
-	_, err = log.WriteString("\nInitialize hub in progress.\n")
-	if err != nil {
-		return xerrors.Errorf("failed writing to initialize log for hub: %w", err)
-	}
-
+	// XXX this must be persisted to disk, not memory
 	var targetMasterPort int
-	err = h.Substep(initializeStream, upgradestatus.CREATE_TARGET_CONFIG,
-		func(_ OutStreams) error {
-			var err error
-			targetMasterPort, err = h.GenerateInitsystemConfig(in.Ports)
-			return err
-		})
-	if err != nil {
+	substeps.Run(idl.UpgradeSteps_CREATE_TARGET_CONFIG, func(_ OutStreams) error {
+		var err error
+		targetMasterPort, err = h.GenerateInitsystemConfig(in.Ports)
 		return err
-	}
+	})
+	substeps.Run(idl.UpgradeSteps_SHUTDOWN_SOURCE_CLUSTER, func(stream OutStreams) error {
+		return StopCluster(stream, h.source)
+	})
+	substeps.Run(idl.UpgradeSteps_INIT_TARGET_CLUSTER, func(stream OutStreams) error {
+		return h.CreateTargetCluster(stream, targetMasterPort)
+	})
+	substeps.Run(idl.UpgradeSteps_SHUTDOWN_TARGET_CLUSTER, func(stream OutStreams) error {
+		return h.ShutdownCluster(stream, false)
+	})
+	substeps.Run(idl.UpgradeSteps_CHECK_UPGRADE,
+		h.CheckUpgrade,
+	)
 
-	err = h.Substep(initializeStream, upgradestatus.SHUTDOWN_SOURCE_CLUSTER,
-		func(stream OutStreams) error {
-			return StopCluster(stream, h.source)
-		})
-	if err != nil {
-		return err
-	}
-
-	err = h.Substep(initializeStream, upgradestatus.INIT_TARGET_CLUSTER,
-		func(stream OutStreams) error {
-			return h.CreateTargetCluster(stream, targetMasterPort)
-		})
-	if err != nil {
-		return err
-	}
-
-	err = h.Substep(initializeStream, upgradestatus.SHUTDOWN_TARGET_CLUSTER,
-		func(stream OutStreams) error {
-			return h.ShutdownCluster(stream, false)
-		})
-	if err != nil {
-		return err
-	}
-
-	return h.Substep(initializeStream, upgradestatus.CHECK_UPGRADE, h.CheckUpgrade)
+	return substeps.Err()
 }
 
 // create old/new clusters, write to disk and re-read from disk to make sure it is "durable"

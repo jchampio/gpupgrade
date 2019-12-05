@@ -21,7 +21,7 @@ import (
 func (h *Hub) BeginStep(name string, stream messageSender) (*SubstepChain, error) {
 	// Create a log file to contain step output.
 	path := filepath.Join(h.conf.StateDir, fmt.Sprintf("%s.log", name))
-	log, err := utils.System.OpenFile(path, os.O_WRONLY|os.O_CREATE, 0600)
+	log, err := utils.System.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0600)
 	if err != nil {
 		return nil, xerrors.Errorf(`step "%s": %w`, name, err)
 	}

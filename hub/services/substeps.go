@@ -32,11 +32,17 @@ func (h *Hub) BeginStep(name string, stream messageSender) (*SubstepChain, error
 		return nil, xerrors.Errorf(`logging step "%s": %w`, name, err)
 	}
 
+	dir := filepath.Join(h.conf.StateDir, "status")
+	if err = utils.System.MkdirAll(dir, 0700); err != nil {
+		log.Close()
+		return nil, xerrors.Errorf(`creating status directory: %w`, err)
+	}
+
 	return &SubstepChain{
 		name:   name,
 		stream: newMultiplexedStream(stream, log),
 		log:    log,
-		hub:    h,
+		dir:    dir,
 	}, nil
 }
 
@@ -44,38 +50,45 @@ type SubstepChain struct {
 	name   string
 	stream *multiplexedStream
 	log    io.WriteCloser
-	hub    *Hub // XXX only needed for InitializeStep
+	dir    string
 	err    error
 }
 
-func (c *SubstepChain) Run(name string, f func(OutStreams) error) {
+func (c *SubstepChain) Run(code idl.UpgradeSteps, f func(OutStreams) error) {
 	if c.err != nil {
 		// Short-circuit remaining elements in the chain.
 		return
 	}
 
-	_, err := fmt.Fprintf(c.stream.writer, "\nStarting %s...\n\n", name)
+	name := strings.ToLower(code.String())
+
+	var err error
+	defer func() {
+		if err != nil {
+			c.err = xerrors.Errorf(`substep "%s": %w`, name, err)
+		}
+	}()
+
+	_, err = fmt.Fprintf(c.stream.writer, "\nStarting %s...\n\n", name)
 	if err != nil {
-		c.err = xerrors.Errorf(`logging substep "%s": %w`, name, err)
 		return
 	}
 
-	substep, err := c.hub.InitializeStep(name, c.stream.stream)
+	dir := filepath.Join(c.dir, strings.ToLower(code.String()))
+	s := &substep{dir, code, c.stream.stream}
+
+	err = s.MarkInProgress()
 	if err != nil {
-		c.err = xerrors.Errorf(`initializing substep "%s": %w`, name, err)
 		return
 	}
 
 	err = f(c.stream)
 	if err != nil {
-		substep.MarkFailed()
-
-		// Prevent future substeps from running.
-		c.err = err
+		s.MarkFailed()
 		return
 	}
 
-	substep.MarkComplete()
+	s.MarkComplete()
 }
 
 func (c *SubstepChain) Err() error {
@@ -87,6 +100,62 @@ func (c *SubstepChain) Finish() error {
 		return xerrors.Errorf(`step "%s": %w`, c.name, err)
 	}
 
+	return nil
+}
+
+type substep struct {
+	dir    string           // path to step-specific state directory
+	code   idl.UpgradeSteps // the gRPC code associated with this step
+	stream messageSender    // the stream on which to send status messages
+}
+
+func (s *substep) send(status idl.StepStatus) {
+	// A stream is not guaranteed to remain connected during execution, so
+	// errors are explicitly ignored.
+	_ = s.stream.Send(&idl.Message{
+		Contents: &idl.Message_Status{&idl.UpgradeStepStatus{
+			Step:   s.code,
+			Status: status,
+		}},
+	})
+}
+
+func touch(path string) error {
+	f, err := utils.System.OpenFile(path, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600)
+	if err != nil {
+		return err
+	}
+
+	f.Close()
+	return nil
+}
+
+func (s *substep) MarkInProgress() error {
+	if err := utils.System.Mkdir(s.dir, 0700); err != nil {
+		return xerrors.Errorf(`marking in-progress: %w`, err)
+	}
+
+	s.send(idl.StepStatus_RUNNING)
+	return nil
+}
+
+func (s *substep) MarkFailed() error {
+	path := filepath.Join(s.dir, "failed")
+	if err := touch(path); err != nil {
+		return xerrors.Errorf(`marking failed: %w`, err)
+	}
+
+	s.send(idl.StepStatus_FAILED)
+	return nil
+}
+
+func (s *substep) MarkComplete() error {
+	path := filepath.Join(s.dir, "complete")
+	if err := touch(path); err != nil {
+		return xerrors.Errorf(`marking complete: %w`, err)
+	}
+
+	s.send(idl.StepStatus_COMPLETE)
 	return nil
 }
 

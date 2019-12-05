@@ -32,6 +32,7 @@ type SystemFunctions struct {
 	Getpid          func() int
 	Hostname        func() (string, error)
 	IsNotExist      func(err error) bool
+	Mkdir           func(name string, perm os.FileMode) error
 	MkdirAll        func(path string, perm os.FileMode) error
 	Now             func() time.Time
 	Open            func(name string) (*os.File, error)
@@ -54,6 +55,7 @@ func InitializeSystemFunctions() *SystemFunctions {
 		Getpid:          os.Getpid,
 		Hostname:        os.Hostname,
 		IsNotExist:      os.IsNotExist,
+		Mkdir:           os.Mkdir,
 		MkdirAll:        os.MkdirAll,
 		Now:             time.Now,
 		Open:            os.Open,

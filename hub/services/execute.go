@@ -6,7 +6,6 @@ import (
 	"github.com/greenplum-db/gp-common-go-libs/gplog"
 	"github.com/hashicorp/go-multierror"
 
-	"github.com/greenplum-db/gpupgrade/hub/upgradestatus"
 	"github.com/greenplum-db/gpupgrade/idl"
 )
 
@@ -26,16 +25,16 @@ func (h *Hub) Execute(request *idl.ExecuteRequest, stream idl.CliToHub_ExecuteSe
 		}
 	}()
 
-	substeps.Run(upgradestatus.UPGRADE_MASTER, func(streams OutStreams) error {
+	substeps.Run(idl.UpgradeSteps_UPGRADE_MASTER, func(streams OutStreams) error {
 		return h.UpgradeMaster(streams, false)
 	})
-	substeps.Run(upgradestatus.COPY_MASTER,
+	substeps.Run(idl.UpgradeSteps_COPY_MASTER,
 		h.CopyMasterDataDir,
 	)
-	substeps.Run(upgradestatus.UPGRADE_PRIMARIES, func(_ OutStreams) error {
+	substeps.Run(idl.UpgradeSteps_UPGRADE_PRIMARIES, func(_ OutStreams) error {
 		return h.ConvertPrimaries(false)
 	})
-	substeps.Run(upgradestatus.START_TARGET_CLUSTER, func(streams OutStreams) error {
+	substeps.Run(idl.UpgradeSteps_START_TARGET_CLUSTER, func(streams OutStreams) error {
 		return StartCluster(streams, h.target)
 	})
 

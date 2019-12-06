@@ -32,6 +32,7 @@ func (h *Hub) BeginStep(name string, stream messageSender) (*SubstepChain, error
 		return nil, xerrors.Errorf(`logging step "%s": %w`, name, err)
 	}
 
+	// TODO move to global initialization
 	dir := filepath.Join(h.conf.StateDir, "status")
 	if err = utils.System.MkdirAll(dir, 0700); err != nil {
 		log.Close()
@@ -79,6 +80,10 @@ func (c *SubstepChain) Run(code idl.UpgradeSteps, f func(OutStreams) error) {
 
 	err = s.MarkInProgress()
 	if err != nil {
+		if err == ErrSkip {
+			// This is not an error condition; just short-circuit.
+			err = nil
+		}
 		return
 	}
 
@@ -130,8 +135,62 @@ func touch(path string) error {
 	return nil
 }
 
+func exists(path string) (bool, error) {
+	_, err := os.Stat(path)
+
+	switch {
+	case err == nil:
+		return true, nil
+	case os.IsNotExist(err):
+		return false, nil
+	default:
+		return false, err
+	}
+}
+
+func (s *substep) failMarker() string {
+	return filepath.Join(s.dir, "failed")
+}
+
+func (s *substep) doneMarker() string {
+	return filepath.Join(s.dir, "complete")
+}
+
+var ErrSkip = errors.New("skipping completed substep")
+
 func (s *substep) MarkInProgress() error {
-	if err := utils.System.Mkdir(s.dir, 0700); err != nil {
+	err := utils.System.Mkdir(s.dir, 0700)
+
+	if os.IsExist(err) {
+		// The step was already started; see if it failed or completed.
+		var done, failed bool
+
+		done, err = exists(s.doneMarker())
+		if err != nil {
+			return xerrors.Errorf("checking completion: %w", err)
+		}
+
+		if done {
+			// We don't need to perform this step again.
+			s.send(idl.StepStatus_SKIPPED)
+			return ErrSkip
+		}
+
+		failed, err = exists(s.failMarker())
+		if err != nil {
+			return xerrors.Errorf("checking failure: %w", err)
+		}
+
+		if !failed {
+			// Bad. Is this step already running elsewhere?
+			return errors.New("step is already marked in-progress")
+		}
+
+		// This step previously failed; clean up and continue.
+		err = os.Remove(s.failMarker())
+	}
+
+	if err != nil {
 		return xerrors.Errorf(`marking in-progress: %w`, err)
 	}
 
@@ -140,8 +199,7 @@ func (s *substep) MarkInProgress() error {
 }
 
 func (s *substep) MarkFailed() error {
-	path := filepath.Join(s.dir, "failed")
-	if err := touch(path); err != nil {
+	if err := touch(s.failMarker()); err != nil {
 		return xerrors.Errorf(`marking failed: %w`, err)
 	}
 
@@ -150,8 +208,7 @@ func (s *substep) MarkFailed() error {
 }
 
 func (s *substep) MarkComplete() error {
-	path := filepath.Join(s.dir, "complete")
-	if err := touch(path); err != nil {
+	if err := touch(s.doneMarker()); err != nil {
 		return xerrors.Errorf(`marking complete: %w`, err)
 	}
 

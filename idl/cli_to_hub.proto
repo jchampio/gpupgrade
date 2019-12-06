@@ -61,6 +61,7 @@ enum StepStatus {
     RUNNING = 2;
     COMPLETE = 3;
     FAILED = 4;
+    SKIPPED = 5;
 }
 
 message CheckVersionRequest {}

@@ -36,6 +36,7 @@ var indicators = map[idl.StepStatus]string{
 	idl.StepStatus_RUNNING:  "[IN PROGRESS]",
 	idl.StepStatus_COMPLETE: "[COMPLETE]",
 	idl.StepStatus_FAILED:   "[FAILED]",
+	idl.StepStatus_SKIPPED:  "[SKIPPED]",
 }
 
 func Initialize(client idl.CliToHubClient, oldBinDir, newBinDir string, oldPort int, verbose bool) (err error) {

@@ -260,6 +260,8 @@ _gpupgrade_config_show()
 
     flags+=("--new-bindir")
     local_nonpersistent_flags+=("--new-bindir")
+    flags+=("--new-datadir")
+    local_nonpersistent_flags+=("--new-datadir")
     flags+=("--old-bindir")
     local_nonpersistent_flags+=("--old-bindir")
 

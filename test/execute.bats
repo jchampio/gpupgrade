@@ -5,10 +5,14 @@ load helpers
 setup() {
     skip_if_no_gpdb
 
-    STATE_DIR=`mktemp -d`
+    STATE_DIR=`mktemp -d /tmp/gpupgrade.XXXXXX`
     export GPUPGRADE_HOME="${STATE_DIR}/gpupgrade"
 
     gpupgrade kill-services
+
+    # If this variable is set (to a master data directory), teardown() will call
+    # gpdeletesystem on this cluster.
+    NEW_CLUSTER=
 }
 
 teardown() {
@@ -17,6 +21,12 @@ teardown() {
 
     gpupgrade kill-services
     rm -r "$STATE_DIR"
+
+    if [ -n "$NEW_CLUSTER" ]; then
+        delete_cluster $NEW_CLUSTER
+    fi
+
+    gpstart -a
 }
 
 ensure_hardlinks_for_relfilenode_on_master_and_segments() {
@@ -60,8 +70,9 @@ ensure_hardlinks_for_relfilenode_on_master_and_segments() {
         --link \
         --disk-free-ratio 0 \
         --verbose
+    NEW_CLUSTER="$(gpupgrade config show --new-datadir)"
 
     gpupgrade execute --verbose
 
-    ensure_hardlinks_for_relfilenode_on_master_and_segments 'test_linking' 2
+    PGPORT=50432 ensure_hardlinks_for_relfilenode_on_master_and_segments 'test_linking' 2
 }

@@ -238,6 +238,7 @@ func initialize() *cobra.Command {
 	var stopBeforeClusterCreation bool
 	var verbose bool
 	var ports string
+	var useLinkMode bool
 
 	subInit := &cobra.Command{
 		Use:   "initialize",
@@ -328,6 +329,7 @@ If you would like to return the cluster to its original state, run
 	subInit.MarkPersistentFlagRequired("old-port")
 	subInit.PersistentFlags().BoolVar(&stopBeforeClusterCreation, "stop-before-cluster-creation", false, "only run up to pre-init")
 	subInit.PersistentFlags().MarkHidden("stop-before-cluster-creation")
+	subInit.PersistentFlags().BoolVar(&useLinkMode, "link", false, "use hardlinks instead of copying data files")
 	subInit.PersistentFlags().Float64Var(&diskFreeRatio, "disk-free-ratio", 0.60, "percentage of disk space that must be available (from 0.0 - 1.0)")
 	subInit.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "print the output stream from all substeps")
 	subInit.Flags().StringVar(&ports, "ports", "", "set of ports to use when initializing the new cluster")

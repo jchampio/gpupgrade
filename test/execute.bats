@@ -49,21 +49,19 @@ ensure_hardlinks_for_relfilenode_on_master_and_segments() {
 @test "gpupgrade execute should remember that link mode was specified in initialize" {
     require_gnu_stat
 
-    # Setup
-    psql postgres -c "create table test_linking (a int);"
+    psql postgres -c "drop table if exists test_linking; create table test_linking (a int);"
 
     ensure_hardlinks_for_relfilenode_on_master_and_segments 'test_linking' 1
 
-    # Run upgrade steps
     gpupgrade initialize \
         --old-bindir="$GPHOME/bin" \
         --new-bindir="$GPHOME/bin" \
         --old-port="${PGPORT}" \
         --link \
+        --disk-free-ratio 0 \
         --verbose
 
     gpupgrade execute --verbose
 
-    # expect link mode to have created a hardlink
     ensure_hardlinks_for_relfilenode_on_master_and_segments 'test_linking' 2
 }

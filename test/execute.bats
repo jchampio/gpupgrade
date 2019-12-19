@@ -33,22 +33,28 @@ ensure_hardlinks_for_relfilenode_on_master_and_segments() {
     local tablename=$1
     local expected_number_of_hardlinks=$2
 
-    psql postgres -c "
-      create or replace function get_relfilenode_for_table_for_segments(tablename text) returns setof text as \$\$
-           select current_setting('data_directory') || '/' || pg_relation_filepath(tablename);
-      \$\$ LANGUAGE SQL EXECUTE ON ALL SEGMENTS;
+    read -r -a relfilenodes <<< $(psql postgres --tuples-only --no-align -c "
+        CREATE FUNCTION pg_temp.seg_relation_filepath(tbl text)
+            RETURNS TABLE (dbid int, path text)
+            EXECUTE ON ALL SEGMENTS
+            LANGUAGE SQL
+        AS \$\$
+            SELECT current_setting('gp_dbid')::int, pg_relation_filepath(tbl);
+        \$\$;
 
-      create or replace function get_relfilenode_for_table_for_master(tablename text) returns setof text as \$\$
-             select current_setting('data_directory') || '/' || pg_relation_filepath(tablename);
-      \$\$ LANGUAGE SQL EXECUTE ON MASTER;
+        CREATE FUNCTION pg_temp.gp_relation_filepath(tbl text)
+            RETURNS TABLE (dbid int, path text)
+            LANGUAGE SQL
+        AS \$\$
+            SELECT current_setting('gp_dbid')::int, pg_relation_filepath(tbl)
+                UNION ALL SELECT * FROM pg_temp.seg_relation_filepath(tbl);
+        \$\$;
 
-      create or replace function get_relfilenode_for_table(tablename text) returns setof text as \$\$
-             select get_relfilenode_for_table_for_master(tablename) union all
-                    select get_relfilenode_for_table_for_segments(tablename);
-      \$\$ LANGUAGE SQL;
-    "
-
-    read -a relfilenodes <<< $(psql postgres --tuples-only --no-align -c " select get_relfilenode_for_table('$tablename');")
+        SELECT c.datadir || '/' || f.path
+          FROM pg_temp.gp_relation_filepath('$tablename') f
+          JOIN gp_segment_configuration c
+            ON c.dbid = f.dbid;
+    ")
 
     for relfilenode in "${relfilenodes[@]}"; do
       local number_of_hardlinks=$($STAT --format "%h" "${relfilenode}")

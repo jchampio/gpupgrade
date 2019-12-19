@@ -57,8 +57,9 @@ ensure_hardlinks_for_relfilenode_on_master_and_segments() {
     ")
 
     for relfilenode in "${relfilenodes[@]}"; do
-      local number_of_hardlinks=$($STAT --format "%h" "${relfilenode}")
-      [ $number_of_hardlinks -eq $expected_number_of_hardlinks ]
+        local number_of_hardlinks=$($STAT --format "%h" "${relfilenode}")
+        [ $number_of_hardlinks -eq $expected_number_of_hardlinks ] \
+            || fail "expected $expected_number_of_hardlinks hardlinks to $relfilenode; found $number_of_hardlinks"
     done
 }
 

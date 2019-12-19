@@ -6,9 +6,10 @@ import (
 	"os"
 	"path"
 
+	"github.com/pkg/errors"
+
 	"github.com/greenplum-db/gpupgrade/testutils"
 	"github.com/greenplum-db/gpupgrade/utils"
-	"github.com/pkg/errors"
 
 	"github.com/greenplum-db/gp-common-go-libs/cluster"
 	"github.com/greenplum-db/gp-common-go-libs/dbconn"
@@ -43,7 +44,7 @@ var _ = Describe("Cluster", func() {
 
 	Describe("Commit and Load", func() {
 		It("can save a config and successfully load it back in", func() {
-			err := expectedCluster.Commit()
+			err := expectedCluster.Commit(utils.WriteJSONFile)
 			Expect(err).ToNot(HaveOccurred())
 			givenCluster := &utils.Cluster{
 				ConfigPath: path.Join(testStateDir, "cluster_config.json"),

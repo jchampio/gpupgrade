@@ -63,7 +63,7 @@ func (h *Hub) CreateTargetCluster(stream OutStreams, masterPort int) error {
 	}
 
 	targetDBConn := db.NewDBConn("localhost", masterPort, "template1")
-	return ReloadAndCommitCluster(h.target, targetDBConn)
+	return ReloadAndCommitCluster(h.target, targetDBConn, utils.WriteJSONFile)
 }
 
 func (h *Hub) InitTargetCluster(stream OutStreams) error {

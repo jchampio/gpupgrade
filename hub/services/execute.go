@@ -31,6 +31,9 @@ func (h *Hub) Execute(request *idl.ExecuteRequest, stream idl.CliToHub_ExecuteSe
 
 	executeStream := newMultiplexedStream(stream, log)
 
+	data, err := utils.ReadJSONFile(utils.UPGRADE_CONFIG_FILENAME, utils.UpgradeConfig{})
+	upgradeConfig := data.(utils.UpgradeConfig)
+
 	_, err = log.WriteString("\nExecute in progress.\n")
 	if err != nil {
 		return xerrors.Errorf("failed writing to execute log: %w", err)
@@ -38,7 +41,7 @@ func (h *Hub) Execute(request *idl.ExecuteRequest, stream idl.CliToHub_ExecuteSe
 
 	err = h.Substep(executeStream, upgradestatus.UPGRADE_MASTER,
 		func(streams OutStreams) error {
-			return h.UpgradeMaster(streams, false)
+			return h.UpgradeMaster(streams, false, upgradeConfig)
 		})
 	if err != nil {
 		return err

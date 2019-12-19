@@ -3,6 +3,8 @@ package services
 import (
 	"sync"
 
+	"github.com/greenplum-db/gpupgrade/utils"
+
 	"github.com/hashicorp/go-multierror"
 )
 
@@ -14,7 +16,7 @@ func (h *Hub) CheckUpgrade(stream OutStreams) error {
 	go func() {
 		defer wg.Done()
 
-		err := h.UpgradeMaster(stream, true)
+		err := h.UpgradeMaster(stream, true, utils.UpgradeConfig{})
 		if err != nil {
 			checkErrs <- err
 		}

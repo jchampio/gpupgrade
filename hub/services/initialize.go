@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 
 	"github.com/greenplum-db/gp-common-go-libs/cluster"
+
 	"github.com/greenplum-db/gp-common-go-libs/dbconn"
 	"github.com/greenplum-db/gp-common-go-libs/gplog"
 	"github.com/hashicorp/go-multierror"
@@ -44,7 +45,15 @@ func (h *Hub) Initialize(in *idl.InitializeRequest, stream idl.CliToHub_Initiali
 
 	err = h.Substep(initializeStream, upgradestatus.CONFIG,
 		func(stream OutStreams) error {
-			return h.fillClusterConfigsSubStep(stream, in.OldBinDir, in.NewBinDir, int(in.OldPort))
+			dbConn := db.NewDBConn("localhost", int(in.OldPort), "template1")
+			defer dbConn.Close()
+
+			source, target, err := fillClusterConfigsSubStep(stream, in.OldBinDir, in.NewBinDir, int(in.OldPort), h.conf.StateDir, false, utils.WriteJSONFile, dbConn)
+
+			h.source = source
+			h.target = target
+
+			return err
 		})
 	if err != nil {
 		return err
@@ -120,21 +129,26 @@ func (h *Hub) InitializeCreateCluster(in *idl.InitializeCreateClusterRequest, st
 }
 
 // create old/new clusters, write to disk and re-read from disk to make sure it is "durable"
-func (h *Hub) fillClusterConfigsSubStep(_ OutStreams, oldBinDir, newBinDir string, oldPort int) error {
-	source := &utils.Cluster{BinDir: path.Clean(oldBinDir), ConfigPath: filepath.Join(h.conf.StateDir, utils.SOURCE_CONFIG_FILENAME)}
-	dbConn := db.NewDBConn("localhost", oldPort, "template1")
-	defer dbConn.Close()
-	err := ReloadAndCommitCluster(source, dbConn)
+func fillClusterConfigsSubStep(_ OutStreams, oldBinDir, newBinDir string, oldPort int, stateDir string, useLinkMode bool, jsonWriterFunc utils.JsonWriterFunc, dbConn *dbconn.DBConn) (*utils.Cluster, *utils.Cluster, error) {
+	source := &utils.Cluster{
+		BinDir:     path.Clean(oldBinDir),
+		ConfigPath: filepath.Join(stateDir, utils.SOURCE_CONFIG_FILENAME),
+	}
+
+	err := ReloadAndCommitCluster(source, dbConn, jsonWriterFunc)
+
 	if err != nil {
-		return err
+		return nil, nil, err
 	}
 
 	emptyCluster := cluster.NewCluster([]cluster.SegConfig{})
-	target := &utils.Cluster{Cluster: emptyCluster, BinDir: path.Clean(newBinDir), ConfigPath: filepath.Join(h.conf.StateDir, utils.TARGET_CONFIG_FILENAME)}
-	err = target.Commit()
+	target := &utils.Cluster{Cluster: emptyCluster, BinDir: path.Clean(newBinDir), ConfigPath: filepath.Join(stateDir, utils.TARGET_CONFIG_FILENAME)}
+	err = target.Commit(jsonWriterFunc)
 	if err != nil {
-		return errors.Wrap(err, "Unable to save target cluster configuration")
+		return nil, nil, errors.Wrap(err, "Unable to save target cluster configuration")
 	}
+
+	jsonWriterFunc(utils.UPGRADE_CONFIG_FILENAME, &utils.UpgradeConfig{UseLinkMode: useLinkMode})
 
 	// XXX: This is really not necessary as we are just verifying that
 	// the configuration that we just wrote is readable.
@@ -142,30 +156,27 @@ func (h *Hub) fillClusterConfigsSubStep(_ OutStreams, oldBinDir, newBinDir strin
 	errTarget := target.Load()
 	if errSource != nil && errTarget != nil {
 		errBoth := errors.Errorf("Source error: %s\nTarget error: %s", errSource.Error(), errTarget.Error())
-		return errors.Wrap(errBoth, "Unable to load source or target cluster configuration")
+		return nil, nil, errors.Wrap(errBoth, "Unable to load source or target cluster configuration")
 	} else if errSource != nil {
-		return errors.Wrap(errSource, "Unable to load source cluster configuration")
+		return nil, nil, errors.Wrap(errSource, "Unable to load source cluster configuration")
 	} else if errTarget != nil {
-		return errors.Wrap(errTarget, "Unable to load target cluster configuration")
+		return nil, nil, errors.Wrap(errTarget, "Unable to load target cluster configuration")
 	}
 
-	// link in source/target to hub
-	h.source = source
-	h.target = target
-
-	return err
+	return source, target, err
 }
 
 // ReloadAndCommitCluster() will fill in a utils.Cluster using a database
 // connection and additionally write the results to disk.
-func ReloadAndCommitCluster(cluster *utils.Cluster, conn *dbconn.DBConn) error {
+func ReloadAndCommitCluster(cluster *utils.Cluster, conn *dbconn.DBConn, jsonWriterFunc utils.JsonWriterFunc) error {
 	newCluster, err := utils.ClusterFromDB(conn, cluster.BinDir, cluster.ConfigPath)
+
 	if err != nil {
 		return errors.Wrap(err, "could not retrieve cluster configuration")
 	}
 
 	*cluster = *newCluster
-	err = cluster.Commit()
+	err = cluster.Commit(jsonWriterFunc)
 	if err != nil {
 		return errors.Wrap(err, "could not save cluster configuration")
 	}

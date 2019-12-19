@@ -146,3 +146,19 @@ func WriteJSONFile(fileName string, contents interface{}) error {
 
 	return nil
 }
+
+func ReadJSONFile(filename string, data interface{}) (interface{}, error) {
+	contents, err := System.ReadFile(filename)
+
+	if err != nil {
+		return nil, err
+	}
+
+	err = json.Unmarshal([]byte(contents), data)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return data, nil
+}

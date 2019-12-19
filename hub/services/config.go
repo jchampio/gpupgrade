@@ -2,6 +2,7 @@ package services
 
 import (
 	"github.com/greenplum-db/gpupgrade/idl"
+	"github.com/greenplum-db/gpupgrade/utils"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -21,11 +22,11 @@ func (h *Hub) SetConfig(ctx context.Context, in *idl.SetConfigRequest) (*idl.Set
 	}
 
 	// Persist.
-	err := h.source.Commit()
+	err := h.source.Commit(utils.WriteJSONFile)
 	if err != nil {
 		return &idl.SetConfigReply{}, err
 	}
-	err = h.target.Commit()
+	err = h.target.Commit(utils.WriteJSONFile)
 	if err != nil {
 		return &idl.SetConfigReply{}, err
 	}

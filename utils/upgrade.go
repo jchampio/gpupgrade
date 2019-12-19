@@ -5,6 +5,12 @@ import (
 	"path/filepath"
 )
 
+const UPGRADE_CONFIG_FILENAME = "upgrade_config.json"
+
+type UpgradeConfig struct {
+	UseLinkMode bool
+}
+
 // PGUpgradeDirectory returns a path to a directory underneath the state
 // directory that is to be used for storing pg_upgrade state. It does not ensure
 // the directory exists first.

@@ -32,7 +32,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	err = cluster.Commit()
+	err = cluster.Commit(utils.WriteJSONFile)
 	if err != nil {
 		log.Fatal(err)
 	}

@@ -77,6 +77,7 @@ ensure_hardlinks_for_relfilenode_on_master_and_segments() {
         --link \
         --disk-free-ratio 0 \
         --verbose
+
     NEW_CLUSTER="$(gpupgrade config show --new-datadir)"
 
     gpupgrade execute --verbose

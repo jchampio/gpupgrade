@@ -43,7 +43,7 @@ func CreateStateDirAndClusterConfigs(sourceBinDir, targetBinDir string) (err err
 		BinDir:     path.Clean(sourceBinDir),
 		ConfigPath: filepath.Join(stateDir, utils.SOURCE_CONFIG_FILENAME),
 	}
-	err = source.Commit()
+	err = source.Commit(utils.WriteJSONFile)
 	if err != nil {
 		return errors.Wrap(err, "Unable to save empty source cluster configuration")
 	}
@@ -53,7 +53,7 @@ func CreateStateDirAndClusterConfigs(sourceBinDir, targetBinDir string) (err err
 		BinDir:     path.Clean(targetBinDir),
 		ConfigPath: filepath.Join(stateDir, utils.TARGET_CONFIG_FILENAME),
 	}
-	err = target.Commit()
+	err = target.Commit(utils.WriteJSONFile)
 	if err != nil {
 		return errors.Wrap(err, "Unable to save empty target cluster configuration")
 	}

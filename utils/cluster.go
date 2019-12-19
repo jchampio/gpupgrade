@@ -32,6 +32,8 @@ type ClusterConfig struct {
 	Version    dbconn.GPDBVersion
 }
 
+type JsonWriterFunc func(fileName string, contents interface{}) error
+
 // ClusterFromDB will create a Cluster by querying the passed DBConn for
 // information. You must pass the cluster's binary directory and configuration
 // path, since these cannot be divined from the database.
@@ -73,7 +75,7 @@ func (c *Cluster) Load() error {
 	return nil
 }
 
-func (c *Cluster) Commit() error {
+func (c *Cluster) Commit(jsonWriterFunc JsonWriterFunc) error {
 	segConfigs := make([]cluster.SegConfig, 0)
 	clusterConfig := &ClusterConfig{BinDir: c.BinDir}
 
@@ -84,7 +86,7 @@ func (c *Cluster) Commit() error {
 	clusterConfig.SegConfigs = segConfigs
 	clusterConfig.Version = c.Version
 
-	return WriteJSONFile(c.ConfigPath, clusterConfig)
+	return jsonWriterFunc(c.ConfigPath, clusterConfig)
 }
 
 func (c *Cluster) MasterDataDir() string {

@@ -292,7 +292,7 @@ This step can be reverted.
 
 			client := connectToHub()
 
-			err = commanders.Initialize(client, oldBinDir, newBinDir, oldPort, verbose)
+			err = commanders.Initialize(client, oldBinDir, newBinDir, oldPort, useLinkMode, verbose)
 			if err != nil {
 				return errors.Wrap(err, "initializing hub")
 			}

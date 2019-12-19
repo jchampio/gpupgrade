@@ -92,7 +92,7 @@ func TestUpgradeMaster(t *testing.T) {
 		// NOTE: avoid testing paths that might be symlinks, such as /tmp, as
 		// the "actual" working directory might look different to the
 		// subprocess.
-		err := pair.ConvertMaster(stream, "/", false)
+		err := pair.ConvertMaster(stream, "/", false, utils.UpgradeConfig{})
 		g.Expect(err).NotTo(HaveOccurred())
 
 		wd := stream.stdout.String()
@@ -114,7 +114,7 @@ func TestUpgradeMaster(t *testing.T) {
 		// Echo the environment to stdout.
 		execCommand = exectest.NewCommand(EnvironmentMain)
 
-		err := pair.ConvertMaster(stream, "", false)
+		err := pair.ConvertMaster(stream, "", false, utils.UpgradeConfig{})
 		g.Expect(err).NotTo(HaveOccurred())
 
 		scanner := bufio.NewScanner(&stream.stdout)
@@ -168,7 +168,7 @@ func TestUpgradeMaster(t *testing.T) {
 				g.Expect(fs.Args()).To(BeEmpty())
 			})
 
-		err := pair.ConvertMaster(stream, "", false)
+		err := pair.ConvertMaster(stream, "", false, utils.UpgradeConfig{})
 		g.Expect(err).NotTo(HaveOccurred())
 	})
 
@@ -215,7 +215,15 @@ func TestUpgradeMaster(t *testing.T) {
 				g.Expect(fs.Args()).To(BeEmpty())
 			})
 
-		err := pair.ConvertMaster(stream, "", true)
+		err := pair.ConvertMaster(stream, "", true, utils.UpgradeConfig{})
 		g.Expect(err).NotTo(HaveOccurred())
+	})
+
+	t.Run("calls pg_upgrade with --link when given an upgrade config including useLinkMode=true", func(t *testing.T) {
+		stream := new(bufferedStreams)
+		upgradeConfig := utils.UpgradeConfig{UseLinkMode: true}
+
+		err := pair.ConvertMaster(stream, "", true, upgradeConfig)
+
 	})
 }

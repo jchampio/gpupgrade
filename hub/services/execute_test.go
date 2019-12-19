@@ -95,7 +95,7 @@ func TestStreaming(t *testing.T) {
 		stream := new(bufferedStreams)
 		execCommand = exectest.NewCommand(StreamingMain)
 
-		err := pair.ConvertMaster(stream, "", false)
+		err := pair.ConvertMaster(stream, "", false, utils.UpgradeConfig{})
 		g.Expect(err).NotTo(HaveOccurred())
 
 		g.Expect(stream.stdout.String()).To(Equal(StreamingMainStdout))
@@ -107,7 +107,7 @@ func TestStreaming(t *testing.T) {
 		execCommand = exectest.NewCommand(BlindlyWritingMain)
 
 		expectedErr := errors.New("write failed!")
-		err := pair.ConvertMaster(failingStreams{expectedErr}, "", false)
+		err := pair.ConvertMaster(failingStreams{expectedErr}, "", false, utils.UpgradeConfig{})
 
 		g.Expect(err).To(Equal(expectedErr))
 	})

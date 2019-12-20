@@ -127,52 +127,9 @@ func TestUpgradeMaster(t *testing.T) {
 		g.Expect(scanner.Err()).NotTo(HaveOccurred())
 	})
 
-	t.Run("calls pg_upgrade with the expected options with no check", func(t *testing.T) {
-		g := NewGomegaWithT(t)
-		stream := new(bufferedStreams)
+	optionsTest := func(t *testing.T, check, link bool) {
+		t.Helper()
 
-		execCommand = exectest.NewCommandWithVerifier(EmptyMain,
-			func(path string, args ...string) {
-				// pg_upgrade should be run from the target installation.
-				expectedPath := filepath.Join(pair.Target.BinDir, "pg_upgrade")
-				g.Expect(path).To(Equal(expectedPath))
-
-				// Check the arguments. We use a FlagSet so as not to couple
-				// against option order.
-				var fs flag.FlagSet
-
-				oldBinDir := fs.String("old-bindir", "", "")
-				newBinDir := fs.String("new-bindir", "", "")
-				oldDataDir := fs.String("old-datadir", "", "")
-				newDataDir := fs.String("new-datadir", "", "")
-				oldPort := fs.Int("old-port", -1, "")
-				newPort := fs.Int("new-port", -1, "")
-				oldDBID := fs.Int("old-gp-dbid", -1, "")
-				newDBID := fs.Int("new-gp-dbid", -1, "")
-				mode := fs.String("mode", "", "")
-
-				err := fs.Parse(args)
-				g.Expect(err).NotTo(HaveOccurred())
-
-				g.Expect(*oldBinDir).To(Equal(pair.Source.BinDir))
-				g.Expect(*newBinDir).To(Equal(pair.Target.BinDir))
-				g.Expect(*oldDataDir).To(Equal(pair.Source.MasterDataDir()))
-				g.Expect(*newDataDir).To(Equal(pair.Target.MasterDataDir()))
-				g.Expect(*oldPort).To(Equal(pair.Source.MasterPort()))
-				g.Expect(*newPort).To(Equal(pair.Target.MasterPort()))
-				g.Expect(*oldDBID).To(Equal(pair.Source.GetDbidForContent(-1)))
-				g.Expect(*newDBID).To(Equal(pair.Target.GetDbidForContent(-1)))
-				g.Expect(*mode).To(Equal("dispatcher"))
-
-				// No other arguments should be passed.
-				g.Expect(fs.Args()).To(BeEmpty())
-			})
-
-		err := pair.ConvertMaster(stream, "", false, utils.UpgradeConfig{})
-		g.Expect(err).NotTo(HaveOccurred())
-	})
-
-	t.Run("calls pg_upgrade with the expected options with no check", func(t *testing.T) {
 		g := NewGomegaWithT(t)
 		stream := new(bufferedStreams)
 
@@ -196,6 +153,7 @@ func TestUpgradeMaster(t *testing.T) {
 				newDBID := fs.Int("new-gp-dbid", -1, "")
 				mode := fs.String("mode", "", "")
 				checkOnly := fs.Bool("check", false, "")
+				linkMode := fs.Bool("link", false, "")
 
 				err := fs.Parse(args)
 				g.Expect(err).NotTo(HaveOccurred())
@@ -209,21 +167,26 @@ func TestUpgradeMaster(t *testing.T) {
 				g.Expect(*oldDBID).To(Equal(pair.Source.GetDbidForContent(-1)))
 				g.Expect(*newDBID).To(Equal(pair.Target.GetDbidForContent(-1)))
 				g.Expect(*mode).To(Equal("dispatcher"))
-				g.Expect(*checkOnly).To(Equal(true))
+				g.Expect(*checkOnly).To(Equal(check))
+				g.Expect(*linkMode).To(Equal(link))
 
 				// No other arguments should be passed.
 				g.Expect(fs.Args()).To(BeEmpty())
 			})
 
-		err := pair.ConvertMaster(stream, "", true, utils.UpgradeConfig{})
+		err := pair.ConvertMaster(stream, "", check, utils.UpgradeConfig{link})
 		g.Expect(err).NotTo(HaveOccurred())
+	}
+
+	t.Run("calls pg_upgrade with the expected options with no check", func(t *testing.T) {
+		optionsTest(t, false, false)
+	})
+
+	t.Run("calls pg_upgrade with the expected options with check", func(t *testing.T) {
+		optionsTest(t, true, false)
 	})
 
 	t.Run("calls pg_upgrade with --link when given an upgrade config including useLinkMode=true", func(t *testing.T) {
-		stream := new(bufferedStreams)
-		upgradeConfig := utils.UpgradeConfig{UseLinkMode: true}
-
-		err := pair.ConvertMaster(stream, "", true, upgradeConfig)
-
+		optionsTest(t, false, true)
 	})
 }

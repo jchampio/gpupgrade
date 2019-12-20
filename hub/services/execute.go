@@ -31,7 +31,12 @@ func (h *Hub) Execute(request *idl.ExecuteRequest, stream idl.CliToHub_ExecuteSe
 
 	executeStream := newMultiplexedStream(stream, log)
 
+	// TODO: this should be done at hub start, not execute time.
 	data, err := utils.ReadJSONFile(utils.UPGRADE_CONFIG_FILENAME, utils.UpgradeConfig{})
+	if err != nil {
+		return xerrors.Errorf("loading configuration: %w", err)
+	}
+
 	upgradeConfig := data.(utils.UpgradeConfig)
 
 	_, err = log.WriteString("\nExecute in progress.\n")

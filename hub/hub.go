@@ -113,6 +113,7 @@ func (h *Hub) Start() error {
 	tracer, err := zipkin.NewTracer(reporter,
 		zipkin.WithSampler(zipkin.AlwaysSample),
 		zipkin.WithLocalEndpoint(endpoint),
+		zipkin.WithSharedSpans(false), // disable server/client span combination
 	)
 	if err != nil {
 		return err

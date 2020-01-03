@@ -14,14 +14,14 @@ import (
 	"github.com/greenplum-db/gpupgrade/utils/disk"
 )
 
-func RunPreChecks(client idl.CliToHubClient, ratio float64) error {
+func RunPreChecks(ctx context.Context, client idl.CliToHubClient, ratio float64) error {
 	//TODO: when do we check this?  It requires the source cluster to be up.
 	//err := CheckVersion(client)
 	//if err != nil {
 	//	return errors.Wrap(err, "checking version compatibility")
 	//}
 
-	return CheckDiskSpace(client, ratio)
+	return CheckDiskSpace(ctx, client, ratio)
 }
 
 func CheckVersion(client idl.CliToHubClient) (err error) {
@@ -115,11 +115,11 @@ func (t tableRows) Swap(i, j int) {
 	t[i], t[j] = t[j], t[i]
 }
 
-func CheckDiskSpace(client idl.CliToHubClient, ratio float64) (err error) {
+func CheckDiskSpace(ctx context.Context, client idl.CliToHubClient, ratio float64) (err error) {
 	s := Substep("Checking disk space...")
 	defer s.Finish(&err)
 
-	reply, err := client.CheckDiskSpace(context.Background(), &idl.CheckDiskSpaceRequest{Ratio: ratio})
+	reply, err := client.CheckDiskSpace(ctx, &idl.CheckDiskSpaceRequest{Ratio: ratio})
 	if err != nil {
 		return xerrors.Errorf("check disk space: %w", err)
 	}

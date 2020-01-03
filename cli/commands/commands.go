@@ -36,6 +36,10 @@ import (
 	"time"
 
 	"github.com/greenplum-db/gp-common-go-libs/gplog"
+	zipkin "github.com/openzipkin/zipkin-go"
+	zipkingrpc "github.com/openzipkin/zipkin-go/middleware/grpc"
+	zipkinmodel "github.com/openzipkin/zipkin-go/model"
+	zipkinhttp "github.com/openzipkin/zipkin-go/reporter/http"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -99,7 +103,7 @@ func connTimeout() time.Duration {
 // connectToHub() performs a blocking connection to the hub, and returns a
 // CliToHubClient which wraps the resulting gRPC channel. Any errors result in
 // an os.Exit(1).
-func connectToHub() idl.CliToHubClient {
+func connectToHub() (idl.CliToHubClient, *zipkin.Tracer) {
 	upgradePort := os.Getenv("GPUPGRADE_HUB_PORT")
 	if upgradePort == "" {
 		upgradePort = "7527"
@@ -111,8 +115,27 @@ func connectToHub() idl.CliToHubClient {
 	ctx, cancel := context.WithTimeout(context.Background(), connTimeout())
 	defer cancel()
 
+	endpoint, err := zipkin.NewEndpoint("client", "")
+	if err != nil {
+		gplog.Fatal(err, "could not create zipkin endpoint")
+	}
+
+	tracer, err := zipkin.NewTracer(
+		zipkinhttp.NewReporter("http://localhost:9411/api/v2/spans"),
+		zipkin.WithLocalEndpoint(endpoint),
+		zipkin.WithSampler(zipkin.AlwaysSample),
+		zipkin.WithSharedSpans(false), // disable server/client span combination
+	)
+	if err != nil {
+		gplog.Fatal(err, "could not create zipkin tracer")
+	}
+
 	// Attempt a connection.
-	conn, err := grpc.DialContext(ctx, hubAddr, grpc.WithInsecure(), grpc.WithBlock())
+	conn, err := grpc.DialContext(ctx, hubAddr,
+		grpc.WithInsecure(),
+		grpc.WithBlock(),
+		grpc.WithStatsHandler(zipkingrpc.NewClientHandler(tracer)),
+	)
 	if err != nil {
 		// Print a nicer error message if we can't connect to the hub.
 		if ctx.Err() == context.DeadlineExceeded {
@@ -123,7 +146,7 @@ func connectToHub() idl.CliToHubClient {
 		os.Exit(1)
 	}
 
-	return idl.NewCliToHubClient(conn)
+	return idl.NewCliToHubClient(conn), tracer
 }
 
 //////////////////////////////////////// CONFIG and its subcommands
@@ -143,7 +166,7 @@ func createConfigSetSubcommand() *cobra.Command {
 				return errors.New("the set command requires at least one flag to be specified")
 			}
 
-			client := connectToHub()
+			client, _ := connectToHub()
 
 			var requests []*idl.SetConfigRequest
 			cmd.Flags().Visit(func(flag *pflag.Flag) {
@@ -177,7 +200,7 @@ func createConfigShowSubcommand() *cobra.Command {
 		Short: "show configuration settings",
 		Long:  "show configuration settings",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			client := connectToHub()
+			client, _ := connectToHub()
 
 			// Build a list of GetConfigRequests, one for each flag. If no flags
 			// are passed, assume we want to retrieve all of them.
@@ -292,23 +315,30 @@ This step can be reverted.
 				return errors.Wrap(err, "starting hub")
 			}
 
-			client := connectToHub()
+			client, tracer := connectToHub()
 
-			err = commanders.Initialize(client, oldBinDir, newBinDir, oldPort, verbose)
+			span := tracer.StartSpan("initialize", zipkin.Kind(zipkinmodel.Client))
+			defer span.Finish()
+
+			ctx := zipkin.NewContext(context.Background(), span)
+
+			err = commanders.Initialize(ctx, client, oldBinDir, newBinDir, oldPort, verbose)
 			if err != nil {
 				return errors.Wrap(err, "initializing hub")
 			}
 
-			err = commanders.RunPreChecks(client, diskFreeRatio)
+			err = commanders.RunPreChecks(ctx, client, diskFreeRatio)
 			if err != nil {
 				return err
 			}
+
+			span.Annotate(time.Now(), "after checks")
 
 			if stopBeforeClusterCreation {
 				return nil
 			}
 
-			err = commanders.InitializeCreateCluster(client, verbose, ports)
+			err = commanders.InitializeCreateCluster(ctx, client, verbose, ports)
 			if err != nil {
 				return errors.Wrap(err, "initializing cluster")
 			}
@@ -352,7 +382,7 @@ This step can be reverted.
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
 
-			client := connectToHub()
+			client, _ := connectToHub()
 			return commanders.Execute(client, verbose)
 		},
 	}
@@ -370,7 +400,7 @@ Updates the port of the new cluster.
 This step can not be reverted.
 `,
 	Run: func(cmd *cobra.Command, args []string) {
-		client := connectToHub()
+		client, _ := connectToHub()
 		err := commanders.Finalize(client)
 		if err != nil {
 			gplog.Error(err.Error())
@@ -439,7 +469,9 @@ var restartServices = &cobra.Command{
 			fmt.Println("Restarted hub")
 		}
 
-		reply, err := connectToHub().RestartAgents(context.Background(), &idl.RestartAgentsRequest{})
+		client, _ := connectToHub()
+
+		reply, err := client.RestartAgents(context.Background(), &idl.RestartAgentsRequest{})
 		for _, host := range reply.GetAgentHosts() {
 			fmt.Printf("Restarted agent on: %s\n", host)
 		}
@@ -474,7 +506,9 @@ var killServices = &cobra.Command{
 			return nil
 		}
 
-		_, err = connectToHub().StopServices(context.Background(), &idl.StopServicesRequest{})
+		client, _ := connectToHub()
+
+		_, err = client.StopServices(context.Background(), &idl.StopServicesRequest{})
 		if err != nil {
 			errCode := grpcStatus.Code(err)
 			errMsg := grpcStatus.Convert(err).Message()

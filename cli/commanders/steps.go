@@ -38,15 +38,14 @@ var indicators = map[idl.StepStatus]string{
 	idl.StepStatus_FAILED:   "[FAILED]",
 }
 
-func Initialize(client idl.CliToHubClient, oldBinDir, newBinDir string, oldPort int, verbose bool) (err error) {
-
+func Initialize(ctx context.Context, client idl.CliToHubClient, oldBinDir, newBinDir string, oldPort int, verbose bool) (err error) {
 	request := &idl.InitializeRequest{
 		OldBinDir: oldBinDir,
 		NewBinDir: newBinDir,
 		OldPort:   int32(oldPort),
 	}
 
-	stream, err := client.Initialize(context.Background(), request)
+	stream, err := client.Initialize(ctx, request)
 	if err != nil {
 		return errors.Wrap(err, "initializing hub")
 	}
@@ -59,8 +58,8 @@ func Initialize(client idl.CliToHubClient, oldBinDir, newBinDir string, oldPort 
 	return nil
 }
 
-func InitializeCreateCluster(client idl.CliToHubClient, verbose bool, ports []uint32) (err error) {
-	stream, err := client.InitializeCreateCluster(context.Background(),
+func InitializeCreateCluster(ctx context.Context, client idl.CliToHubClient, verbose bool, ports []uint32) (err error) {
+	stream, err := client.InitializeCreateCluster(ctx,
 		&idl.InitializeCreateClusterRequest{
 			Ports: ports,
 		})

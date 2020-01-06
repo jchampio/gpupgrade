@@ -4,9 +4,10 @@ import (
 	"sync"
 
 	"github.com/hashicorp/go-multierror"
+	"golang.org/x/net/context"
 )
 
-func (h *Hub) CheckUpgrade(stream OutStreams) error {
+func (h *Hub) CheckUpgrade(ctx context.Context, stream OutStreams) error {
 	var wg sync.WaitGroup
 	checkErrs := make(chan error, 2)
 
@@ -24,7 +25,7 @@ func (h *Hub) CheckUpgrade(stream OutStreams) error {
 	go func() {
 		defer wg.Done()
 
-		err := h.ConvertPrimaries(true)
+		err := h.ConvertPrimaries(ctx, true)
 		if err != nil {
 			checkErrs <- err
 		}

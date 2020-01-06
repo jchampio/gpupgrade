@@ -60,6 +60,8 @@ type Hub struct {
 
 	stopped chan struct{}
 	daemon  bool
+
+	tracer *zipkin.Tracer
 }
 
 type Connection struct {
@@ -118,6 +120,8 @@ func (h *Hub) Start() error {
 	if err != nil {
 		return err
 	}
+
+	h.tracer = tracer
 
 	// Set up an interceptor function to log any panics we get from request
 	// handlers.
@@ -336,7 +340,10 @@ func (h *Hub) AgentConns() ([]*Connection, error) {
 		ctx, cancelFunc := context.WithTimeout(context.Background(), DialTimeout)
 		conn, err := h.grpcDialer(ctx,
 			host+":"+strconv.Itoa(h.conf.HubToAgentPort),
-			grpc.WithInsecure(), grpc.WithBlock())
+			grpc.WithInsecure(),
+			grpc.WithBlock(),
+			grpc.WithStatsHandler(zipkingrpc.NewClientHandler(h.tracer)),
+		)
 		if err != nil {
 			err = errors.Errorf("grpcDialer failed: %s", err.Error())
 			gplog.Error(err.Error())

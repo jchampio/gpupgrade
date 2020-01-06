@@ -1,18 +1,18 @@
 package hub
 
 import (
-	"context"
 	"fmt"
 	"sort"
 	"sync"
 
 	"github.com/hashicorp/go-multierror"
 	"github.com/pkg/errors"
+	"golang.org/x/net/context"
 
 	"github.com/greenplum-db/gpupgrade/idl"
 )
 
-func (h *Hub) ConvertPrimaries(checkOnly bool) error {
+func (h *Hub) ConvertPrimaries(ctx context.Context, checkOnly bool) error {
 	agentConns, err := h.AgentConns()
 	if err != nil {
 		return errors.Wrap(err, "failed to connect to gpupgrade agent")
@@ -31,7 +31,7 @@ func (h *Hub) ConvertPrimaries(checkOnly bool) error {
 		go func(conn *Connection) {
 			defer wg.Done()
 
-			_, err := idl.NewAgentClient(conn.Conn).UpgradePrimaries(context.Background(), &idl.UpgradePrimariesRequest{
+			_, err := conn.AgentClient.UpgradePrimaries(ctx, &idl.UpgradePrimariesRequest{
 				OldBinDir:    h.source.BinDir,
 				NewBinDir:    h.target.BinDir,
 				NewVersion:   h.target.Version.SemVer.String(),

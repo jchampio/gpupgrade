@@ -56,8 +56,8 @@ func (h *Hub) writeConf(sourceDBConn *dbconn.DBConn, ports []uint32) (int, error
 	return masterPort, WriteInitsystemFile(gpinitsystemConfig, h.initsystemConfPath())
 }
 
-func (h *Hub) CreateTargetCluster(stream OutStreams, masterPort int) error {
-	err := h.InitTargetCluster(stream)
+func (h *Hub) CreateTargetCluster(ctx context.Context, stream OutStreams, masterPort int) error {
+	err := h.InitTargetCluster(ctx, stream)
 	if err != nil {
 		return err
 	}
@@ -66,13 +66,13 @@ func (h *Hub) CreateTargetCluster(stream OutStreams, masterPort int) error {
 	return ReloadAndCommitCluster(h.target, targetDBConn)
 }
 
-func (h *Hub) InitTargetCluster(stream OutStreams) error {
+func (h *Hub) InitTargetCluster(ctx context.Context, stream OutStreams) error {
 	agentConns, err := h.AgentConns()
 	if err != nil {
 		return errors.Wrap(err, "Could not get/create agents")
 	}
 
-	err = CreateAllDataDirectories(agentConns, h.source)
+	err = CreateAllDataDirectories(ctx, agentConns, h.source)
 	if err != nil {
 		return err
 	}
@@ -231,7 +231,7 @@ func WriteSegmentArray(config []string, source *utils.Cluster, ports []uint32) (
 	return config, int(masterPort), nil
 }
 
-func CreateAllDataDirectories(agentConns []*Connection, source *utils.Cluster) error {
+func CreateAllDataDirectories(ctx context.Context, agentConns []*Connection, source *utils.Cluster) error {
 	// create master data directory for gpinitsystem if it doesn't exist
 	targetDataDir := path.Dir(source.MasterDataDir()) + "_upgrade"
 	_, err := utils.System.Stat(targetDataDir)
@@ -244,7 +244,7 @@ func CreateAllDataDirectories(agentConns []*Connection, source *utils.Cluster) e
 		return xerrors.Errorf("stat master upgrade directory %s: %w", targetDataDir, err)
 	}
 	// create segment data directories for gpinitsystem if they don't exist
-	err = CreateSegmentDataDirectories(agentConns, source)
+	err = CreateSegmentDataDirectories(ctx, agentConns, source)
 	if err != nil {
 		return xerrors.Errorf("segment data directories: %w", err)
 	}
@@ -293,7 +293,7 @@ func GetMasterSegPrefix(datadir string) (string, error) {
 	return segPrefix, nil
 }
 
-func CreateSegmentDataDirectories(agentConns []*Connection, cluster *utils.Cluster) error {
+func CreateSegmentDataDirectories(ctx context.Context, agentConns []*Connection, cluster *utils.Cluster) error {
 	wg := sync.WaitGroup{}
 	errChan := make(chan error, len(agentConns))
 
@@ -317,7 +317,7 @@ func CreateSegmentDataDirectories(agentConns []*Connection, cluster *utils.Clust
 				req.Datadirs = append(req.Datadirs, datadir)
 			}
 
-			_, err = c.AgentClient.CreateSegmentDataDirectories(context.Background(), req)
+			_, err = c.AgentClient.CreateSegmentDataDirectories(ctx, req)
 			if err != nil {
 				gplog.Error("Error creating segment data directories on host %s: %s",
 					c.Hostname, err.Error())

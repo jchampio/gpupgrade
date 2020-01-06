@@ -8,14 +8,17 @@ import (
 	"strconv"
 	"sync"
 
+	"github.com/greenplum-db/gp-common-go-libs/cluster"
+	"github.com/greenplum-db/gp-common-go-libs/gplog"
+	zipkin "github.com/openzipkin/zipkin-go"
+	zipkingrpc "github.com/openzipkin/zipkin-go/middleware/grpc"
+	zipkinhttp "github.com/openzipkin/zipkin-go/reporter/http"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/reflection"
+
 	"github.com/greenplum-db/gpupgrade/idl"
 	"github.com/greenplum-db/gpupgrade/utils/daemon"
 	"github.com/greenplum-db/gpupgrade/utils/log"
-
-	"github.com/greenplum-db/gp-common-go-libs/cluster"
-	"github.com/greenplum-db/gp-common-go-libs/gplog"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/reflection"
 )
 
 type Server struct {
@@ -55,13 +58,34 @@ func (a *Server) Start() {
 		gplog.Fatal(err, "failed to listen")
 	}
 
+	// Set up Zipkin tracing.
+	reporter := zipkinhttp.NewReporter("http://localhost:9411/api/v2/spans")
+	defer reporter.Close()
+
+	endpoint, err := zipkin.NewEndpoint("agent", lis.Addr().String())
+	if err != nil {
+		gplog.Fatal(err, "failed to create zipkin endpoint")
+	}
+
+	tracer, err := zipkin.NewTracer(
+		reporter,
+		zipkin.WithSampler(zipkin.AlwaysSample),
+		zipkin.WithLocalEndpoint(endpoint),
+	)
+	if err != nil {
+		gplog.Fatal(err, "failed to create zipkin tracer")
+	}
+
 	// Set up an interceptor function to log any panics we get from request
 	// handlers.
 	interceptor := func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp interface{}, err error) {
 		defer log.WritePanics()
 		return handler(ctx, req)
 	}
-	server := grpc.NewServer(grpc.UnaryInterceptor(interceptor))
+	server := grpc.NewServer(
+		grpc.UnaryInterceptor(interceptor),
+		grpc.StatsHandler(zipkingrpc.NewServerHandler(tracer)),
+	)
 
 	a.mu.Lock()
 	a.server = server

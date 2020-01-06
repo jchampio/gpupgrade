@@ -81,6 +81,8 @@ func (h *Hub) InitializeCreateCluster(in *idl.InitializeCreateClusterRequest, st
 		return xerrors.Errorf("failed writing to initialize log for hub: %w", err)
 	}
 
+	ctx := stream.Context()
+
 	var targetMasterPort int
 	err = h.Substep(initializeStream, upgradestatus.CREATE_TARGET_CONFIG,
 		func(_ OutStreams) error {
@@ -102,7 +104,7 @@ func (h *Hub) InitializeCreateCluster(in *idl.InitializeCreateClusterRequest, st
 
 	err = h.Substep(initializeStream, upgradestatus.INIT_TARGET_CLUSTER,
 		func(stream OutStreams) error {
-			return h.CreateTargetCluster(stream, targetMasterPort)
+			return h.CreateTargetCluster(ctx, stream, targetMasterPort)
 		})
 	if err != nil {
 		return err
@@ -116,7 +118,11 @@ func (h *Hub) InitializeCreateCluster(in *idl.InitializeCreateClusterRequest, st
 		return err
 	}
 
-	return h.Substep(initializeStream, upgradestatus.CHECK_UPGRADE, h.CheckUpgrade)
+	return h.Substep(initializeStream, upgradestatus.CHECK_UPGRADE,
+		func(stream OutStreams) error {
+			return h.CheckUpgrade(ctx, stream)
+		})
+
 }
 
 // create old/new clusters, write to disk and re-read from disk to make sure it is "durable"

@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 
 	"github.com/hashicorp/go-multierror"
+	"golang.org/x/net/context"
 	"golang.org/x/xerrors"
 
 	"github.com/greenplum-db/gpupgrade/hub/upgradestatus"
@@ -51,7 +52,7 @@ func (h *Hub) Execute(request *idl.ExecuteRequest, stream idl.CliToHub_ExecuteSe
 
 	err = h.Substep(executeStream, upgradestatus.UPGRADE_PRIMARIES,
 		func(_ OutStreams) error {
-			return h.ConvertPrimaries(false)
+			return h.ConvertPrimaries(context.TODO(), false)
 		})
 	if err != nil {
 		return err

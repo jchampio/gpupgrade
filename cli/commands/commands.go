@@ -384,8 +384,15 @@ This step can be reverted.
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
 
-			client, _, _ := connectToHub()
-			return commanders.Execute(client, verbose)
+			client, tracer, reporter := connectToHub()
+			defer reporter.Close()
+
+			span := tracer.StartSpan("execute", zipkin.Kind(zipkinmodel.Client))
+			defer span.Finish()
+
+			ctx := zipkin.NewContext(context.Background(), span)
+
+			return commanders.Execute(ctx, client, verbose)
 		},
 	}
 
@@ -402,8 +409,15 @@ Updates the port of the new cluster.
 This step can not be reverted.
 `,
 	Run: func(cmd *cobra.Command, args []string) {
-		client, _, _ := connectToHub()
-		err := commanders.Finalize(client)
+		client, tracer, reporter := connectToHub()
+		defer reporter.Close()
+
+		span := tracer.StartSpan("finalize", zipkin.Kind(zipkinmodel.Client))
+		defer span.Finish()
+
+		ctx := zipkin.NewContext(context.Background(), span)
+
+		err := commanders.Finalize(ctx, client)
 		if err != nil {
 			gplog.Error(err.Error())
 			os.Exit(1)

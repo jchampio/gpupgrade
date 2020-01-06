@@ -414,6 +414,7 @@
     "github.com/openzipkin/zipkin-go",
     "github.com/openzipkin/zipkin-go/middleware/grpc",
     "github.com/openzipkin/zipkin-go/model",
+    "github.com/openzipkin/zipkin-go/reporter",
     "github.com/openzipkin/zipkin-go/reporter/http",
     "github.com/pkg/errors",
     "github.com/spf13/cobra",

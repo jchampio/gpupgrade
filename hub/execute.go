@@ -5,7 +5,6 @@ import (
 	"path/filepath"
 
 	"github.com/hashicorp/go-multierror"
-	"golang.org/x/net/context"
 	"golang.org/x/xerrors"
 
 	"github.com/greenplum-db/gpupgrade/hub/upgradestatus"
@@ -37,6 +36,8 @@ func (h *Hub) Execute(request *idl.ExecuteRequest, stream idl.CliToHub_ExecuteSe
 		return xerrors.Errorf("failed writing to execute log: %w", err)
 	}
 
+	ctx := stream.Context()
+
 	err = h.Substep(executeStream, upgradestatus.UPGRADE_MASTER,
 		func(streams OutStreams) error {
 			return h.UpgradeMaster(streams, false)
@@ -45,14 +46,17 @@ func (h *Hub) Execute(request *idl.ExecuteRequest, stream idl.CliToHub_ExecuteSe
 		return err
 	}
 
-	err = h.Substep(executeStream, upgradestatus.COPY_MASTER, h.CopyMasterDataDir)
+	err = h.Substep(executeStream, upgradestatus.COPY_MASTER,
+		func(_ OutStreams) error {
+			return h.CopyMasterDataDir(ctx)
+		})
 	if err != nil {
 		return err
 	}
 
 	err = h.Substep(executeStream, upgradestatus.UPGRADE_PRIMARIES,
 		func(_ OutStreams) error {
-			return h.ConvertPrimaries(context.TODO(), false)
+			return h.ConvertPrimaries(ctx, false)
 		})
 	if err != nil {
 		return err

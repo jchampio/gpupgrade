@@ -75,12 +75,12 @@ func InitializeCreateCluster(ctx context.Context, client idl.CliToHubClient, ver
 	return nil
 }
 
-func Execute(client idl.CliToHubClient, verbose bool) error {
+func Execute(ctx context.Context, client idl.CliToHubClient, verbose bool) error {
 	fmt.Println()
 	fmt.Println("Execute in progress.")
 	fmt.Println()
 
-	stream, err := client.Execute(context.Background(), &idl.ExecuteRequest{})
+	stream, err := client.Execute(ctx, &idl.ExecuteRequest{})
 	if err != nil {
 		// TODO: Change the logging message?
 		gplog.Error("ERROR - Unable to connect to hub")
@@ -108,12 +108,12 @@ If you would like to return the cluster to its original state, run
 	return nil
 }
 
-func Finalize(client idl.CliToHubClient) error {
+func Finalize(ctx context.Context, client idl.CliToHubClient) error {
 	fmt.Println()
 	fmt.Println("Finalize in progress.")
 	fmt.Println()
 
-	stream, err := client.Finalize(context.Background(), &idl.FinalizeRequest{})
+	stream, err := client.Finalize(ctx, &idl.FinalizeRequest{})
 	if err != nil {
 		gplog.Error(err.Error())
 		return err

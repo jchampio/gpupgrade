@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	"github.com/pkg/errors"
+	"golang.org/x/net/context"
 
 	"github.com/greenplum-db/gpupgrade/idl"
 	"github.com/greenplum-db/gpupgrade/utils"
@@ -13,10 +14,9 @@ import (
 	"github.com/greenplum-db/gp-common-go-libs/cluster"
 	"github.com/greenplum-db/gp-common-go-libs/gplog"
 	"github.com/hashicorp/go-multierror"
-	"golang.org/x/net/context"
 )
 
-func (h *Hub) CopyMasterDataDir(_ OutStreams) error {
+func (h *Hub) CopyMasterDataDir(ctx context.Context) error {
 	var err error
 	rsyncFlags := "-rzpogt"
 
@@ -46,7 +46,7 @@ func (h *Hub) CopyMasterDataDir(_ OutStreams) error {
 		}
 	}
 
-	copyErr := CopyMaster(h.agentConns, h.target, destinationDirName)
+	copyErr := CopyMaster(ctx, h.agentConns, h.target, destinationDirName)
 	if copyErr != nil {
 		return multierror.Append(err, copyErr)
 	}
@@ -54,7 +54,7 @@ func (h *Hub) CopyMasterDataDir(_ OutStreams) error {
 	return err
 }
 
-func CopyMaster(agentConns []*Connection, target *utils.Cluster, destinationDirName string) error {
+func CopyMaster(ctx context.Context, agentConns []*Connection, target *utils.Cluster, destinationDirName string) error {
 	segmentDataDirMap := map[string][]string{}
 	for _, content := range target.ContentIDs {
 		if content != -1 {
@@ -73,7 +73,7 @@ func CopyMaster(agentConns []*Connection, target *utils.Cluster, destinationDirN
 		go func(conn *Connection) {
 			defer wg.Done()
 
-			_, err := conn.AgentClient.CopyMaster(context.Background(),
+			_, err := conn.AgentClient.CopyMaster(ctx,
 				&idl.CopyMasterRequest{
 					MasterDir: destinationDirName,
 					Datadirs:  segmentDataDirMap[conn.Hostname],

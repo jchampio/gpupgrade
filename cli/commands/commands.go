@@ -39,6 +39,7 @@ import (
 	zipkin "github.com/openzipkin/zipkin-go"
 	zipkingrpc "github.com/openzipkin/zipkin-go/middleware/grpc"
 	zipkinmodel "github.com/openzipkin/zipkin-go/model"
+	zipkinreporter "github.com/openzipkin/zipkin-go/reporter"
 	zipkinhttp "github.com/openzipkin/zipkin-go/reporter/http"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
@@ -103,7 +104,7 @@ func connTimeout() time.Duration {
 // connectToHub() performs a blocking connection to the hub, and returns a
 // CliToHubClient which wraps the resulting gRPC channel. Any errors result in
 // an os.Exit(1).
-func connectToHub() (idl.CliToHubClient, *zipkin.Tracer) {
+func connectToHub() (idl.CliToHubClient, *zipkin.Tracer, zipkinreporter.Reporter) {
 	upgradePort := os.Getenv("GPUPGRADE_HUB_PORT")
 	if upgradePort == "" {
 		upgradePort = "7527"
@@ -120,11 +121,11 @@ func connectToHub() (idl.CliToHubClient, *zipkin.Tracer) {
 		gplog.Fatal(err, "could not create zipkin endpoint")
 	}
 
+	reporter := zipkinhttp.NewReporter("http://localhost:9411/api/v2/spans")
 	tracer, err := zipkin.NewTracer(
-		zipkinhttp.NewReporter("http://localhost:9411/api/v2/spans"),
+		reporter,
 		zipkin.WithLocalEndpoint(endpoint),
 		zipkin.WithSampler(zipkin.AlwaysSample),
-		zipkin.WithSharedSpans(false), // disable server/client span combination
 	)
 	if err != nil {
 		gplog.Fatal(err, "could not create zipkin tracer")
@@ -146,7 +147,7 @@ func connectToHub() (idl.CliToHubClient, *zipkin.Tracer) {
 		os.Exit(1)
 	}
 
-	return idl.NewCliToHubClient(conn), tracer
+	return idl.NewCliToHubClient(conn), tracer, reporter
 }
 
 //////////////////////////////////////// CONFIG and its subcommands
@@ -166,7 +167,7 @@ func createConfigSetSubcommand() *cobra.Command {
 				return errors.New("the set command requires at least one flag to be specified")
 			}
 
-			client, _ := connectToHub()
+			client, _, _ := connectToHub()
 
 			var requests []*idl.SetConfigRequest
 			cmd.Flags().Visit(func(flag *pflag.Flag) {
@@ -200,7 +201,7 @@ func createConfigShowSubcommand() *cobra.Command {
 		Short: "show configuration settings",
 		Long:  "show configuration settings",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			client, _ := connectToHub()
+			client, _, _ := connectToHub()
 
 			// Build a list of GetConfigRequests, one for each flag. If no flags
 			// are passed, assume we want to retrieve all of them.
@@ -315,7 +316,8 @@ This step can be reverted.
 				return errors.Wrap(err, "starting hub")
 			}
 
-			client, tracer := connectToHub()
+			client, tracer, reporter := connectToHub()
+			defer reporter.Close()
 
 			span := tracer.StartSpan("initialize", zipkin.Kind(zipkinmodel.Client))
 			defer span.Finish()
@@ -382,7 +384,7 @@ This step can be reverted.
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
 
-			client, _ := connectToHub()
+			client, _, _ := connectToHub()
 			return commanders.Execute(client, verbose)
 		},
 	}
@@ -400,7 +402,7 @@ Updates the port of the new cluster.
 This step can not be reverted.
 `,
 	Run: func(cmd *cobra.Command, args []string) {
-		client, _ := connectToHub()
+		client, _, _ := connectToHub()
 		err := commanders.Finalize(client)
 		if err != nil {
 			gplog.Error(err.Error())
@@ -469,7 +471,7 @@ var restartServices = &cobra.Command{
 			fmt.Println("Restarted hub")
 		}
 
-		client, _ := connectToHub()
+		client, _, _ := connectToHub()
 
 		reply, err := client.RestartAgents(context.Background(), &idl.RestartAgentsRequest{})
 		for _, host := range reply.GetAgentHosts() {
@@ -506,7 +508,7 @@ var killServices = &cobra.Command{
 			return nil
 		}
 
-		client, _ := connectToHub()
+		client, _, _ := connectToHub()
 
 		_, err = client.StopServices(context.Background(), &idl.StopServicesRequest{})
 		if err != nil {

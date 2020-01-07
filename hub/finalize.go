@@ -33,7 +33,8 @@ func (h *Hub) Finalize(_ *idl.FinalizeRequest, stream idl.CliToHub_FinalizeServe
 
 	finalizeStream := newMultiplexedStream(stream, log)
 
-	err = h.UpgradeReconfigurePortsSubStep(finalizeStream)
+	ctx := stream.Context()
+	err = h.UpgradeReconfigurePortsSubStep(ctx, finalizeStream)
 	return err
 }
 

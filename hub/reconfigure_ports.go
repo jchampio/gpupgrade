@@ -9,15 +9,16 @@ import (
 
 	"github.com/greenplum-db/gp-common-go-libs/gplog"
 	multierror "github.com/hashicorp/go-multierror"
+	"golang.org/x/net/context"
 	"golang.org/x/xerrors"
 
 	"github.com/greenplum-db/gpupgrade/hub/upgradestatus"
 )
 
-func (h *Hub) UpgradeReconfigurePortsSubStep(stream *multiplexedStream) error {
+func (h *Hub) UpgradeReconfigurePortsSubStep(ctx context.Context, stream *multiplexedStream) error {
 	gplog.Info("starting %s", upgradestatus.RECONFIGURE_PORTS)
 
-	step, err := h.InitializeStep(upgradestatus.RECONFIGURE_PORTS, stream.stream)
+	step, err := h.InitializeStep(ctx, upgradestatus.RECONFIGURE_PORTS, stream.stream)
 	if err != nil {
 		gplog.Error(err.Error())
 		return err

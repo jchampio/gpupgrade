@@ -4,9 +4,12 @@ import (
 	"fmt"
 	"io"
 	"sync"
+	"time"
 
 	"github.com/greenplum-db/gp-common-go-libs/gplog"
+	zipkin "github.com/openzipkin/zipkin-go"
 	"github.com/pkg/errors"
+	"golang.org/x/net/context"
 	"golang.org/x/xerrors"
 
 	"github.com/greenplum-db/gpupgrade/hub/upgradestatus"
@@ -24,14 +27,14 @@ type OutStreams interface {
 // Substep executes an upgrade substep of the given name using the provided
 // implementation callback. All status and error reporting is coordinated on the
 // provided stream.
-func (h *Hub) Substep(stream *multiplexedStream, name string, f func(OutStreams) error) error {
+func (h *Hub) Substep(ctx context.Context, stream *multiplexedStream, name string, f func(OutStreams) error) error {
 	gplog.Info("starting %s", name)
 	_, err := fmt.Fprintf(stream.writer, "\nStarting %s...\n\n", name)
 	if err != nil {
 		return xerrors.Errorf("failed writing to log: %w", err)
 	}
 
-	step, err := h.InitializeStep(name, stream.stream)
+	step, err := h.InitializeStep(ctx, name, stream.stream)
 	if err != nil {
 		gplog.Error(err.Error())
 		return err
@@ -50,7 +53,12 @@ func (h *Hub) Substep(stream *multiplexedStream, name string, f func(OutStreams)
 
 // Extracts common hub logic to reset state directory, mark step as in-progress,
 // and control status streaming.
-func (h *Hub) InitializeStep(step string, stream messageSender) (upgradestatus.StateWriter, error) {
+func (h *Hub) InitializeStep(ctx context.Context, step string, stream messageSender) (upgradestatus.StateWriter, error) {
+	span := zipkin.SpanFromContext(ctx)
+	if span != nil {
+		span.Annotate(time.Now(), step)
+	}
+
 	stepWriter := streamStepWriter{
 		h.checklist.GetStepWriter(step),
 		stream,

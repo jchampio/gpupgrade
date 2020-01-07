@@ -42,7 +42,9 @@ func (h *Hub) Initialize(in *idl.InitializeRequest, stream idl.CliToHub_Initiali
 		return xerrors.Errorf("failed writing to initialize log: %w", err)
 	}
 
-	err = h.Substep(initializeStream, upgradestatus.CONFIG,
+	ctx := stream.Context()
+
+	err = h.Substep(ctx, initializeStream, upgradestatus.CONFIG,
 		func(stream OutStreams) error {
 			return h.fillClusterConfigsSubStep(stream, in.OldBinDir, in.NewBinDir, int(in.OldPort))
 		})
@@ -50,7 +52,7 @@ func (h *Hub) Initialize(in *idl.InitializeRequest, stream idl.CliToHub_Initiali
 		return err
 	}
 
-	err = h.Substep(initializeStream, upgradestatus.START_AGENTS, h.startAgentsSubStep)
+	err = h.Substep(ctx, initializeStream, upgradestatus.START_AGENTS, h.startAgentsSubStep)
 	if err != nil {
 		return err
 	}
@@ -84,7 +86,7 @@ func (h *Hub) InitializeCreateCluster(in *idl.InitializeCreateClusterRequest, st
 	ctx := stream.Context()
 
 	var targetMasterPort int
-	err = h.Substep(initializeStream, upgradestatus.CREATE_TARGET_CONFIG,
+	err = h.Substep(ctx, initializeStream, upgradestatus.CREATE_TARGET_CONFIG,
 		func(_ OutStreams) error {
 			var err error
 			targetMasterPort, err = h.GenerateInitsystemConfig(in.Ports)
@@ -94,7 +96,7 @@ func (h *Hub) InitializeCreateCluster(in *idl.InitializeCreateClusterRequest, st
 		return err
 	}
 
-	err = h.Substep(initializeStream, upgradestatus.SHUTDOWN_SOURCE_CLUSTER,
+	err = h.Substep(ctx, initializeStream, upgradestatus.SHUTDOWN_SOURCE_CLUSTER,
 		func(stream OutStreams) error {
 			return StopCluster(stream, h.source)
 		})
@@ -102,7 +104,7 @@ func (h *Hub) InitializeCreateCluster(in *idl.InitializeCreateClusterRequest, st
 		return err
 	}
 
-	err = h.Substep(initializeStream, upgradestatus.INIT_TARGET_CLUSTER,
+	err = h.Substep(ctx, initializeStream, upgradestatus.INIT_TARGET_CLUSTER,
 		func(stream OutStreams) error {
 			return h.CreateTargetCluster(ctx, stream, targetMasterPort)
 		})
@@ -110,7 +112,7 @@ func (h *Hub) InitializeCreateCluster(in *idl.InitializeCreateClusterRequest, st
 		return err
 	}
 
-	err = h.Substep(initializeStream, upgradestatus.SHUTDOWN_TARGET_CLUSTER,
+	err = h.Substep(ctx, initializeStream, upgradestatus.SHUTDOWN_TARGET_CLUSTER,
 		func(stream OutStreams) error {
 			return h.ShutdownCluster(stream, false)
 		})
@@ -118,7 +120,7 @@ func (h *Hub) InitializeCreateCluster(in *idl.InitializeCreateClusterRequest, st
 		return err
 	}
 
-	return h.Substep(initializeStream, upgradestatus.CHECK_UPGRADE,
+	return h.Substep(ctx, initializeStream, upgradestatus.CHECK_UPGRADE,
 		func(stream OutStreams) error {
 			return h.CheckUpgrade(ctx, stream)
 		})

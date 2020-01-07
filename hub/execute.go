@@ -38,7 +38,7 @@ func (h *Hub) Execute(request *idl.ExecuteRequest, stream idl.CliToHub_ExecuteSe
 
 	ctx := stream.Context()
 
-	err = h.Substep(executeStream, upgradestatus.UPGRADE_MASTER,
+	err = h.Substep(ctx, executeStream, upgradestatus.UPGRADE_MASTER,
 		func(streams OutStreams) error {
 			return h.UpgradeMaster(streams, false)
 		})
@@ -46,7 +46,7 @@ func (h *Hub) Execute(request *idl.ExecuteRequest, stream idl.CliToHub_ExecuteSe
 		return err
 	}
 
-	err = h.Substep(executeStream, upgradestatus.COPY_MASTER,
+	err = h.Substep(ctx, executeStream, upgradestatus.COPY_MASTER,
 		func(_ OutStreams) error {
 			return h.CopyMasterDataDir(ctx)
 		})
@@ -54,7 +54,7 @@ func (h *Hub) Execute(request *idl.ExecuteRequest, stream idl.CliToHub_ExecuteSe
 		return err
 	}
 
-	err = h.Substep(executeStream, upgradestatus.UPGRADE_PRIMARIES,
+	err = h.Substep(ctx, executeStream, upgradestatus.UPGRADE_PRIMARIES,
 		func(_ OutStreams) error {
 			return h.ConvertPrimaries(ctx, false)
 		})
@@ -62,7 +62,7 @@ func (h *Hub) Execute(request *idl.ExecuteRequest, stream idl.CliToHub_ExecuteSe
 		return err
 	}
 
-	err = h.Substep(executeStream, upgradestatus.START_TARGET_CLUSTER,
+	err = h.Substep(ctx, executeStream, upgradestatus.START_TARGET_CLUSTER,
 		func(streams OutStreams) error {
 			return StartCluster(streams, h.target)
 		})

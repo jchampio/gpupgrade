@@ -25,7 +25,7 @@ var execCommand = exec.Command
 func (s *Server) UpgradePrimaries(ctx context.Context, in *idl.UpgradePrimariesRequest) (*idl.UpgradePrimariesReply, error) {
 	gplog.Info("agent starting %s", upgradestatus.UPGRADE_PRIMARIES)
 
-	err := UpgradePrimary(in.OldBinDir, in.NewBinDir, in.DataDirPairs, s.conf.StateDir, in.CheckOnly)
+	err := UpgradePrimary(ctx, in.OldBinDir, in.NewBinDir, in.DataDirPairs, s.conf.StateDir, in.CheckOnly)
 	return &idl.UpgradePrimariesReply{}, err
 }
 
@@ -35,7 +35,7 @@ type Segment struct {
 	WorkDir string // the pg_upgrade working directory, where logs are stored
 }
 
-func UpgradePrimary(sourceBinDir string, targetBinDir string, dataDirPairs []*idl.DataDirPair, stateDir string, checkOnly bool) error {
+func UpgradePrimary(ctx context.Context, sourceBinDir string, targetBinDir string, dataDirPairs []*idl.DataDirPair, stateDir string, checkOnly bool) error {
 	segments := make([]Segment, 0, len(dataDirPairs))
 
 	for _, dataPair := range dataDirPairs {
@@ -57,7 +57,7 @@ func UpgradePrimary(sourceBinDir string, targetBinDir string, dataDirPairs []*id
 		})
 	}
 
-	err := UpgradeSegments(sourceBinDir, targetBinDir, segments, checkOnly)
+	err := UpgradeSegments(ctx, sourceBinDir, targetBinDir, segments, checkOnly)
 	if err != nil {
 		return errors.Wrap(err, "failed to upgrade segments")
 	}
@@ -65,7 +65,7 @@ func UpgradePrimary(sourceBinDir string, targetBinDir string, dataDirPairs []*id
 	return nil
 }
 
-func UpgradeSegments(sourceBinDir string, targetBinDir string, segments []Segment, checkOnly bool) (err error) {
+func UpgradeSegments(ctx context.Context, sourceBinDir string, targetBinDir string, segments []Segment, checkOnly bool) (err error) {
 	// TODO: consolidate this logic with Hub.ConvertMaster().
 
 	host, err := os.Hostname()
@@ -114,7 +114,7 @@ func UpgradeSegments(sourceBinDir string, targetBinDir string, segments []Segmen
 		go func() {
 			defer wg.Done()
 
-			_, err := cmd.Output()
+			_, err := agentTracer.Output(ctx, cmd)
 			if err != nil {
 				failedAction := "upgrade"
 				if checkOnly {

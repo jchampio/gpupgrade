@@ -77,7 +77,7 @@ func (h *Hub) InitTargetCluster(ctx context.Context, stream OutStreams) error {
 		return err
 	}
 
-	return RunInitsystemForTargetCluster(stream, h.target, h.initsystemConfPath())
+	return RunInitsystemForTargetCluster(ctx, stream, h.target, h.initsystemConfPath())
 }
 
 func GetCheckpointSegmentsAndEncoding(gpinitsystemConfig []string, dbConnector *dbconn.DBConn) ([]string, error) {
@@ -251,7 +251,7 @@ func CreateAllDataDirectories(ctx context.Context, agentConns []*Connection, sou
 	return nil
 }
 
-func RunInitsystemForTargetCluster(stream OutStreams, target *utils.Cluster, gpinitsystemFilepath string) error {
+func RunInitsystemForTargetCluster(ctx context.Context, stream OutStreams, target *utils.Cluster, gpinitsystemFilepath string) error {
 	gphome := filepath.Dir(path.Clean(target.BinDir)) //works around https://github.com/golang/go/issues/4837 in go10.4
 
 	args := "-a -I " + gpinitsystemFilepath
@@ -270,7 +270,7 @@ func RunInitsystemForTargetCluster(stream OutStreams, target *utils.Cluster, gpi
 	cmd.Stdout = stream.Stdout()
 	cmd.Stderr = stream.Stderr()
 
-	err := cmd.Run()
+	err := hubTracer.Run(ctx, cmd)
 	if err != nil {
 		return xerrors.Errorf("gpinitsystem: %w", err)
 	}

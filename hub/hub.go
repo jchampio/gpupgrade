@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"os/exec"
 	"strconv"
 	"strings"
 	"sync"
@@ -60,8 +61,6 @@ type Hub struct {
 
 	stopped chan struct{}
 	daemon  bool
-
-	tracer *zipkin.Tracer
 }
 
 type Connection struct {
@@ -121,7 +120,8 @@ func (h *Hub) Start() error {
 		return err
 	}
 
-	h.tracer = tracer
+	// Set up the global tracer instance.
+	hubTracer = cmdTracer{tracer}
 
 	// Set up an interceptor function to log any panics we get from request
 	// handlers.
@@ -288,7 +288,7 @@ func RestartAgents(ctx context.Context,
 			}
 			cmd := execCommand("ssh", host,
 				fmt.Sprintf("bash -c \"%s agent --daemonize --state-directory %s\"", agentPath, stateDir))
-			stdout, err := cmd.Output()
+			stdout, err := hubTracer.Output(ctx, cmd)
 			if err != nil {
 				errs <- err
 				return
@@ -342,7 +342,7 @@ func (h *Hub) AgentConns() ([]*Connection, error) {
 			host+":"+strconv.Itoa(h.conf.HubToAgentPort),
 			grpc.WithInsecure(),
 			grpc.WithBlock(),
-			grpc.WithStatsHandler(zipkingrpc.NewClientHandler(h.tracer)),
+			grpc.WithStatsHandler(zipkingrpc.NewClientHandler(hubTracer.Tracer)),
 		)
 		if err != nil {
 			err = errors.Errorf("grpcDialer failed: %s", err.Error())
@@ -390,4 +390,38 @@ func (h *Hub) closeAgentConns() {
 		}
 		conn.Conn.WaitForStateChange(context.Background(), currState)
 	}
+}
+
+type cmdTracer struct {
+	*zipkin.Tracer
+}
+
+var hubTracer cmdTracer
+
+func (c cmdTracer) startSpan(ctx context.Context, cmd *exec.Cmd) zipkin.Span {
+	span, _ := c.StartSpanFromContext(ctx, cmd.Path,
+		zipkin.Tags(map[string]string{
+			"command": strings.Join(append([]string{cmd.Path}, cmd.Args...), " "),
+		}),
+	)
+
+	return span
+}
+
+func (c cmdTracer) Run(ctx context.Context, cmd *exec.Cmd) error {
+	if c.Tracer != nil {
+		span := c.startSpan(ctx, cmd)
+		defer span.Finish()
+	}
+
+	return cmd.Run()
+}
+
+func (c cmdTracer) Output(ctx context.Context, cmd *exec.Cmd) ([]byte, error) {
+	if c.Tracer != nil {
+		span := c.startSpan(ctx, cmd)
+		defer span.Finish()
+	}
+
+	return cmd.Output()
 }

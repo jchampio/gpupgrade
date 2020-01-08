@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"os/exec"
 	"strconv"
+	"strings"
 	"sync"
 
 	"github.com/greenplum-db/gp-common-go-libs/cluster"
@@ -76,6 +78,9 @@ func (a *Server) Start() {
 		gplog.Fatal(err, "failed to create zipkin tracer")
 	}
 
+	// Set up the global tracer instance.
+	agentTracer = cmdTracer{tracer}
+
 	// Set up an interceptor function to log any panics we get from request
 	// handlers.
 	interceptor := func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp interface{}, err error) {
@@ -132,4 +137,23 @@ func createIfNotExists(dir string) {
 	if _, err := os.Stat(dir); os.IsNotExist(err) {
 		os.Mkdir(dir, 0777)
 	}
+}
+
+type cmdTracer struct {
+	*zipkin.Tracer
+}
+
+var agentTracer cmdTracer
+
+func (c cmdTracer) Output(ctx context.Context, cmd *exec.Cmd) ([]byte, error) {
+	if c.Tracer != nil {
+		span, _ := c.StartSpanFromContext(ctx, cmd.Path,
+			zipkin.Tags(map[string]string{
+				"command": strings.Join(append([]string{cmd.Path}, cmd.Args...), " "),
+			}),
+		)
+		defer span.Finish()
+	}
+
+	return cmd.Output()
 }

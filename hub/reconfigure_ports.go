@@ -24,7 +24,7 @@ func (h *Hub) UpgradeReconfigurePortsSubStep(ctx context.Context, stream *multip
 		return err
 	}
 
-	if err := h.reconfigurePorts(stream); err != nil {
+	if err := h.reconfigurePorts(ctx, stream); err != nil {
 		gplog.Error(err.Error())
 
 		// Log any stderr from failed commands.
@@ -45,9 +45,9 @@ func (h *Hub) UpgradeReconfigurePortsSubStep(ctx context.Context, stream *multip
 // change the ports on a cluster.
 //
 // TODO: this method needs test coverage.
-func (h *Hub) reconfigurePorts(stream *multiplexedStream) (err error) {
+func (h *Hub) reconfigurePorts(ctx context.Context, stream *multiplexedStream) (err error) {
 	// 1). bring down the cluster
-	err = StopCluster(stream, h.target)
+	err = StopCluster(ctx, stream, h.target)
 	if err != nil {
 		return xerrors.Errorf("%s failed to stop cluster: %w",
 			upgradestatus.RECONFIGURE_PORTS, err)
@@ -57,7 +57,7 @@ func (h *Hub) reconfigurePorts(stream *multiplexedStream) (err error) {
 	script := fmt.Sprintf("source %s/../greenplum_path.sh && %s/gpstart -am -d %s",
 		h.target.BinDir, h.target.BinDir, h.target.MasterDataDir())
 	cmd := exec.Command("bash", "-c", script)
-	_, err = cmd.Output()
+	_, err = hubTracer.Output(ctx, cmd)
 	if err != nil {
 		return xerrors.Errorf("%s failed to start target cluster in utility mode: %w",
 			upgradestatus.RECONFIGURE_PORTS, err)
@@ -73,7 +73,7 @@ func (h *Hub) reconfigurePorts(stream *multiplexedStream) (err error) {
 	script = fmt.Sprintf("source %s/../greenplum_path.sh && %s/gpstop -aim -d %s",
 		h.target.BinDir, h.target.BinDir, h.target.MasterDataDir())
 	cmd = exec.Command("bash", "-c", script)
-	_, err = cmd.Output()
+	_, err = hubTracer.Output(ctx, cmd)
 	if err != nil {
 		return xerrors.Errorf("%s failed to stop target cluster in utility mode: %w",
 			upgradestatus.RECONFIGURE_PORTS, err)
@@ -88,7 +88,7 @@ func (h *Hub) reconfigurePorts(stream *multiplexedStream) (err error) {
 	)
 	gplog.Debug("executing command: %+v", script) // TODO: Move this debug log into ExecuteLocalCommand()
 	cmd = exec.Command("bash", "-c", script)
-	_, err = cmd.Output()
+	_, err = hubTracer.Output(ctx, cmd)
 	if err != nil {
 		return xerrors.Errorf("%s failed to execute sed command: %w",
 			upgradestatus.RECONFIGURE_PORTS, err)
@@ -98,7 +98,7 @@ func (h *Hub) reconfigurePorts(stream *multiplexedStream) (err error) {
 	script = fmt.Sprintf("source %s/../greenplum_path.sh && %s/gpstart -a -d %s",
 		h.target.BinDir, h.target.BinDir, h.target.MasterDataDir())
 	cmd = exec.Command("bash", "-c", script)
-	_, err = cmd.Output()
+	_, err = hubTracer.Output(ctx, cmd)
 	if err != nil {
 		return xerrors.Errorf("%s failed to start target cluster: %w",
 			upgradestatus.RECONFIGURE_PORTS, err)

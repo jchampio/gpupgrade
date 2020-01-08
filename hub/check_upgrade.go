@@ -15,7 +15,7 @@ func (h *Hub) CheckUpgrade(ctx context.Context, stream OutStreams) error {
 	go func() {
 		defer wg.Done()
 
-		err := h.UpgradeMaster(stream, true)
+		err := h.UpgradeMaster(ctx, stream, true)
 		if err != nil {
 			checkErrs <- err
 		}

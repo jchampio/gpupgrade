@@ -5,6 +5,7 @@ import (
 	"os/exec"
 
 	"github.com/pkg/errors"
+	"golang.org/x/net/context"
 
 	"github.com/greenplum-db/gpupgrade/utils"
 )
@@ -12,14 +13,14 @@ import (
 var isPostmasterRunningCmd = exec.Command
 var startStopClusterCmd = exec.Command
 
-func (h *Hub) ShutdownCluster(stream OutStreams, isSource bool) error {
+func (h *Hub) ShutdownCluster(ctx context.Context, stream OutStreams, isSource bool) error {
 	if isSource {
-		err := StopCluster(stream, h.source)
+		err := StopCluster(ctx, stream, h.source)
 		if err != nil {
 			return errors.Wrap(err, "failed to stop source cluster")
 		}
 	} else {
-		err := StopCluster(stream, h.target)
+		err := StopCluster(ctx, stream, h.target)
 		if err != nil {
 			return errors.Wrap(err, "failed to stop target cluster")
 		}
@@ -28,14 +29,14 @@ func (h *Hub) ShutdownCluster(stream OutStreams, isSource bool) error {
 	return nil
 }
 
-func StopCluster(stream OutStreams, cluster *utils.Cluster) error {
-	return startStopCluster(stream, cluster, true)
+func StopCluster(ctx context.Context, stream OutStreams, cluster *utils.Cluster) error {
+	return startStopCluster(ctx, stream, cluster, true)
 }
-func StartCluster(stream OutStreams, cluster *utils.Cluster) error {
-	return startStopCluster(stream, cluster, false)
+func StartCluster(ctx context.Context, stream OutStreams, cluster *utils.Cluster) error {
+	return startStopCluster(ctx, stream, cluster, false)
 }
 
-func startStopCluster(stream OutStreams, cluster *utils.Cluster, stop bool) error {
+func startStopCluster(ctx context.Context, stream OutStreams, cluster *utils.Cluster, stop bool) error {
 	// TODO: why can't we call IsPostmasterRunning for the !stop case?  If we do, we get this on the pipeline:
 	// Usage: pgrep [-flvx] [-d DELIM] [-n|-o] [-P PPIDLIST] [-g PGRPLIST] [-s SIDLIST]
 	// [-u EUIDLIST] [-U UIDLIST] [-G GIDLIST] [-t TERMLIST] [PATTERN]
@@ -44,7 +45,7 @@ func startStopCluster(stream OutStreams, cluster *utils.Cluster, stop bool) erro
 	cmdName := "gpstart"
 	if stop {
 		cmdName = "gpstop"
-		err := IsPostmasterRunning(stream, cluster)
+		err := IsPostmasterRunning(ctx, stream, cluster)
 		if err != nil {
 			return err
 		}
@@ -60,10 +61,10 @@ func startStopCluster(stream OutStreams, cluster *utils.Cluster, stop bool) erro
 	cmd.Stdout = stream.Stdout()
 	cmd.Stderr = stream.Stderr()
 
-	return cmd.Run()
+	return hubTracer.Run(ctx, cmd)
 }
 
-func IsPostmasterRunning(stream OutStreams, cluster *utils.Cluster) error {
+func IsPostmasterRunning(ctx context.Context, stream OutStreams, cluster *utils.Cluster) error {
 	cmd := isPostmasterRunningCmd("bash", "-c",
 		fmt.Sprintf("pgrep -F %s/postmaster.pid",
 			cluster.MasterDataDir(),
@@ -72,5 +73,5 @@ func IsPostmasterRunning(stream OutStreams, cluster *utils.Cluster) error {
 	cmd.Stdout = stream.Stdout()
 	cmd.Stderr = stream.Stderr()
 
-	return cmd.Run()
+	return hubTracer.Run(ctx, cmd)
 }

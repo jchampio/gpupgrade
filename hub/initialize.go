@@ -98,7 +98,7 @@ func (h *Hub) InitializeCreateCluster(in *idl.InitializeCreateClusterRequest, st
 
 	err = h.Substep(ctx, initializeStream, upgradestatus.SHUTDOWN_SOURCE_CLUSTER,
 		func(stream OutStreams) error {
-			return StopCluster(stream, h.source)
+			return StopCluster(ctx, stream, h.source)
 		})
 	if err != nil {
 		return err
@@ -114,7 +114,7 @@ func (h *Hub) InitializeCreateCluster(in *idl.InitializeCreateClusterRequest, st
 
 	err = h.Substep(ctx, initializeStream, upgradestatus.SHUTDOWN_TARGET_CLUSTER,
 		func(stream OutStreams) error {
-			return h.ShutdownCluster(stream, false)
+			return h.ShutdownCluster(ctx, stream, false)
 		})
 	if err != nil {
 		return err

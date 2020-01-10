@@ -14,13 +14,13 @@ import (
 var execCommand = exec.Command
 
 func (h *Hub) UpgradeMaster(stream OutStreams, checkOnly bool) error {
-	wd := utils.MasterPGUpgradeDirectory(h.conf.StateDir)
+	wd := utils.MasterPGUpgradeDirectory(h.StateDir)
 	err := utils.System.MkdirAll(wd, 0700)
 	if err != nil {
 		return err
 	}
 
-	pair := clusterPair{h.source, h.target}
+	pair := clusterPair{h.Source, h.Target}
 	return pair.ConvertMaster(stream, wd, checkOnly)
 }
 

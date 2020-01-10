@@ -59,7 +59,7 @@ func (h *Hub) Execute(request *idl.ExecuteRequest, stream idl.CliToHub_ExecuteSe
 
 	err = h.Substep(executeStream, upgradestatus.START_TARGET_CLUSTER,
 		func(streams OutStreams) error {
-			return StartCluster(streams, h.target)
+			return StartCluster(streams, h.Target)
 		})
 	return err
 }

@@ -92,7 +92,7 @@ func (h *Hub) InitializeCreateCluster(in *idl.InitializeCreateClusterRequest, st
 
 	err = h.Substep(initializeStream, upgradestatus.SHUTDOWN_SOURCE_CLUSTER,
 		func(stream OutStreams) error {
-			return StopCluster(stream, h.source)
+			return StopCluster(stream, h.Source)
 		})
 	if err != nil {
 		return err
@@ -134,11 +134,6 @@ func (h *Hub) fillClusterConfigsSubStep(_ OutStreams, oldBinDir, newBinDir strin
 		return err
 	}
 
-	// link in source/target to hub
-	// TODO: remove once we deduplicate
-	h.source = h.Source
-	h.target = h.Target
-
 	return nil
 }
 
@@ -153,8 +148,8 @@ func getAgentPath() (string, error) {
 
 // TODO: use the implementation in RestartAgents() for this function and combine them
 func (h *Hub) startAgentsSubStep(stream OutStreams) error {
-	source := h.source
-	stateDir := h.conf.StateDir
+	source := h.Source
+	stateDir := h.StateDir
 
 	// XXX If there are failures, does it matter what agents have successfully
 	// started, or do we just want to stop all of them and kick back to the

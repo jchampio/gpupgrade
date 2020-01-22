@@ -174,27 +174,6 @@ outputContains() {
     done
 }
 
-# TODO: Remove this test once PR #179 is merged.
-@test "start agents idempotent" {
-    run gpupgrade initialize \
-        --old-bindir="$GPHOME/bin" \
-        --new-bindir="$GPHOME/bin" \
-        --old-port="${PGPORT}" \
-        --disk-free-ratio 0 \
-        --stop-before-cluster-creation 3>&-
-    [ "$status" -eq 0 ] || fail "failed to initialize: $output"
-
-    sed  -i -e 's/"START_AGENTS": "COMPLETE"/"START_AGENTS": "FAILED"/g' "$GPUPGRADE_HOME/status.json"
-
-    run gpupgrade initialize \
-        --old-bindir="$GPHOME/bin" \
-        --new-bindir="$GPHOME/bin" \
-        --old-port="${PGPORT}" \
-        --disk-free-ratio 0 \
-        --stop-before-cluster-creation 3>&-
-    [ "$status" -eq 0 ] || fail "failed to initialize: $output"
-}
-
 wait_for_port_change() {
     local port=$1
     local ret=$2
@@ -274,4 +253,31 @@ wait_for_port_change() {
     TEARDOWN_FUNCTIONS+=( teardown_target_cluster )
 
     pg_isready -q || fail "expected source cluster to be available"
+}
+
+# This is a very simple way to flush out the most obvious idempotence bugs. It
+# replicates what would happen if every substep failed/crashed right after
+# completing its work but before completion was signalled back to the hub.
+@test "all substeps can be re-run after completion" {
+    # Force a target cluster to be created (setup's initialize stops before that
+    # happens).
+    gpupgrade initialize \
+        --old-bindir="$GPHOME/bin" \
+        --new-bindir="$GPHOME/bin" \
+        --old-port="${PGPORT}"\
+        --disk-free-ratio 0 3>&-
+
+    set_target_cluster_var_for_teardown
+    TEARDOWN_FUNCTIONS+=( teardown_target_cluster )
+
+    # Mark every substep in the status file as failed. Then restart the cluster
+    # and re-initialize.
+    sed -i .bak -e 's/"COMPLETE"/"FAILED"/g' "$GPUPGRADE_HOME/status.json"
+    gpstart -a
+
+    gpupgrade initialize \
+        --old-bindir="$GPHOME/bin" \
+        --new-bindir="$GPHOME/bin" \
+        --old-port="${PGPORT}"\
+        --disk-free-ratio 0 3>&-
 }

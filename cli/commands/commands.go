@@ -215,6 +215,7 @@ func createConfigShowSubcommand() *cobra.Command {
 
 	subShow.Flags().Bool("old-bindir", false, "show install directory for old gpdb version")
 	subShow.Flags().Bool("new-bindir", false, "show install directory for new gpdb version")
+	subShow.Flags().Bool("new-datadir", false, "show temporary data directory for new gpdb cluster")
 
 	return subShow
 }

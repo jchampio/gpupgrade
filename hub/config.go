@@ -38,6 +38,8 @@ func (h *Hub) GetConfig(ctx context.Context, in *idl.GetConfigRequest) (*idl.Get
 		resp.Value = h.Source.BinDir
 	case "new-bindir":
 		resp.Value = h.Target.BinDir
+	case "new-datadir":
+		resp.Value = h.Target.MasterDataDir()
 	default:
 		return nil, status.Errorf(codes.NotFound, "%s is not a valid configuration key", in.Name)
 	}

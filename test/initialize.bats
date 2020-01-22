@@ -41,8 +41,7 @@ teardown() {
 }
 
 set_target_cluster_var_for_teardown() {
-    local newmasterdir="$(upgrade_datadir $MASTER_DATA_DIRECTORY)"
-    TARGET_CLUSTER="${newmasterdir}"
+    TARGET_CLUSTER="$(gpupgrade config show --new-datadir)"
 }
 
 teardown_target_cluster() {
@@ -247,14 +246,14 @@ wait_for_port_change() {
 }
 
 @test "the check_upgrade substep always runs" {
-    set_target_cluster_var_for_teardown
-    TEARDOWN_FUNCTIONS+=( teardown_target_cluster )
-
     gpupgrade initialize \
         --old-bindir="$GPHOME/bin" \
         --new-bindir="$GPHOME/bin" \
         --old-port="${PGPORT}" \
         --disk-free-ratio 0 3>&-
+
+    set_target_cluster_var_for_teardown
+    TEARDOWN_FUNCTIONS+=( teardown_target_cluster )
 
     setup_check_upgrade_to_fail
     TEARDOWN_FUNCTIONS+=( teardown_check_upgrade_failure )

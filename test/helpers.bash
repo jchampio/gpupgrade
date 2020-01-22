@@ -62,18 +62,6 @@ delete_target_datadirs() {
     rm -rf "${datadir}"/*_upgrade
 }
 
-# Takes an old datadir and echoes the expected new datadir path.
-upgrade_datadir() {
-    local base="$(basename $1)"
-    local dir="$(dirname $1)_upgrade"
-
-    # Sanity check.
-    [ -n "$base" ]
-    [ -n "$dir" ]
-
-    echo "$dir/$base"
-}
-
 # require_gnu_stat tries to find a GNU stat program. If one is found, it will be
 # assigned to the STAT global variable; otherwise the current test is skipped.
 require_gnu_stat() {

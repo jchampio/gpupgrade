@@ -36,18 +36,9 @@ teardown() {
     $PSQL -d postgres -p $PGPORT -c "DROP TABLE IF EXISTS test_pg_upgrade CASCADE;"
 }
 
-setup_newmasterdir() {
-    # TODO: code factor this with execute.bats
-    run $PSQL -At -p $PGPORT postgres -c "SELECT datadir FROM gp_segment_configuration WHERE role = 'p' and content = -1"
-    [ "$status" -eq 0 ] || fail "$output"
-
-    newmasterdir="$(upgrade_datadir $output)"
-}
-
 # yes, this will fail once we allow an index on a partition table
 @test "pg_upgrade --check fails on a source cluster with an index on a partition table" {
     skip_if_no_gpdb
-    setup_newmasterdir
 
     # add in a index on a partition table, which causes pg_upgrade --check to fail
     $PSQL -d postgres -p $PGPORT -c "CREATE TABLE test_pg_upgrade(a int) DISTRIBUTED BY (a) PARTITION BY RANGE (a)(start (1) end(4) every(1));"
@@ -64,7 +55,7 @@ setup_newmasterdir() {
         --verbose 3>&- || status=$?
     [ "$status" -eq 1 ]
 
-    NEW_CLUSTER="$newmasterdir"
+    NEW_CLUSTER="$(gpupgrade config show --new-datadir)"
 
     grep "Checking for indexes on partitioned tables                  fatal" "$GPUPGRADE_HOME"/initialize.log
 
@@ -76,7 +67,6 @@ setup_newmasterdir() {
 
 @test "gpupgrade initialize runs pg_upgrade --check on master and primaries" {
     skip_if_no_gpdb
-    setup_newmasterdir
 
     gpupgrade initialize \
         --old-bindir "$GPHOME/bin" \
@@ -84,7 +74,7 @@ setup_newmasterdir() {
         --old-port "$PGPORT" \
         --disk-free-ratio=0 3>&-
 
-    NEW_CLUSTER="$newmasterdir"
+    NEW_CLUSTER="$(gpupgrade config show --new-datadir)"
 
     grep "Clusters are compatible" "$GPUPGRADE_HOME"/initialize.log
 
@@ -117,14 +107,13 @@ count_primary_gp_dbids() {
 @test "upgrade maintains separate DBIDs for each segment" {
     local old_dbid_num=$(count_primary_gp_dbids $PGPORT)
 
-    setup_newmasterdir
     gpupgrade initialize \
         --verbose \
         --old-bindir "$GPHOME/bin" \
         --new-bindir "$GPHOME/bin" \
         --old-port "$PGPORT" \
         --disk-free-ratio=0 3>&-
-    NEW_CLUSTER="$newmasterdir"
+    NEW_CLUSTER="$(gpupgrade config show --new-datadir)"
 
     gpupgrade execute --verbose
 

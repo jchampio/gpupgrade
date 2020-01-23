@@ -3,14 +3,23 @@ package hub
 import (
 	"fmt"
 	"os/exec"
+	"path/filepath"
 
 	"github.com/pkg/errors"
 
+	"github.com/greenplum-db/gpupgrade/testutils/exectest"
 	"github.com/greenplum-db/gpupgrade/utils"
 )
 
-var isPostmasterRunningCmd = exec.Command
-var startStopClusterCmd = exec.Command
+// These variables provide injection points for exectest.Command.
+// XXX we badly need a way to combine these; they're proliferating
+var (
+	isPostmasterRunningCmd = exec.Command
+	startStopClusterCmd    = exec.Command
+	pgCtlCmd               = exec.Command
+	gpstopCmd              = exec.Command
+	gpstartCmd             = exec.Command
+)
 
 func (h *Hub) ShutdownCluster(stream OutStreams, isSource bool) error {
 	if isSource {
@@ -28,9 +37,55 @@ func (h *Hub) ShutdownCluster(stream OutStreams, isSource bool) error {
 	return nil
 }
 
-func StopCluster(stream OutStreams, cluster *utils.Cluster) error {
-	return startStopCluster(stream, cluster, true)
+// runGPCommand returns the results of an exec.Cmd run for the given GPDB
+// utility invocation.
+//
+// XXX There are way too many inputs to this.
+func runGPCommand(cmdFunc exectest.Command, path, args string, stream OutStreams, cluster *utils.Cluster) error {
+	path = filepath.Join(cluster.BinDir, path)
+
+	cmd := cmdFunc("bash", "-c",
+		fmt.Sprintf("source %s/../greenplum_path.sh && %s %s",
+			cluster.BinDir,
+			path,
+			args,
+		))
+
+	cmd.Stdout = stream.Stdout()
+	cmd.Stderr = stream.Stderr()
+
+	fmt.Fprintf(stream.Stdout(), "executing %q %q\n", cmd.Path, cmd.Args)
+	return cmd.Run()
 }
+
+func StopCluster(stream OutStreams, cluster *utils.Cluster) error {
+	// pg_ctl stop the master
+	err := runGPCommand(pgCtlCmd,
+		"pg_ctl", fmt.Sprintf("stop -m fast -w -D %s", cluster.MasterDataDir()),
+		stream, cluster)
+	if err != nil {
+		// Because `pg_ctl stop` can fail because the master is already stopped,
+		// but it does not give us a programmatic distinction between a hard
+		// failure and an already-stopped failure, we explicitly ignore non-zero
+		// exit codes here and rely on the following gpstart to catch any
+		// problems.
+		fmt.Fprintf(stream.Stderr(), "ignoring pg_ctl failure: %+v\n", err)
+	}
+
+	// gpstart the cluster to fully bring up the cluster
+	err = runGPCommand(gpstartCmd,
+		"gpstart", fmt.Sprintf("-a -d %s", cluster.MasterDataDir()),
+		stream, cluster)
+	if err != nil {
+		return err
+	}
+
+	// gpstop the cluster...the cluster is now properly shut down
+	return runGPCommand(gpstopCmd,
+		"gpstop", fmt.Sprintf("-a -f -d %s", cluster.MasterDataDir()),
+		stream, cluster)
+}
+
 func StartCluster(stream OutStreams, cluster *utils.Cluster) error {
 	return startStopCluster(stream, cluster, false)
 }

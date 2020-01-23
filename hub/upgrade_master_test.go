@@ -19,7 +19,9 @@ import (
 	"github.com/greenplum-db/gpupgrade/utils"
 )
 
+// TODO: move to the exectest package; these are widely used
 func Success() {}
+func Failure() { os.Exit(1) }
 
 const StreamingMainStdout = "expected\nstdout\n"
 const StreamingMainStderr = "process\nstderr\n"
@@ -50,6 +52,7 @@ func BlindlyWritingMain() {
 func init() {
 	exectest.RegisterMains(
 		Success,
+		Failure,
 		StreamingMain,
 		BlindlyWritingMain,
 	)

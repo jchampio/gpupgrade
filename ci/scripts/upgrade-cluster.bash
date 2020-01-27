@@ -48,6 +48,7 @@ sudo ln -s trampoline pg_ctl
 sudo ln -s trampoline pg_resetxlog
 sudo ln -s trampoline postgres
 
+sudo ln -s trampoline gpstart
 sudo ln -s trampoline gpstop
 
 # GPHOME_NEW might be the same as GPHOME_OLD for same-version upgrades.
@@ -62,6 +63,7 @@ if [ "$GPHOME_NEW" != "$GPHOME_OLD" ]; then
     sudo ln -s trampoline pg_resetxlog
     sudo ln -s trampoline postgres
 
+    sudo ln -s trampoline gpstart
     sudo ln -s trampoline gpstop
 fi
 

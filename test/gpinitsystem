@@ -1,0 +1,131 @@
+#! /bin/bash
+#
+# A version of gpinitsystem that caches the last created cluster. Cache is hit
+# if, and only if, all of the following are true:
+#
+# - The arguments passed to gpinitsystem are identical to the last run.
+# - The -I input option to gpinitsystem is used, and the contents of that file
+#   are identical to the last run.
+#
+# BUGS:
+# - Mirrors are ignored. This only works for upgrade scenarios.
+#
+
+set -o errexit
+set -o pipefail
+set -o nounset
+
+CACHEDIR=/tmp/gpinitsystem.cache
+mkdir -p "$CACHEDIR"
+
+HASHPROG=
+if command -v shasum; then
+    HASHPROG=shasum
+elif command -v sha1sum; then
+    HASHPROG=sha1sum
+elif command -v md5sum; then
+    HASHPROG=md5sum
+fi
+
+log() {
+    echo "$@" >> "$CACHEDIR/log"
+}
+
+datadir() {
+    echo "$@" | cut -d~ -f3
+}
+
+cache() {
+    local cachedir=$1
+    local datadir=$2
+
+    local subdir="$cachedir/$datadir"
+    mkdir -p "$subdir"
+
+    cp -pR "$datadir"/ "$subdir"
+}
+
+restore() {
+    local cachedir=$1
+    local datadir=$2
+
+    local subdir="$cachedir/$datadir"
+
+    mkdir "$datadir" # fail if it already exists
+    cp -pR "$subdir"/ "$datadir"
+}
+
+main() {
+    local inputfile=
+
+    log "called with args: $@"
+
+    while getopts ":I:" opt; do
+        case "$opt" in
+            I)
+                inputfile="$OPTARG"
+                ;;
+        esac
+    done
+
+    local hash=
+    if [ -n "$HASHPROG" -a -n "$inputfile" ]; then
+        # Hash the contents and arguments.
+        hash=$(echo "$@" | cat - "$inputfile" | "$HASHPROG" | cut -d' ' -f1)
+        log "cache hash: $hash"
+    fi
+
+    local dir="$CACHEDIR/cache.$hash"
+
+    if [ ! -f "$dir/valid" ]; then
+        log "cache miss"
+
+        # Run the actual gpinitsystem.
+        gpinitsystem.bak "$@"
+
+        if [ -z "$hash" -o -z "$inputfile" ]; then
+            # We can't cache this run, so we're done.
+            exit 0
+        fi
+
+        # Clear out any previous caches.
+        rm -rf "$CACHEDIR/cache.*"
+
+        source "$inputfile"
+        local master_datadir="$(datadir $QD_PRIMARY_ARRAY)"
+
+        # Bring the cluster down before copying. It's restarted before we exit
+        # the utility.
+        gpstop -a -d "$master_datadir"
+
+        cache "$dir" "$master_datadir"
+
+        for seg in "${PRIMARY_ARRAY[@]}"; do
+            local seg_datadir="$(datadir $seg)"
+            cache "$dir" "$seg_datadir"
+        done
+
+        gpstart -a -d "$master_datadir"
+
+        # Mark the cache ready for use.
+        touch "$dir/valid"
+        exit 0
+    fi
+
+    # Cache hit. Restore all segments from the cache.
+    log "cache hit"
+    source "$inputfile"
+
+    local master_datadir="$(datadir $QD_PRIMARY_ARRAY)"
+    restore "$dir" "$master_datadir"
+
+    for seg in "${PRIMARY_ARRAY[@]}"; do
+        local seg_datadir="$(datadir $seg)"
+        restore "$dir" "$seg_datadir"
+    done
+
+    # Bring the cluster up to match gpinitsystem behavior.
+    gpstart -a -d "$master_datadir"
+}
+
+main "$@"

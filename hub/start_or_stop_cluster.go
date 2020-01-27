@@ -73,7 +73,7 @@ func runGPCommand(cmdFunc exectest.Command, path, args string, stream OutStreams
 func StopCluster(stream OutStreams, cluster *utils.Cluster) error {
 	// pg_ctl stop the master
 	err := runGPCommand(pgCtlCmd,
-		"pg_ctl", fmt.Sprintf("stop -m fast -w -D %s", cluster.MasterDataDir()),
+		"gpstop", fmt.Sprintf("-a -f -m -d %s", cluster.MasterDataDir()),
 		stream, cluster)
 	if err != nil {
 		// Because `pg_ctl stop` can fail because the master is already stopped,

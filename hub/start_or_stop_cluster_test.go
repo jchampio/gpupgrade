@@ -128,7 +128,7 @@ func TestStartOrStopCluster(t *testing.T) {
 
 			pgCtlCmd = exectest.NewCommandWithVerifier(main,
 				func(path string, args ...string) {
-					expected := "/source/bindir/pg_ctl stop -m fast -w -D basedir/seg-1"
+					expected := "/source/bindir/gpstop -a -f -m -d basedir/seg-1"
 					verify(t, path, args, expected)
 				})
 

@@ -93,7 +93,7 @@ func TestStartOrStopCluster(t *testing.T) {
 					t.Errorf("first argument to %q must be -c; got %q", path, args[0])
 				}
 
-				expected = fmt.Sprintf("source /source/bindir/../greenplum_path.sh && %s", expected)
+				expected = fmt.Sprintf("source /source/greenplum_path.sh && %s", expected)
 				if args[1] != expected {
 					t.Errorf("bash command was %q, want %q", args[1], expected)
 				}

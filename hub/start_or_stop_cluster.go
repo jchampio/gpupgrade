@@ -42,14 +42,14 @@ func (h *Hub) ShutdownCluster(stream OutStreams, isSource bool) error {
 //
 // XXX There are way too many inputs to this.
 func runGPCommand(cmdFunc exectest.Command, path, args string, stream OutStreams, cluster *utils.Cluster) error {
+	envScript := filepath.Join(cluster.BinDir, "..", "greenplum_path.sh")
 	path = filepath.Join(cluster.BinDir, path)
 
-	cmd := cmdFunc("bash", "-c",
-		fmt.Sprintf("source %s/../greenplum_path.sh && %s %s",
-			cluster.BinDir,
-			path,
-			args,
-		))
+	cmd := cmdFunc("bash", "-c", fmt.Sprintf("source %s && %s %s",
+		envScript,
+		path,
+		args,
+	))
 
 	cmd.Stdout = stream.Stdout()
 	cmd.Stderr = stream.Stderr()
@@ -69,7 +69,8 @@ func StopCluster(stream OutStreams, cluster *utils.Cluster) error {
 		// failure and an already-stopped failure, we explicitly ignore non-zero
 		// exit codes here and rely on the following gpstart to catch any
 		// problems.
-		fmt.Fprintf(stream.Stderr(), "ignoring pg_ctl failure: %+v\n", err)
+		fmt.Fprintf(stream.Stderr(), "ignoring pg_ctl failure (is master already stopped?): %+v\n", err)
+		fmt.Fprintf(stream.Stderr(), "if gpstart fails, check the above error\n")
 	}
 
 	// gpstart the cluster to fully bring up the cluster

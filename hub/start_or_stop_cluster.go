@@ -5,6 +5,7 @@ import (
 	"os/exec"
 	"path/filepath"
 
+	"github.com/blang/semver"
 	"github.com/pkg/errors"
 
 	"github.com/greenplum-db/gpupgrade/testutils/exectest"
@@ -53,6 +54,17 @@ func runGPCommand(cmdFunc exectest.Command, path, args string, stream OutStreams
 
 	cmd.Stdout = stream.Stdout()
 	cmd.Stderr = stream.Stderr()
+
+	// Don't leak the hub environment to the subprocesses.
+	cmd.Env = []string{}
+
+	// XXX If this is a 5X cluster, gpstart and gpstop need the
+	// MASTER_DATA_DIRECTORY environment variable to be set due to a bug in the
+	// -d option's implementation.
+	if cluster.Version.SemVer.LT(semver.MustParse("6.0.0")) {
+		mdd := fmt.Sprintf("MASTER_DATA_DIRECTORY=%s", cluster.MasterDataDir())
+		cmd.Env = append(cmd.Env, mdd)
+	}
 
 	fmt.Fprintf(stream.Stdout(), "executing %q %q\n", cmd.Path, cmd.Args)
 	return cmd.Run()

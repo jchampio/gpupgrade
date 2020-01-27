@@ -76,7 +76,6 @@ sudo ln -s trampoline psql
 sudo ln -s trampoline vacuumdb
 
 sudo ln -s trampoline gpinitsystem
-sudo ln -s trampoline gpstart
 EOF
     done
 }

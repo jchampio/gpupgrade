@@ -98,8 +98,7 @@ reset_master_and_primary_pg_control_files() {
         --disk-free-ratio 0 \
         --verbose
 
-    local datadir=$(dirname $(dirname "${MASTER_DATA_DIRECTORY}"))
-    NEW_CLUSTER="${datadir}/qddir_upgrade/demoDataDir-1"
+    NEW_CLUSTER="$(gpupgrade config show --new-datadir)"
 
     gpupgrade execute --verbose
     TEARDOWN_FUNCTIONS+=( reset_master_and_primary_pg_control_files )
@@ -121,24 +120,24 @@ reset_master_and_primary_pg_control_files() {
         --disk-free-ratio 0 \
         --verbose
 
-    local datadir=$(dirname $(dirname "${MASTER_DATA_DIRECTORY}"))
-    NEW_CLUSTER="${datadir}/qddir_upgrade/demoDataDir-1"
+    local datadir="$(gpupgrade config show --new-datadir)"
+    NEW_CLUSTER="${datadir}"
 
     # Initialize creates a backup of the target master data dir, during execute
     # upgrade master steps refreshes the content of the target master data dir
     # with the existing backup. Remove the target master data directory to
     # ensure that initialize created a backup and upgrade master refreshed the
     # target master data directory with the backup.
-    rm -rf "${datadir}"/qddir_upgrade/demoDataDir-1/*
+    rm -rf "${datadir}"/*
     
     # create an extra file to ensure that its deleted during rsync as we pass
     # --delete flag
-    mkdir "${datadir}"/qddir_upgrade/demoDataDir-1/base_extra    
-    touch "${datadir}"/qddir_upgrade/demoDataDir-1/base_extra/1101
+    mkdir "${datadir}"/base_extra
+    touch "${datadir}"/base_extra/1101
     gpupgrade execute --verbose
     
     # check that the extraneous files are deleted
-    [ ! -d "${datadir}"/qddir_upgrade/demoDataDir-1/base_extra ]
+    [ ! -d "${datadir}"/base_extra ]
 
     TEARDOWN_FUNCTIONS+=( reset_master_and_primary_pg_control_files )
 }

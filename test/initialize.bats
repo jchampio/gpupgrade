@@ -270,10 +270,8 @@ wait_for_port_change() {
     set_target_cluster_var_for_teardown
     TEARDOWN_FUNCTIONS+=( teardown_target_cluster )
 
-    # Mark every substep in the status file as failed. Then restart the cluster
-    # and re-initialize.
+    # Mark every substep in the status file as failed. Then re-initialize.
     sed -i.bak -e 's/"COMPLETE"/"FAILED"/g' "$GPUPGRADE_HOME/status.json"
-    gpstart -a
 
     gpupgrade initialize \
         --old-bindir="$GPHOME/bin" \

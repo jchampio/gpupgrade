@@ -24,7 +24,6 @@ abort() {
 skip_if_no_gpdb() {
     [ -n "${GPHOME}" ] || skip "this test requires an active GPDB cluster (set GPHOME)"
     [ -n "${PGPORT}" ] || skip "this test requires an active GPDB cluster (set PGPORT)"
-    pg_isready -q || skip "this test requires an active GPDB cluster (run gpstart)"
 }
 
 # start_source_cluster() ensures that database is up before returning

@@ -62,7 +62,8 @@ teardown() {
     run gpupgrade config show
     [ "$status" -eq 0 ]
     [ "${lines[0]}" = "new-bindir - /my/new/bin/dir" ]
-    [ "${lines[1]}" = "old-bindir - /my/old/bin/dir" ]
+    [ "${lines[1]}" = "new-datadir - " ] # This isn't populated until cluster creation, but it's still displayed here
+    [ "${lines[2]}" = "old-bindir - /my/old/bin/dir" ]
 }
 
 @test "multiple configuration values can be set at once" {
@@ -71,5 +72,5 @@ teardown() {
     run gpupgrade config show
     [ "$status" -eq 0 ]
     [ "${lines[0]}" = "new-bindir - /my/new/bin/dir" ]
-    [ "${lines[1]}" = "old-bindir - /my/old/bin/dir" ]
+    [ "${lines[2]}" = "old-bindir - /my/old/bin/dir" ]
 }

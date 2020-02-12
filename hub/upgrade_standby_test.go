@@ -17,7 +17,7 @@ func TestUpgradeStandby(t *testing.T) {
 		spyEnv := NewSpyGreenplumEnv()
 
 		config := hub.StandbyConfig{
-			Port:          "8888",
+			Port:          8888,
 			Hostname:      "some-hostname",
 			DataDirectory: "/some/standby/data/directory",
 			GreenplumEnv:  spyEnv,

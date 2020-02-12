@@ -2,6 +2,7 @@ package hub
 
 import (
 	"fmt"
+	"strconv"
 
 	"github.com/greenplum-db/gp-common-go-libs/gplog"
 )
@@ -12,7 +13,7 @@ var upgradeStandbyFunc = upgradeStandby
 
 type StandbyConfig struct {
 	GreenplumEnv
-	Port          string
+	Port          int
 	Hostname      string
 	DataDirectory string
 }
@@ -58,7 +59,7 @@ func gpinitstandbyRemove(standbyConfig StandbyConfig) error {
 
 func gpinitstandbyCreate(standbyConfig StandbyConfig) error {
 	return standbyConfig.Run("gpinitstandby",
-		"-P", standbyConfig.Port,
+		"-P", strconv.Itoa(standbyConfig.Port),
 		"-s", standbyConfig.Hostname,
 		"-S", standbyConfig.DataDirectory,
 		"-a")

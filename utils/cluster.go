@@ -2,7 +2,6 @@ package utils
 
 import (
 	"fmt"
-	"path/filepath"
 
 	"github.com/greenplum-db/gp-common-go-libs/dbconn"
 	"github.com/pkg/errors"
@@ -52,6 +51,18 @@ func (c *Cluster) MasterDataDir() string {
 
 func (c *Cluster) MasterPort() int {
 	return c.GetPortForContent(-1)
+}
+
+func (c *Cluster) StandbyPort() int {
+	return c.Mirrors[-1].Port
+}
+
+func (c *Cluster) StandbyHostname() string {
+	return c.Mirrors[-1].Hostname
+}
+
+func (c *Cluster) StandbyDataDirectory() string {
+	return c.Mirrors[-1].DataDir
 }
 
 // XXX This does not provide mirror hostnames yet.
@@ -115,16 +126,4 @@ func (c Cluster) SegmentsOn(hostname string) ([]cluster.SegConfig, error) {
 	}
 
 	return segments, nil
-}
-
-func (c *Cluster) StandbyPort() string {
-	return "6101"
-}
-
-func (c *Cluster) StandbyHostname() string {
-	return "localhost"
-}
-
-func (c *Cluster) StandbyDataDirectory() string {
-	return filepath.Join(c.MasterDataDir(), "..", "..", "standby")
 }

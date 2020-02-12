@@ -5,7 +5,6 @@ import (
 	"errors"
 	"io/ioutil"
 	"os"
-	"path/filepath"
 	"testing"
 
 	"github.com/greenplum-db/gp-common-go-libs/dbconn"
@@ -43,8 +42,9 @@ func TestFinalize(t *testing.T) {
 			return nil
 		})
 
-		source = makeCluster()
-		target = makeCluster()
+		source = makeCluster(8888, "", "")
+		target = makeCluster(9999, "some-target-hostname", "/some/target/master/data/dir")
+
 		stream := &spyStream{}
 		substepStateStore := &stubStore{}
 
@@ -70,20 +70,19 @@ func TestFinalize(t *testing.T) {
 			t.Errorf("got messages %v, wanted upgrade standby is running", stream.messagesAsText())
 		}
 
-		if standbyConfigurationUsed.Port != "6101" {
+		if standbyConfigurationUsed.Port != 9999 {
 			t.Errorf("got port for new standby = %v, wanted %v",
-				standbyConfigurationUsed.Port, "6101")
+				standbyConfigurationUsed.Port, 9999)
 		}
 
-		if standbyConfigurationUsed.Hostname != "localhost" {
+		if standbyConfigurationUsed.Hostname != "some-target-hostname" {
 			t.Errorf("got hostname for new standby = %v, wanted %v",
-				standbyConfigurationUsed.Hostname, "localhost")
+				standbyConfigurationUsed.Hostname, "some-target-hostname")
 		}
 
-		expectedStandbyDataDirectory := filepath.Join(target.MasterDataDir(), "..", "..", "standby_upgrade")
-		if standbyConfigurationUsed.DataDirectory != expectedStandbyDataDirectory {
+		if standbyConfigurationUsed.DataDirectory != "/some/target/master/data/dir_upgrade" {
 			t.Errorf("got standby data directory for new standby = %v, wanted %v",
-				standbyConfigurationUsed.DataDirectory, expectedStandbyDataDirectory)
+				standbyConfigurationUsed.DataDirectory, "/some/target/master/data/dir_upgrade")
 		}
 
 		if standbyConfigurationUsed.MasterDataDirectory() != target.MasterDataDir() {
@@ -104,8 +103,8 @@ func TestFinalize(t *testing.T) {
 			return errors.New("failed")
 		})
 
-		source = makeCluster()
-		target = makeCluster()
+		source = makeCluster(0, "", "")
+		target = makeCluster(0, "", "")
 		stream := &spyStream{}
 		substepStore := &stubStore{}
 		substepStore.stubRead(idl.Status_UNKNOWN_STATUS, nil)
@@ -220,21 +219,32 @@ func (d *dummyExecutor) ExecuteLocalCommand(commandStr string) (string, error) {
 // Create a quick cluster of information
 //
 //
-func makeCluster() *utils.Cluster {
-	segments := map[int]cluster.SegConfig{
-		1: cluster.SegConfig{
+func makeCluster(port int, hostname string, dataDir string) *utils.Cluster {
+	primaries := map[int]cluster.SegConfig{
+		-1: cluster.SegConfig{
 			DbID:      100,
 			ContentID: -1,
-			Port:      8000,
+			Port:      7890,
 			Hostname:  "somehost",
-			DataDir:   "/some/data/dir",
+			DataDir:   "/some/dir",
+		},
+	}
+
+	mirrors := map[int]cluster.SegConfig{
+		-1: cluster.SegConfig{
+			DbID:      100,
+			ContentID: -1,
+			Port:      port,
+			Hostname:  hostname,
+			DataDir:   dataDir,
 		},
 	}
 
 	c := &utils.Cluster{
 		&cluster.Cluster{
 			ContentIDs: []int{1},
-			Primaries:  segments,
+			Primaries:  primaries,
+			Mirrors:    mirrors,
 		},
 		"",
 		dbconn.GPDBVersion{},

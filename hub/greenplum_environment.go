@@ -49,14 +49,3 @@ type greenplumEnv struct {
 	masterDataDirectory string
 	masterPort          int
 }
-
-func NewGreenplumEnv(binDir string, masterDataDirectory string) *greenplumEnv {
-	if binDir == "" {
-		panic(fmt.Sprintf("invalid bin dir: %v", binDir))
-	}
-
-	return &greenplumEnv{
-		binDir:              binDir,
-		masterDataDirectory: masterDataDirectory,
-	}
-}

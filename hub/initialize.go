@@ -18,7 +18,12 @@ import (
 )
 
 func (s *Server) Initialize(in *idl.InitializeRequest, stream idl.CliToHub_InitializeServer) (err error) {
-	st, err := BeginStep(s.StateDir, "initialize", stream)
+	store, err := s.NewSubstepStateStore("initalize")
+	if err != nil {
+		return err
+	}
+
+	st, err := BeginStep(s.StateDir, "initialize", stream, store)
 	if err != nil {
 		return err
 	}
@@ -46,7 +51,12 @@ func (s *Server) Initialize(in *idl.InitializeRequest, stream idl.CliToHub_Initi
 }
 
 func (s *Server) InitializeCreateCluster(in *idl.InitializeCreateClusterRequest, stream idl.CliToHub_InitializeCreateClusterServer) (err error) {
-	st, err := BeginStep(s.StateDir, "initialize", stream)
+	store, err := s.NewSubstepStateStore("initalize")
+	if err != nil {
+		return nil
+	}
+
+	st, err := BeginStep(s.StateDir, "initialize", stream, store)
 	if err != nil {
 		return err
 	}

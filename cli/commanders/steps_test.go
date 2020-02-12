@@ -4,6 +4,7 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
+	"strings"
 	"sync"
 	"testing"
 
@@ -125,6 +126,20 @@ func TestUILoop(t *testing.T) {
 		actual := string(actualOut)
 		if actual != expected {
 			t.Errorf("output %#v want %#v", actual, expected)
+		}
+	})
+
+	t.Run("it formats the upgrade standby substep", func(t *testing.T) {
+		message := commanders.FormatStatus(&idl.SubstepStatus{
+			Step:   idl.Substep_UPGRADE_STANDBY,
+			Status: idl.Status_COMPLETE,
+		})
+
+		expectedMessage := "Upgrading standby..."
+
+		if !strings.Contains(message, expectedMessage) {
+			t.Errorf("got %v, wanted %v",
+				message, expectedMessage)
 		}
 	})
 

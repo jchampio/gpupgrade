@@ -1,283 +1,244 @@
 package hub_test
 
 import (
-	"fmt"
-	"strings"
+	"context"
+	"errors"
+	"io/ioutil"
+	"os"
+	"path/filepath"
 	"testing"
 
-	sqlmock "github.com/DATA-DOG/go-sqlmock"
-	multierror "github.com/hashicorp/go-multierror"
-	"golang.org/x/xerrors"
+	"github.com/greenplum-db/gp-common-go-libs/dbconn"
+	"google.golang.org/grpc/metadata"
 
+	"github.com/greenplum-db/gpupgrade/idl"
+	"github.com/greenplum-db/gpupgrade/utils"
 	"github.com/greenplum-db/gpupgrade/utils/cluster"
 
-	. "github.com/greenplum-db/gpupgrade/hub"
+	"github.com/greenplum-db/gp-common-go-libs/gplog"
+
+	"github.com/greenplum-db/gpupgrade/hub"
 )
 
-// Sentinel error values to make error case testing easier.
-var (
-	ErrSentinel = fmt.Errorf("sentinel error")
-	ErrRollback = fmt.Errorf("rollback failed")
-)
+func TestFinalize(t *testing.T) {
+	numberOfSubsteps := 2
 
-// finishMock is a defer function to make the sqlmock API a little bit more like
-// gomock. Use it like this:
-//
-//     db, mock, err := sqlmock.New()
-//     if err != nil {
-//         t.Fatalf("couldn't create sqlmock: %v", err)
-//     }
-//     defer finishMock(mock, t)
-//
-func finishMock(mock sqlmock.Sqlmock, t *testing.T) {
-	if err := mock.ExpectationsWereMet(); err != nil {
-		t.Errorf("%v", err)
-	}
-}
-
-func TestClonePortsFromCluster(t *testing.T) {
-	src, err := cluster.NewCluster([]cluster.SegConfig{
-		{ContentID: -1, Port: 123, Role: "p"},
-		{ContentID: 0, Port: 234, Role: "p"},
-		{ContentID: 1, Port: 345, Role: "p"},
-		{ContentID: 2, Port: 456, Role: "p"},
-	})
+	tempDir, err := ioutil.TempDir("", "gpupgrade")
 	if err != nil {
-		t.Fatalf("constructing test cluster: %+v", err)
+		t.Error("error creating state dir for finalize test")
 	}
+	defer os.RemoveAll(tempDir)
 
-	t.Run("updates ports for every segment", func(t *testing.T) {
-		db, mock, err := sqlmock.New()
+	gplog.InitializeLogging("gpupgrade agent", tempDir)
+
+	t.Run("it upgrades the standby", func(t *testing.T) {
+		hub.StubReconfigurePortsToSucceed()
+
+		upgradeWasCalled := false
+		var standbyConfigurationUsed hub.StandbyConfig
+
+		hub.StubUpgradeStandby(func(config hub.StandbyConfig) error {
+			upgradeWasCalled = true
+			standbyConfigurationUsed = config
+			return nil
+		})
+
+		source = makeCluster()
+		target = makeCluster()
+		stream := &spyStream{}
+		substepStateStore := &stubStore{}
+
+		err = hub.Finalize(tempDir, source, target, stream, substepStateStore)
+
 		if err != nil {
-			t.Fatalf("couldn't create sqlmock: %v", err)
-		}
-		defer finishMock(mock, t)
-
-		contents := sqlmock.NewRows([]string{"content"})
-		for _, content := range src.ContentIDs {
-			contents.AddRow(content)
+			t.Errorf("unexpected error during Finalize: %v", err)
 		}
 
-		mock.ExpectBegin()
-		mock.ExpectQuery("SELECT content FROM gp_segment_configuration").
-			WillReturnRows(contents)
-
-		// We want one port update for every segment.
-		// Note that ranging over a map doesn't guarantee execution order, so we
-		// range over the contents instead.
-		for _, content := range src.ContentIDs {
-			conf := src.Primaries[content]
-			mock.ExpectExec("UPDATE gp_segment_configuration SET port = (.+) WHERE content = (.+)").
-				WithArgs(conf.Port, content).
-				WillReturnResult(sqlmock.NewResult(0, 1))
+		if !upgradeWasCalled {
+			t.Error("wanted the standby to be upgraded, but it was not")
 		}
 
-		mock.ExpectCommit()
+		if len(stream.sentMessages) == 0 {
+			t.Errorf("got zero sent messages on the stream, wanted %v", numberOfSubsteps)
+		}
 
-		err = ClonePortsFromCluster(db, src)
-		if err != nil {
-			t.Fatalf("returned error %#v", err)
+		if !stream.messagesInclude(idl.Substep_UPGRADE_STANDBY, idl.Status_RUNNING) {
+			t.Errorf("got messages %v, wanted upgrade standby is running", stream.messagesAsText())
+		}
+
+		if !stream.messagesInclude(idl.Substep_UPGRADE_STANDBY, idl.Status_COMPLETE) {
+			t.Errorf("got messages %v, wanted upgrade standby is running", stream.messagesAsText())
+		}
+
+		if standbyConfigurationUsed.Port != "6101" {
+			t.Errorf("got port for new standby = %v, wanted %v",
+				standbyConfigurationUsed.Port, "6101")
+		}
+
+		if standbyConfigurationUsed.Hostname != "localhost" {
+			t.Errorf("got hostname for new standby = %v, wanted %v",
+				standbyConfigurationUsed.Hostname, "localhost")
+		}
+
+		expectedStandbyDataDirectory := filepath.Join(target.MasterDataDir(), "..", "..", "standby_upgrade")
+		if standbyConfigurationUsed.DataDirectory != expectedStandbyDataDirectory {
+			t.Errorf("got standby data directory for new standby = %v, wanted %v",
+				standbyConfigurationUsed.DataDirectory, expectedStandbyDataDirectory)
+		}
+
+		if standbyConfigurationUsed.MasterDataDirectory() != target.MasterDataDir() {
+			t.Errorf("got target cluster master data directory for standby configuration = %v, wanted %v",
+				standbyConfigurationUsed.MasterDataDirectory(), target.MasterDataDir())
+		}
+
+		if standbyConfigurationUsed.MasterPort() != target.MasterPort() {
+			t.Errorf("got target cluster master port for standby configuration = %v, wanted %v",
+				standbyConfigurationUsed.MasterPort(), target.MasterPort())
 		}
 	})
 
-	// All cases added to this table expect an error to be returned. The core of
-	// the test case is .prepare(), which sets up the Sqlmock appropriately.
-	// The case's .check() method tests that the returned error is what the test
-	// case expected; in simple cases you can use the match() helper to check
-	// that the error is of a particular "type".
-	errorCases := []struct {
-		name    string
-		prepare func(sqlmock.Sqlmock)
-		verify  func(*testing.T, error)
-	}{{
-		"on transaction failure",
-		func(mock sqlmock.Sqlmock) {
-			mock.ExpectBegin().WillReturnError(ErrSentinel)
-		},
-		expect(ErrSentinel),
-	}, {
-		"and rolls back on query failure",
-		func(mock sqlmock.Sqlmock) {
-			mock.ExpectBegin()
-			mock.ExpectQuery("SELECT").WillReturnError(ErrSentinel)
-			mock.ExpectRollback()
-		},
-		expect(ErrSentinel),
-	}, {
-		"and rolls back on iteration failure",
-		func(mock sqlmock.Sqlmock) {
-			contents := sqlmock.NewRows([]string{"content"}).
-				AddRow(-1).
-				RowError(0, ErrSentinel)
+	t.Run("it returns an error when upgrading the standby fails with an error", func(t *testing.T) {
+		hub.StubReconfigurePortsToSucceed()
 
-			mock.ExpectBegin()
-			mock.ExpectQuery("SELECT content FROM gp_segment_configuration").
-				WillReturnRows(contents)
-			mock.ExpectRollback()
-		},
-		expect(ErrSentinel),
-	}, {
-		"and rolls back on update failure",
-		func(mock sqlmock.Sqlmock) {
-			contents := sqlmock.NewRows([]string{"content"})
-			for _, content := range src.ContentIDs {
-				contents.AddRow(content)
-			}
-
-			mock.ExpectBegin()
-			mock.ExpectQuery("SELECT content FROM gp_segment_configuration").
-				WillReturnRows(contents)
-			mock.ExpectExec("UPDATE gp_segment_configuration SET port = (.+) WHERE content = (.+)").
-				WithArgs(src.Primaries[-1].Port, -1).
-				WillReturnError(ErrSentinel)
-			mock.ExpectRollback()
-		},
-		expect(ErrSentinel),
-	}, {
-		"on commit failure",
-		func(mock sqlmock.Sqlmock) {
-			contents := sqlmock.NewRows([]string{"content"})
-			for _, content := range src.ContentIDs {
-				contents.AddRow(content)
-			}
-
-			mock.ExpectBegin()
-			mock.ExpectQuery("SELECT content FROM gp_segment_configuration").
-				WillReturnRows(contents)
-
-			for _, content := range src.ContentIDs {
-				conf := src.Primaries[content]
-				mock.ExpectExec("UPDATE gp_segment_configuration SET port = (.+) WHERE content = (.+)").
-					WithArgs(conf.Port, content).
-					WillReturnResult(sqlmock.NewResult(0, 1))
-			}
-
-			mock.ExpectCommit().WillReturnError(ErrSentinel)
-		},
-		expect(ErrSentinel),
-	}, {
-		"and rolls back on row scan failure",
-		func(mock sqlmock.Sqlmock) {
-			contents := sqlmock.NewRows([]string{"content"}).
-				AddRow("hello")
-
-			mock.ExpectBegin()
-			mock.ExpectQuery("SELECT content FROM gp_segment_configuration").
-				WillReturnRows(contents)
-			mock.ExpectRollback()
-		},
-		func(t *testing.T, err error) {
-			// XXX It'd be nice to inject our ErrSentinel into the Scan
-			// function, but there doesn't seem to be a way to do that. We
-			// instead return junk values from our query, and search for the
-			// "scan error" hardcoded string. Blech.
-			if err == nil || !strings.Contains(err.Error(), "Scan error") {
-				t.Errorf("returned %#v which does not appear to be a scan error", err)
-			}
-		},
-	}, {
-		"on rollback",
-		func(mock sqlmock.Sqlmock) {
-			mock.ExpectBegin()
-			mock.ExpectQuery("SELECT").WillReturnError(ErrSentinel)
-			mock.ExpectRollback().WillReturnError(ErrRollback)
-		},
-		func(t *testing.T, err error) {
-			multiErr, ok := err.(*multierror.Error)
-			if !ok {
-				t.Fatal("did not return a multierror")
-			}
-			if !xerrors.Is(multiErr.Errors[0], ErrSentinel) {
-				t.Errorf("first error was %#v want %#v", err, ErrSentinel)
-			}
-			if !xerrors.Is(multiErr.Errors[1], ErrRollback) {
-				t.Errorf("second error was %#v want %#v", err, ErrRollback)
-			}
-		},
-	}, {
-		"when there are content ids in the database missing from the cluster",
-		func(mock sqlmock.Sqlmock) {
-			contents := sqlmock.NewRows([]string{"content"}).
-				AddRow(-1).
-				AddRow(0).
-				AddRow(1).
-				AddRow(2).
-				AddRow(3) // extra content, does not exist
-
-			mock.ExpectBegin()
-			mock.ExpectQuery("SELECT content FROM gp_segment_configuration").
-				WillReturnRows(contents)
-			mock.ExpectRollback()
-		},
-		expect(ErrContentMismatch),
-	}, {
-		"when there are content ids in the cluster missing from the database",
-		func(mock sqlmock.Sqlmock) {
-			contents := sqlmock.NewRows([]string{"content"}).
-				AddRow(-1).
-				AddRow(0).
-				// missing content, skipping 1
-				AddRow(2)
-
-			mock.ExpectBegin()
-			mock.ExpectQuery("SELECT content FROM gp_segment_configuration").
-				WillReturnRows(contents)
-			mock.ExpectRollback()
-		},
-		expect(ErrContentMismatch),
-	}, {
-		"if UPDATE updates multiple rows",
-		func(mock sqlmock.Sqlmock) {
-			contents := sqlmock.NewRows([]string{"content"}).
-				AddRow(-1).
-				AddRow(0).
-				AddRow(1).
-				AddRow(2)
-
-			mock.ExpectBegin()
-			mock.ExpectQuery("SELECT content FROM gp_segment_configuration").
-				WillReturnRows(contents)
-
-			mock.ExpectExec("UPDATE gp_segment_configuration SET port = (.+) WHERE content = (.+)").
-				WillReturnResult(sqlmock.NewResult(0, 2))
-
-			mock.ExpectRollback()
-		},
-		func(t *testing.T, err error) {
-			expectedErr := "updated 2 rows for content -1, expected 1"
-			if err.Error() != expectedErr {
-				t.Errorf("returned '%s' want '%s'", err.Error(), expectedErr)
-			}
-		},
-	}}
-
-	for _, c := range errorCases {
-		t.Run(fmt.Sprintf("returns an error %s", c.name), func(t *testing.T) {
-			db, mock, err := sqlmock.New()
-			if err != nil {
-				t.Fatalf("couldn't create sqlmock: %v", err)
-			}
-			defer finishMock(mock, t)
-
-			// prepare() sets up any mock expectations.
-			c.prepare(mock)
-
-			err = ClonePortsFromCluster(db, src)
-
-			// Make sure the error is the one we expect.
-			c.verify(t, err)
+		hub.StubUpgradeStandby(func(config hub.StandbyConfig) error {
+			return errors.New("failed")
 		})
-	}
+
+		source = makeCluster()
+		target = makeCluster()
+		stream := &spyStream{}
+		substepStore := &stubStore{}
+		substepStore.stubRead(idl.Status_UNKNOWN_STATUS, nil)
+
+		err = hub.Finalize(tempDir, source, target, stream, substepStore)
+
+		if err == nil {
+			t.Error("got nil error for finalize, but expected it to fail during upgrade standby")
+		}
+	})
 }
 
-// expect is a helper for the errorCases table test above. You can use it as the
-// errorCase.verify() callback implementation; it just uses errors.Is() to see
-// whether the actual error returned matches the expected one, and complains
-// through the testing.T if not.
-func expect(expected error) func(*testing.T, error) {
-	return func(t *testing.T, actual error) {
-		if !xerrors.Is(actual, expected) {
-			t.Errorf("returned %#v want %#v", actual, expected)
+//
+//
+// Stub for Substep State Store
+//
+//
+type stubStore struct {
+	stubbedReadStatus idl.Status
+	stubbedReadError  error
+}
+
+func (s *stubStore) Read(step idl.Substep) (idl.Status, error) {
+	return s.stubbedReadStatus, s.stubbedReadError
+}
+
+func (s *stubStore) Write(idl.Substep, idl.Status) error {
+	return nil
+}
+
+func (s *stubStore) stubRead(stubbedStatus idl.Status, stubbedError error) {
+	s.stubbedReadStatus = stubbedStatus
+	s.stubbedReadError = stubbedError
+}
+
+//
+//
+// Spy for Stream
+//
+//
+type spyStream struct {
+	sentMessages []*idl.Message
+}
+
+func (m *spyStream) Send(message *idl.Message) error {
+	m.sentMessages = append(m.sentMessages, message)
+	return nil
+}
+
+func (m *spyStream) SetHeader(metadata.MD) error {
+	return nil
+}
+
+func (m *spyStream) SendHeader(metadata.MD) error {
+	return nil
+}
+
+func (m *spyStream) SetTrailer(metadata.MD) {
+}
+
+func (m *spyStream) Context() context.Context {
+	return nil
+}
+
+func (m *spyStream) SendMsg(message interface{}) error {
+	return nil
+}
+
+func (m *spyStream) RecvMsg(message interface{}) error {
+	return nil
+}
+
+func (m *spyStream) messagesInclude(expectedSubstep idl.Substep, expectedStatus idl.Status) bool {
+	for _, message := range m.sentMessages {
+		currentStatus := message.GetStatus()
+
+		if currentStatus == nil {
+			continue
+		}
+
+		if currentStatus.Step == expectedSubstep && currentStatus.Status == expectedStatus {
+			return true
 		}
 	}
+	return false
+}
+
+func (m *spyStream) messagesAsText() []string {
+	var messages []string
+
+	for _, message := range m.sentMessages {
+		messages = append(messages, message.String())
+	}
+
+	return messages
+}
+
+//
+//
+// Dummy executor: should not have any interesting interaction with this
+//
+//
+type dummyExecutor struct {
+}
+
+func (d *dummyExecutor) ExecuteLocalCommand(commandStr string) (string, error) {
+	return "", nil
+}
+
+//
+//
+// Create a quick cluster of information
+//
+//
+func makeCluster() *utils.Cluster {
+	segments := map[int]cluster.SegConfig{
+		1: cluster.SegConfig{
+			DbID:      100,
+			ContentID: -1,
+			Port:      8000,
+			Hostname:  "somehost",
+			DataDir:   "/some/data/dir",
+		},
+	}
+
+	c := &utils.Cluster{
+		&cluster.Cluster{
+			ContentIDs: []int{1},
+			Primaries:  segments,
+		},
+		"",
+		dbconn.GPDBVersion{},
+	}
+
+	return c
 }

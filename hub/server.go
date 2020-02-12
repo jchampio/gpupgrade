@@ -13,6 +13,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/greenplum-db/gpupgrade/step"
+
 	"github.com/greenplum-db/gp-common-go-libs/gplog"
 	"github.com/hashicorp/go-multierror"
 	"github.com/pkg/errors"
@@ -399,4 +401,15 @@ func (s *Server) SaveConfig() (err error) {
 	}
 
 	return nil
+}
+
+func (s *Server) NewSubstepStateStore(stepName string) (step.Store, error) {
+	statusPath, err := getStatusFile(s.StateDir)
+
+	if err != nil {
+		return nil, xerrors.Errorf("step %q: %w", stepName, err)
+	}
+
+	substepStateStore := step.NewFileStore(statusPath)
+	return substepStateStore, nil
 }

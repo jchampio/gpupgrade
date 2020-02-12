@@ -2,6 +2,7 @@ package utils
 
 import (
 	"fmt"
+	"path/filepath"
 
 	"github.com/greenplum-db/gp-common-go-libs/dbconn"
 	"github.com/pkg/errors"
@@ -114,4 +115,16 @@ func (c Cluster) SegmentsOn(hostname string) ([]cluster.SegConfig, error) {
 	}
 
 	return segments, nil
+}
+
+func (c *Cluster) StandbyPort() string {
+	return "6101"
+}
+
+func (c *Cluster) StandbyHostname() string {
+	return "localhost"
+}
+
+func (c *Cluster) StandbyDataDirectory() string {
+	return filepath.Join(c.MasterDataDir(), "..", "..", "standby")
 }

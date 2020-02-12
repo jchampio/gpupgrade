@@ -55,6 +55,7 @@ enum Substep {
     UPGRADE_PRIMARIES = 11;
     START_TARGET_CLUSTER = 12;
     RECONFIGURE_PORTS = 13;
+    UPGRADE_STANDBY = 14;
 }
 
 enum Status {

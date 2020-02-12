@@ -18,7 +18,7 @@ import (
 	"github.com/greenplum-db/gpupgrade/step"
 )
 
-func BeginStep(stateDir string, name string, sender idl.MessageSender) (*step.Step, error) {
+func BeginStep(stateDir string, name string, sender idl.MessageSender, substepStateStore step.Store) (*step.Step, error) {
 	path := filepath.Join(stateDir, fmt.Sprintf("%s.log", name))
 	log, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0600)
 	if err != nil {
@@ -31,13 +31,8 @@ func BeginStep(stateDir string, name string, sender idl.MessageSender) (*step.St
 		return nil, xerrors.Errorf(`logging step "%s": %w`, name, err)
 	}
 
-	statusPath, err := getStatusFile(stateDir)
-	if err != nil {
-		return nil, xerrors.Errorf("step %q: %w", name, err)
-	}
-
 	streams := newMultiplexedStream(sender, log)
-	return step.New(name, sender, step.NewFileStore(statusPath), streams), nil
+	return step.New(name, sender, substepStateStore, streams), nil
 }
 
 // Returns path to status file, and if one does not exist it creates an empty
@@ -91,6 +86,7 @@ func newMultiplexedStream(stream idl.MessageSender, writer io.Writer) *multiplex
 		multiplexedStream: m,
 		cType:             idl.Chunk_STDOUT,
 	}
+
 	m.stderr = &streamWriter{
 		multiplexedStream: m,
 		cType:             idl.Chunk_STDERR,

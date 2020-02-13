@@ -41,7 +41,6 @@ var indicators = map[idl.Status]string{
 }
 
 func Initialize(client idl.CliToHubClient, request *idl.InitializeRequest, verbose bool) (err error) {
-
 	stream, err := client.Initialize(context.Background(), request)
 	if err != nil {
 		return errors.Wrap(err, "initializing hub")
@@ -55,11 +54,10 @@ func Initialize(client idl.CliToHubClient, request *idl.InitializeRequest, verbo
 	return nil
 }
 
-func InitializeCreateCluster(client idl.CliToHubClient, verbose bool, ports []uint32) (err error) {
+func InitializeCreateCluster(client idl.CliToHubClient, verbose bool) (err error) {
 	stream, err := client.InitializeCreateCluster(context.Background(),
-		&idl.InitializeCreateClusterRequest{
-			Ports: ports,
-		})
+		&idl.InitializeCreateClusterRequest{},
+	)
 	if err != nil {
 		return errors.Wrap(err, "initializing hub2")
 	}

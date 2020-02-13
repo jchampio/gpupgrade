@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 
 	"github.com/greenplum-db/gp-common-go-libs/gplog"
 	"github.com/hashicorp/go-multierror"
@@ -72,26 +73,11 @@ func (s *Server) InitializeCreateCluster(in *idl.InitializeCreateClusterRequest,
 	}()
 
 	st.Run(idl.Substep_CREATE_TARGET_CONFIG, func(_ step.OutStreams) error {
-		var err error
-		targetMasterPort, err := s.GenerateInitsystemConfig(in.Ports)
-		if err != nil {
-			return err
-		}
-
-		// target master port is used for querying segment configuration.
-		// once the target master port is decided, it's persisted in hub configuration
-		// to allow further steps to use it in case they are being re-run after a failed
-		// attempt.
-		s.Config.TargetMasterPort = targetMasterPort
-		if err := s.SaveConfig(); err != nil {
-			return err
-		}
-
-		return err
+		return s.GenerateInitsystemConfig(s.TargetPorts)
 	})
 
 	st.Run(idl.Substep_INIT_TARGET_CLUSTER, func(stream step.OutStreams) error {
-		return s.CreateTargetCluster(stream, s.Config.TargetMasterPort)
+		return s.CreateTargetCluster(stream, s.TargetPorts[0])
 	})
 
 	st.Run(idl.Substep_SHUTDOWN_TARGET_CLUSTER, func(stream step.OutStreams) error {
@@ -125,11 +111,81 @@ func (s *Server) fillClusterConfigsSubStep(_ step.OutStreams, request *idl.Initi
 	s.Target = &utils.Cluster{Cluster: new(cluster.Cluster), BinDir: request.TargetBinDir}
 	s.UseLinkMode = request.UseLinkMode
 
+	s.TargetPorts, err = assignPorts(s.Source, request.Ports)
+	if err != nil {
+		return err
+	}
+
 	if err := s.SaveConfig(); err != nil {
 		return err
 	}
 
 	return nil
+}
+
+func assignPorts(source *utils.Cluster, ports []uint32) ([]int, error) {
+	var intPorts []int
+	for _, p := range ports {
+		intPorts = append(intPorts, int(p))
+	}
+
+	if len(intPorts) == 0 {
+		intPorts = defaultTargetPorts(source)
+	}
+
+	return sanitize(intPorts), nil
+}
+
+// sanitize sorts and deduplicates a slice of port numbers.
+func sanitize(ports []int) []int {
+	sort.Slice(ports, func(i, j int) bool { return ports[i] < ports[j] })
+
+	dedupe := ports[:0] // point at the same backing array
+
+	var last int
+	for i, port := range ports {
+		if i == 0 || port != last {
+			dedupe = append(dedupe, port)
+		}
+		last = port
+	}
+
+	return dedupe
+}
+
+// defaultPorts generates the minimum temporary port range necessary to handle a
+// cluster of the given topology. The first port in the list is meant to be used
+// for the master.
+func defaultTargetPorts(source *utils.Cluster) []int {
+	// Partition segments by host in order to correctly assign ports.
+	segmentsByHost := make(map[string][]cluster.SegConfig)
+
+	for content, segment := range source.Primaries {
+		// Exclude the master for now. We want to give it its own reserved port,
+		// which does not overlap with the other segments, so we'll add it back
+		// later.
+		if content == -1 {
+			continue
+		}
+		segmentsByHost[segment.Hostname] = append(segmentsByHost[segment.Hostname], segment)
+	}
+
+	// Start with the pg_upgrade default of 50432. Reserve enough ports to
+	// handle the host with the most segments.
+	var maxSegs int
+	for _, segments := range segmentsByHost {
+		if len(segments) > maxSegs {
+			maxSegs = len(segments)
+		}
+	}
+
+	var ports []int
+	// Add 1 for the reserved master port
+	for i := 0; i < maxSegs+1; i++ {
+		ports = append(ports, 50432+i)
+	}
+
+	return ports
 }
 
 func getAgentPath() (string, error) {

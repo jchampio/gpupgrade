@@ -83,21 +83,12 @@ func TestGetCheckpointSegmentsAndEncoding(t *testing.T) {
 }
 
 func TestWriteSegmentArray(t *testing.T) {
-	test := func(t *testing.T, cluster *utils.Cluster, ports []uint32, expected []string) {
+	test := func(t *testing.T, cluster *utils.Cluster, ports []int, expected []string) {
 		t.Helper()
 
-		actual, masterPort, err := WriteSegmentArray([]string{}, cluster, ports)
+		actual, err := WriteSegmentArray([]string{}, cluster, ports)
 		if err != nil {
 			t.Errorf("got %#v", err)
-		}
-
-		expectedPort := uint32(50432)
-		if len(ports) > 0 {
-			expectedPort = ports[0]
-		}
-
-		if uint32(masterPort) != expectedPort {
-			t.Errorf("returned master port %d, want %d", masterPort, expectedPort)
 		}
 
 		if !reflect.DeepEqual(actual, expected) {
@@ -123,7 +114,7 @@ func TestWriteSegmentArray(t *testing.T) {
 			{ContentID: 0, DbID: 2, Hostname: "sdw1", DataDir: "/data/dbfast1/seg1", Role: "p"},
 			{ContentID: 1, DbID: 3, Hostname: "sdw2", DataDir: "/data/dbfast2/seg2", Role: "p"},
 		})
-		ports := []uint32{15433, 15434}
+		ports := []int{15433, 15434}
 
 		test(t, cluster, ports, []string{
 			"QD_PRIMARY_ARRAY=mdw~15433~/data/qddir_upgrade/seg-1~1~-1~0",
@@ -140,7 +131,7 @@ func TestWriteSegmentArray(t *testing.T) {
 			{ContentID: 0, DbID: 2, Hostname: "sdw1", DataDir: "/data/dbfast1/seg1", Role: "p"},
 			{ContentID: 1, DbID: 3, Hostname: "sdw1", DataDir: "/data/dbfast2/seg2", Role: "p"},
 		})
-		ports := []uint32{15433, 25432, 25433}
+		ports := []int{15433, 25432, 25433}
 
 		test(t, cluster, ports, []string{
 			"QD_PRIMARY_ARRAY=mdw~15433~/data/qddir_upgrade/seg-1~1~-1~0",
@@ -157,7 +148,7 @@ func TestWriteSegmentArray(t *testing.T) {
 			{ContentID: 0, DbID: 2, Hostname: "mdw", DataDir: "/data/dbfast1/seg1", Role: "p"},
 			{ContentID: 1, DbID: 3, Hostname: "mdw", DataDir: "/data/dbfast2/seg2", Role: "p"},
 		})
-		ports := []uint32{10, 9, 10, 9, 10, 8}
+		ports := []int{10, 9, 10, 9, 10, 8}
 
 		test(t, cluster, ports, []string{
 			"QD_PRIMARY_ARRAY=mdw~8~/data/qddir_upgrade/seg-1~1~-1~0",
@@ -176,7 +167,7 @@ func TestWriteSegmentArray(t *testing.T) {
 			{ContentID: 2, DbID: 4, Hostname: "sdw1", DataDir: "/data/dbfast3/seg3", Role: "p"},
 		})
 
-		test(t, cluster, []uint32{}, []string{
+		test(t, cluster, []int{}, []string{
 			"QD_PRIMARY_ARRAY=mdw~50432~/data/qddir_upgrade/seg-1~1~-1~0",
 			"declare -a PRIMARY_ARRAY=(",
 			"\tmdw~50433~/data/dbfast1_upgrade/seg1~2~0~0",
@@ -190,9 +181,9 @@ func TestWriteSegmentArray(t *testing.T) {
 		cluster := MustCreateCluster(t, []cluster.SegConfig{
 			{ContentID: 0, DbID: 2, Hostname: "sdw1", DataDir: "/data/dbfast1/seg1", Role: "p"},
 		})
-		ports := []uint32{15433}
+		ports := []int{15433}
 
-		_, _, err := WriteSegmentArray([]string{}, cluster, ports)
+		_, err := WriteSegmentArray([]string{}, cluster, ports)
 		if err == nil {
 			t.Errorf("expected error got nil")
 		}
@@ -204,9 +195,9 @@ func TestWriteSegmentArray(t *testing.T) {
 			{ContentID: 0, DbID: 2, Hostname: "mdw", DataDir: "/data/dbfast1/seg1", Role: "p"},
 			{ContentID: 1, DbID: 3, Hostname: "mdw", DataDir: "/data/dbfast2/seg2", Role: "p"},
 		})
-		ports := []uint32{15433}
+		ports := []int{15433}
 
-		_, _, err := WriteSegmentArray([]string{}, cluster, ports)
+		_, err := WriteSegmentArray([]string{}, cluster, ports)
 		if err == nil {
 			t.Errorf("expected error got nil")
 		}
@@ -218,9 +209,9 @@ func TestWriteSegmentArray(t *testing.T) {
 			{ContentID: 0, DbID: 2, Hostname: "sdw1", DataDir: "/data/dbfast1/seg1", Role: "p"},
 			{ContentID: 1, DbID: 3, Hostname: "sdw1", DataDir: "/data/dbfast2/seg2", Role: "p"},
 		})
-		ports := []uint32{15433, 25432}
+		ports := []int{15433, 25432}
 
-		_, _, err := WriteSegmentArray([]string{}, cluster, ports)
+		_, err := WriteSegmentArray([]string{}, cluster, ports)
 		if err == nil {
 			t.Errorf("expected error got nil")
 		}

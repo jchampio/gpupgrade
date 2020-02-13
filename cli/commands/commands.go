@@ -293,6 +293,7 @@ This step can be reverted.
 				TargetBinDir: targetBinDir,
 				SourcePort:   int32(sourcePort),
 				UseLinkMode:  linkMode,
+				Ports:        ports,
 			}
 			err = commanders.Initialize(client, request, verbose)
 			if err != nil {
@@ -308,7 +309,7 @@ This step can be reverted.
 				return nil
 			}
 
-			err = commanders.InitializeCreateCluster(client, verbose, ports)
+			err = commanders.InitializeCreateCluster(client, verbose)
 			if err != nil {
 				return errors.Wrap(err, "initializing cluster")
 			}

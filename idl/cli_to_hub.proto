@@ -20,10 +20,9 @@ message InitializeRequest {
     string targetBinDir = 2;
     int32 sourcePort = 3;
     bool useLinkMode = 4;
+    repeated uint32 ports = 5;
 }
-message InitializeCreateClusterRequest {
-    repeated uint32 ports = 1;
-}
+message InitializeCreateClusterRequest {}
 message ExecuteRequest {}
 message FinalizeRequest {}
 

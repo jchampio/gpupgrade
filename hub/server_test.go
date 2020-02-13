@@ -51,7 +51,7 @@ var _ = Describe("Hub", func() {
 		agentA, mockDialer, hubToAgentPort = mock_agent.NewMockAgentServer()
 		source, target = testutils.CreateMultinodeSampleClusterPair("/tmp")
 		useLinkMode = false
-		conf = &hub.Config{source, target, cliToHubPort, hubToAgentPort, useLinkMode, 50432}
+		conf = &hub.Config{source, target, []int{50432}, cliToHubPort, hubToAgentPort, useLinkMode}
 	})
 
 	AfterEach(func() {
@@ -189,7 +189,7 @@ var _ = Describe("Hub", func() {
 func TestHubSaveConfig(t *testing.T) {
 	source, target := testutils.CreateMultinodeSampleClusterPair("/tmp")
 	useLinkMode := false
-	conf := &hub.Config{source, target, 12345, 54321, useLinkMode, 50432}
+	conf := &hub.Config{source, target, []int{50432}, 12345, 54321, useLinkMode}
 
 	h := hub.New(conf, nil, "")
 

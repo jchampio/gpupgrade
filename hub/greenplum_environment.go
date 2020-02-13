@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os/exec"
 	"path/filepath"
+
+	"github.com/kballard/go-shellquote"
 )
 
 type GreenplumEnv interface {
@@ -27,11 +29,12 @@ func (e *greenplumEnv) MasterPort() int {
 }
 
 func (e *greenplumEnv) Run(utilityName string, arguments ...string) error {
-	commandAsString := exec.Command(
-		filepath.Join(e.binDir, utilityName), arguments...,
-	).String()
+	path := filepath.Join(e.binDir, utilityName)
 
-	withGreenplumPath := fmt.Sprintf("source %s/../greenplum_path.sh && %s", e.binDir, commandAsString)
+	arguments = append([]string{path}, arguments...)
+	script := shellquote.Join(arguments...)
+
+	withGreenplumPath := fmt.Sprintf("source %s/../greenplum_path.sh && %s", e.binDir, script)
 
 	command := exec.Command("bash", "-c", withGreenplumPath)
 	command.Env = append(command.Env, fmt.Sprintf("%v=%v", "MASTER_DATA_DIRECTORY", e.masterDataDirectory))
@@ -39,7 +42,7 @@ func (e *greenplumEnv) Run(utilityName string, arguments ...string) error {
 	output, err := command.CombinedOutput()
 
 	fmt.Printf("Master data directory, %v\n", e.masterDataDirectory)
-	fmt.Printf("%s: %s \n", command.String(), string(output))
+	fmt.Printf("%s: %s \n", script, string(output))
 
 	return err
 }

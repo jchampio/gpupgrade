@@ -135,6 +135,14 @@
 
 [[projects]]
   branch = "master"
+  digest = "1:400e113a367b511b9b09ca642ee11d9885485a93838526d697033af334a2fdde"
+  name = "github.com/kballard/go-shellquote"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "95032a82bc518f77982ea72343cc1ade730072f0"
+
+[[projects]]
+  branch = "master"
   digest = "1:ee780c2838219eedc4146248ddf9b82bb6a4a344425ee1aeb9f0d6eb8435614d"
   name = "github.com/lib/pq"
   packages = [
@@ -396,6 +404,7 @@
     "github.com/greenplum-db/gp-common-go-libs/gplog",
     "github.com/greenplum-db/gp-common-go-libs/testhelper",
     "github.com/hashicorp/go-multierror",
+    "github.com/kballard/go-shellquote",
     "github.com/lib/pq",
     "github.com/onsi/ginkgo",
     "github.com/onsi/gomega",

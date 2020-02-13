@@ -83,7 +83,7 @@ func TestGetCheckpointSegmentsAndEncoding(t *testing.T) {
 }
 
 func TestWriteSegmentArray(t *testing.T) {
-	test := func(t *testing.T, cluster *utils.Cluster, ports []int, expected []string) {
+	test := func(t *testing.T, cluster *utils.Cluster, ports PortAssignments, expected []string) {
 		t.Helper()
 
 		actual, err := WriteSegmentArray([]string{}, cluster, ports)
@@ -114,7 +114,7 @@ func TestWriteSegmentArray(t *testing.T) {
 			{ContentID: 0, DbID: 2, Hostname: "sdw1", DataDir: "/data/dbfast1/seg1", Role: "p"},
 			{ContentID: 1, DbID: 3, Hostname: "sdw2", DataDir: "/data/dbfast2/seg2", Role: "p"},
 		})
-		ports := []int{15433, 15434}
+		ports := PortAssignments{15433, []int{15434}}
 
 		test(t, cluster, ports, []string{
 			"QD_PRIMARY_ARRAY=mdw~15433~/data/qddir_upgrade/seg-1~1~-1~0",
@@ -131,7 +131,7 @@ func TestWriteSegmentArray(t *testing.T) {
 			{ContentID: 0, DbID: 2, Hostname: "sdw1", DataDir: "/data/dbfast1/seg1", Role: "p"},
 			{ContentID: 1, DbID: 3, Hostname: "sdw1", DataDir: "/data/dbfast2/seg2", Role: "p"},
 		})
-		ports := []int{15433, 25432, 25433}
+		ports := PortAssignments{15433, []int{25432, 25433}}
 
 		test(t, cluster, ports, []string{
 			"QD_PRIMARY_ARRAY=mdw~15433~/data/qddir_upgrade/seg-1~1~-1~0",
@@ -142,74 +142,11 @@ func TestWriteSegmentArray(t *testing.T) {
 		})
 	})
 
-	t.Run("sorts and deduplicates provided port range", func(t *testing.T) {
-		cluster := MustCreateCluster(t, []cluster.SegConfig{
-			{ContentID: -1, DbID: 1, Hostname: "mdw", DataDir: "/data/qddir/seg-1", Role: "p"},
-			{ContentID: 0, DbID: 2, Hostname: "mdw", DataDir: "/data/dbfast1/seg1", Role: "p"},
-			{ContentID: 1, DbID: 3, Hostname: "mdw", DataDir: "/data/dbfast2/seg2", Role: "p"},
-		})
-		ports := []int{10, 9, 10, 9, 10, 8}
-
-		test(t, cluster, ports, []string{
-			"QD_PRIMARY_ARRAY=mdw~8~/data/qddir_upgrade/seg-1~1~-1~0",
-			"declare -a PRIMARY_ARRAY=(",
-			"\tmdw~9~/data/dbfast1_upgrade/seg1~2~0~0",
-			"\tmdw~10~/data/dbfast2_upgrade/seg2~3~1~0",
-			")",
-		})
-	})
-
-	t.Run("uses default port range when port list is empty", func(t *testing.T) {
-		cluster := MustCreateCluster(t, []cluster.SegConfig{
-			{ContentID: -1, DbID: 1, Hostname: "mdw", DataDir: "/data/qddir/seg-1", Role: "p"},
-			{ContentID: 0, DbID: 2, Hostname: "mdw", DataDir: "/data/dbfast1/seg1", Role: "p"},
-			{ContentID: 1, DbID: 3, Hostname: "mdw", DataDir: "/data/dbfast2/seg2", Role: "p"},
-			{ContentID: 2, DbID: 4, Hostname: "sdw1", DataDir: "/data/dbfast3/seg3", Role: "p"},
-		})
-
-		test(t, cluster, []int{}, []string{
-			"QD_PRIMARY_ARRAY=mdw~50432~/data/qddir_upgrade/seg-1~1~-1~0",
-			"declare -a PRIMARY_ARRAY=(",
-			"\tmdw~50433~/data/dbfast1_upgrade/seg1~2~0~0",
-			"\tmdw~50434~/data/dbfast2_upgrade/seg2~3~1~0",
-			"\tsdw1~50433~/data/dbfast3_upgrade/seg3~4~2~0",
-			")",
-		})
-	})
-
 	t.Run("errors when old cluster contains no master segment", func(t *testing.T) {
 		cluster := MustCreateCluster(t, []cluster.SegConfig{
 			{ContentID: 0, DbID: 2, Hostname: "sdw1", DataDir: "/data/dbfast1/seg1", Role: "p"},
 		})
-		ports := []int{15433}
-
-		_, err := WriteSegmentArray([]string{}, cluster, ports)
-		if err == nil {
-			t.Errorf("expected error got nil")
-		}
-	})
-
-	t.Run("errors when not given enough ports (single host)", func(t *testing.T) {
-		cluster := MustCreateCluster(t, []cluster.SegConfig{
-			{ContentID: -1, DbID: 1, Hostname: "mdw", DataDir: "/data/qddir/seg-1", Role: "p"},
-			{ContentID: 0, DbID: 2, Hostname: "mdw", DataDir: "/data/dbfast1/seg1", Role: "p"},
-			{ContentID: 1, DbID: 3, Hostname: "mdw", DataDir: "/data/dbfast2/seg2", Role: "p"},
-		})
-		ports := []int{15433}
-
-		_, err := WriteSegmentArray([]string{}, cluster, ports)
-		if err == nil {
-			t.Errorf("expected error got nil")
-		}
-	})
-
-	t.Run("errors when not given enough ports (multiple hosts)", func(t *testing.T) {
-		cluster := MustCreateCluster(t, []cluster.SegConfig{
-			{ContentID: -1, DbID: 1, Hostname: "mdw", DataDir: "/data/qddir/seg-1", Role: "p"},
-			{ContentID: 0, DbID: 2, Hostname: "sdw1", DataDir: "/data/dbfast1/seg1", Role: "p"},
-			{ContentID: 1, DbID: 3, Hostname: "sdw1", DataDir: "/data/dbfast2/seg2", Role: "p"},
-		})
-		ports := []int{15433, 25432}
+		ports := PortAssignments{15433, []int{15434}}
 
 		_, err := WriteSegmentArray([]string{}, cluster, ports)
 		if err == nil {

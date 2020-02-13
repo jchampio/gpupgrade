@@ -73,11 +73,11 @@ func (s *Server) InitializeCreateCluster(in *idl.InitializeCreateClusterRequest,
 	}()
 
 	st.Run(idl.Substep_CREATE_TARGET_CONFIG, func(_ step.OutStreams) error {
-		return s.GenerateInitsystemConfig(s.TargetPorts)
+		return s.GenerateInitsystemConfig()
 	})
 
 	st.Run(idl.Substep_INIT_TARGET_CLUSTER, func(stream step.OutStreams) error {
-		return s.CreateTargetCluster(stream, s.TargetPorts[0])
+		return s.CreateTargetCluster(stream)
 	})
 
 	st.Run(idl.Substep_SHUTDOWN_TARGET_CLUSTER, func(stream step.OutStreams) error {
@@ -111,7 +111,12 @@ func (s *Server) fillClusterConfigsSubStep(_ step.OutStreams, request *idl.Initi
 	s.Target = &utils.Cluster{Cluster: new(cluster.Cluster), BinDir: request.TargetBinDir}
 	s.UseLinkMode = request.UseLinkMode
 
-	s.TargetPorts, err = assignPorts(s.Source, request.Ports)
+	ports := make([]int, len(request.Ports))
+	for _, p := range request.Ports {
+		ports = append(ports, int(p))
+	}
+
+	s.TargetPorts, err = assignPorts(s.Source, ports)
 	if err != nil {
 		return err
 	}
@@ -123,17 +128,17 @@ func (s *Server) fillClusterConfigsSubStep(_ step.OutStreams, request *idl.Initi
 	return nil
 }
 
-func assignPorts(source *utils.Cluster, ports []uint32) ([]int, error) {
-	var intPorts []int
-	for _, p := range ports {
-		intPorts = append(intPorts, int(p))
+func assignPorts(source *utils.Cluster, ports []int) (PortAssignments, error) {
+	if len(ports) == 0 {
+		return defaultTargetPorts(source), nil
 	}
 
-	if len(intPorts) == 0 {
-		intPorts = defaultTargetPorts(source)
+	ports = sanitize(ports)
+	if err := checkTargetPorts(source, ports); err != nil {
+		return PortAssignments{}, err
 	}
 
-	return sanitize(intPorts), nil
+	return PortAssignments{Master: ports[0], Primaries: ports[1:]}, nil
 }
 
 // sanitize sorts and deduplicates a slice of port numbers.
@@ -156,7 +161,7 @@ func sanitize(ports []int) []int {
 // defaultPorts generates the minimum temporary port range necessary to handle a
 // cluster of the given topology. The first port in the list is meant to be used
 // for the master.
-func defaultTargetPorts(source *utils.Cluster) []int {
+func defaultTargetPorts(source *utils.Cluster) PortAssignments {
 	// Partition segments by host in order to correctly assign ports.
 	segmentsByHost := make(map[string][]cluster.SegConfig)
 
@@ -185,7 +190,31 @@ func defaultTargetPorts(source *utils.Cluster) []int {
 		ports = append(ports, 50432+i)
 	}
 
-	return ports
+	return PortAssignments{Master: ports[0], Primaries: ports[1:]}
+}
+
+// checkTargetPorts ensures that the temporary port range passed by the user has
+// enough ports to cover a cluster of the given topology. This function assumes
+// the port list has at least one port.
+func checkTargetPorts(source *utils.Cluster, desiredPorts []int) error {
+	segmentsByHost := make(map[string][]cluster.SegConfig)
+
+	for content, segment := range source.Primaries {
+		// Exclude the master; it's taken care of with the first port.
+		if content == -1 {
+			continue
+		}
+		segmentsByHost[segment.Hostname] = append(segmentsByHost[segment.Hostname], segment)
+	}
+
+	numSegmentPorts := len(desiredPorts[1:])
+	for _, segments := range segmentsByHost {
+		if numSegmentPorts < len(segments) {
+			return errors.New("not enough ports for each segment")
+		}
+	}
+
+	return nil
 }
 
 func getAgentPath() (string, error) {

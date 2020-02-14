@@ -7,18 +7,15 @@ import (
 	"os"
 	"testing"
 
-	"github.com/greenplum-db/gp-common-go-libs/dbconn"
+	"github.com/greenplum-db/gp-common-go-libs/gplog"
 	"google.golang.org/grpc/metadata"
 
-	"github.com/greenplum-db/gpupgrade/idl"
-	"github.com/greenplum-db/gpupgrade/utils"
-	"github.com/greenplum-db/gpupgrade/utils/cluster"
-
-	"github.com/greenplum-db/gp-common-go-libs/gplog"
-
 	"github.com/greenplum-db/gpupgrade/hub"
+	"github.com/greenplum-db/gpupgrade/idl"
+	"github.com/greenplum-db/gpupgrade/utils/cluster"
 )
 
+// TODO: this seems like a very expensive integration test.
 func TestFinalize(t *testing.T) {
 	numberOfSubsteps := 2
 
@@ -44,13 +41,24 @@ func TestFinalize(t *testing.T) {
 			return nil
 		})
 
-		source = makeCluster(8888, "", "")
-		target = makeCluster(9999, "some-target-hostname", "/some/target/master/data/dir")
+		source = hub.MustCreateCluster(t, []cluster.SegConfig{
+			{ContentID: -1, Port: 7890, Hostname: "somehost", DataDir: "/some/dir", Role: "p"},
+			{ContentID: -1, Port: 8888, Hostname: "some-target-hostname",
+				DataDir: "/some/target/master/data/dir", Role: "m"},
+		})
+		target = hub.MustCreateCluster(t, []cluster.SegConfig{
+			{ContentID: -1, Port: 7890, Hostname: "somehost", DataDir: "/some/dir", Role: "p"},
+		})
 
+		conf := &hub.Config{
+			Source:      source,
+			Target:      target,
+			TargetPorts: hub.PortAssignments{Standby: 9999},
+		}
 		stream := &spyStream{}
 		substepStateStore := &stubStore{}
 
-		err = hub.Finalize(tempDir, source, target, stream, substepStateStore)
+		err = hub.Finalize(tempDir, conf, stream, substepStateStore)
 
 		if err != nil {
 			t.Errorf("unexpected error during Finalize: %v", err)
@@ -110,13 +118,20 @@ func TestFinalize(t *testing.T) {
 			return errors.New("failed")
 		})
 
-		source = makeCluster(0, "", "")
-		target = makeCluster(0, "", "")
+		source = hub.MustCreateCluster(t, []cluster.SegConfig{
+			{ContentID: -1, Port: 7890, Hostname: "somehost", DataDir: "/some/dir", Role: "p"},
+			{ContentID: -1, Port: 0, Hostname: "", DataDir: "", Role: "m"},
+		})
+		target = hub.MustCreateCluster(t, []cluster.SegConfig{
+			{ContentID: -1, Port: 7890, Hostname: "somehost", DataDir: "/some/dir", Role: "p"},
+		})
+
+		conf := &hub.Config{Source: source, Target: target}
 		stream := &spyStream{}
 		substepStore := &stubStore{}
 		substepStore.stubRead(idl.Status_UNKNOWN_STATUS, nil)
 
-		err = hub.Finalize(tempDir, source, target, stream, substepStore)
+		err = hub.Finalize(tempDir, conf, stream, substepStore)
 
 		if err == nil {
 			t.Error("got nil error for finalize, but expected it to fail during upgrade standby")
@@ -219,43 +234,4 @@ type dummyExecutor struct {
 
 func (d *dummyExecutor) ExecuteLocalCommand(commandStr string) (string, error) {
 	return "", nil
-}
-
-//
-//
-// Create a quick cluster of information
-//
-//
-func makeCluster(port int, hostname string, dataDir string) *utils.Cluster {
-	primaries := map[int]cluster.SegConfig{
-		-1: cluster.SegConfig{
-			DbID:      100,
-			ContentID: -1,
-			Port:      7890,
-			Hostname:  "somehost",
-			DataDir:   "/some/dir",
-		},
-	}
-
-	mirrors := map[int]cluster.SegConfig{
-		-1: cluster.SegConfig{
-			DbID:      100,
-			ContentID: -1,
-			Port:      port,
-			Hostname:  hostname,
-			DataDir:   dataDir,
-		},
-	}
-
-	c := &utils.Cluster{
-		&cluster.Cluster{
-			ContentIDs: []int{1},
-			Primaries:  primaries,
-			Mirrors:    mirrors,
-		},
-		"",
-		dbconn.GPDBVersion{},
-	}
-
-	return c
 }

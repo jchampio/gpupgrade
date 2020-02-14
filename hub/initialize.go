@@ -175,8 +175,17 @@ func defaultTargetPorts(source *utils.Cluster) PortAssignments {
 		segmentsByHost[segment.Hostname] = append(segmentsByHost[segment.Hostname], segment)
 	}
 
-	// Start with the pg_upgrade default of 50432. Reserve enough ports to
-	// handle the host with the most segments.
+	const masterPort = 50432
+	nextPort := masterPort + 1
+
+	var standbyPort int
+	if _, ok := source.Mirrors[-1]; ok {
+		// Reserve another port for the standby.
+		standbyPort = nextPort
+		nextPort++
+	}
+
+	// Reserve enough ports to handle the host with the most segments.
 	var maxSegs int
 	for _, segments := range segmentsByHost {
 		if len(segments) > maxSegs {
@@ -184,13 +193,17 @@ func defaultTargetPorts(source *utils.Cluster) PortAssignments {
 		}
 	}
 
-	var ports []int
-	// Add 1 for the reserved master port
-	for i := 0; i < maxSegs+1; i++ {
-		ports = append(ports, 50432+i)
+	var primaryPorts []int
+	for i := 0; i < maxSegs; i++ {
+		primaryPorts = append(primaryPorts, nextPort)
+		nextPort++
 	}
 
-	return PortAssignments{Master: ports[0], Primaries: ports[1:]}
+	return PortAssignments{
+		Master:    masterPort,
+		Standby:   standbyPort,
+		Primaries: primaryPorts,
+	}
 }
 
 // checkTargetPorts ensures that the temporary port range passed by the user has

@@ -371,6 +371,7 @@ type Config struct {
 
 type PortAssignments struct {
 	Master    int
+	Standby   int
 	Primaries []int
 }
 

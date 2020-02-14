@@ -53,6 +53,10 @@ func (c *Cluster) MasterPort() int {
 	return c.GetPortForContent(-1)
 }
 
+func (c *Cluster) MasterHostname() string {
+	return c.Primaries[-1].Hostname
+}
+
 func (c *Cluster) StandbyPort() int {
 	return c.Mirrors[-1].Port
 }

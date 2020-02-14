@@ -77,7 +77,7 @@ var rewritePortsInMasterConfigurationFunc = rewritePortsInMasterConfiguration
 func rewritePortsInMasterConfiguration(cluster *utils.Cluster, newPortNumber int) error {
 	script := fmt.Sprintf(
 		"sed 's/port=%d/port=%d/' %[3]s/postgresql.conf > %[3]s/postgresql.conf.updated && "+
-			"mv %[3]s/postgresql.conf %[3]s/postgresql.conf.bak && "+
+			"mv %[3]s/postgresql.conf %[3]s/postgresql.conf.bak && "+ // XXX not atomic! failure here means we lost the .conf
 			"mv %[3]s/postgresql.conf.updated %[3]s/postgresql.conf",
 		cluster.MasterPort(), newPortNumber, cluster.MasterDataDir(),
 	)

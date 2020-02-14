@@ -8,27 +8,14 @@ import (
 	"github.com/kballard/go-shellquote"
 )
 
-type GreenplumEnv interface {
+type GreenplumRunner interface {
+	ShellRunner
 	BinDir() string
 	MasterDataDirectory() string
 	MasterPort() int
-
-	Run(utilityName string, arguments ...string) error
 }
 
-func (e *greenplumEnv) BinDir() string {
-	return e.binDir
-}
-
-func (e *greenplumEnv) MasterDataDirectory() string {
-	return e.masterDataDirectory
-}
-
-func (e *greenplumEnv) MasterPort() int {
-	return e.masterPort
-}
-
-func (e *greenplumEnv) Run(utilityName string, arguments ...string) error {
+func (e *greenplumRunner) Run(utilityName string, arguments ...string) error {
 	path := filepath.Join(e.binDir, utilityName)
 
 	arguments = append([]string{path}, arguments...)
@@ -47,8 +34,20 @@ func (e *greenplumEnv) Run(utilityName string, arguments ...string) error {
 	return err
 }
 
-type greenplumEnv struct {
+type greenplumRunner struct {
 	binDir              string
 	masterDataDirectory string
 	masterPort          int
+}
+
+func (e *greenplumRunner) BinDir() string {
+	return e.binDir
+}
+
+func (e *greenplumRunner) MasterDataDirectory() string {
+	return e.masterDataDirectory
+}
+
+func (e *greenplumRunner) MasterPort() int {
+	return e.masterPort
 }

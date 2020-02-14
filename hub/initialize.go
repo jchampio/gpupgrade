@@ -138,7 +138,22 @@ func assignPorts(source *utils.Cluster, ports []int) (PortAssignments, error) {
 		return PortAssignments{}, err
 	}
 
-	return PortAssignments{Master: ports[0], Primaries: ports[1:]}, nil
+	// Pop the first port off for master.
+	masterPort := ports[0]
+	ports = ports[1:]
+
+	var standbyPort int
+	if _, ok := source.Mirrors[-1]; ok {
+		// Pop the next port off for standby.
+		standbyPort = ports[0]
+		ports = ports[1:]
+	}
+
+	return PortAssignments{
+		Master:    masterPort,
+		Standby:   standbyPort,
+		Primaries: ports,
+	}, nil
 }
 
 // sanitize sorts and deduplicates a slice of port numbers.
@@ -210,7 +225,15 @@ func defaultTargetPorts(source *utils.Cluster) PortAssignments {
 // enough ports to cover a cluster of the given topology. This function assumes
 // the port list has at least one port.
 func checkTargetPorts(source *utils.Cluster, desiredPorts []int) error {
+	if len(desiredPorts) == 0 {
+		// failed precondition
+		panic("checkTargetPorts() must be called with at least one port")
+	}
+
 	segmentsByHost := make(map[string][]cluster.SegConfig)
+
+	numAvailablePorts := len(desiredPorts)
+	numAvailablePorts-- // master always takes one
 
 	for content, segment := range source.Primaries {
 		// Exclude the master; it's taken care of with the first port.
@@ -220,9 +243,13 @@ func checkTargetPorts(source *utils.Cluster, desiredPorts []int) error {
 		segmentsByHost[segment.Hostname] = append(segmentsByHost[segment.Hostname], segment)
 	}
 
-	numSegmentPorts := len(desiredPorts[1:])
+	if _, ok := source.Mirrors[-1]; ok {
+		// The standby will take a port from the pool.
+		numAvailablePorts--
+	}
+
 	for _, segments := range segmentsByHost {
-		if numSegmentPorts < len(segments) {
+		if numAvailablePorts < len(segments) {
 			return errors.New("not enough ports for each segment")
 		}
 	}

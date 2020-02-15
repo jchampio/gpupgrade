@@ -44,7 +44,9 @@ func clonePortsFromCluster(db *sql.DB, src *cluster.Cluster) (err error) {
 			return err
 		}
 
-		if mirror, ok := src.Mirrors[content]; ok {
+		// TODO: allow all mirrors into this code. For now we only allow
+		// standbys.
+		if mirror, ok := src.Mirrors[content]; ok && content == -1 {
 			err := updatePort(tx, mirror)
 			if err != nil {
 				return err

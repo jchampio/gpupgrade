@@ -43,7 +43,6 @@ teardown() {
 }
 
 @test "finalize modifies ports on the live target cluster" {
-
     # To avoid spinning up an entire upgrade just to test finalize, we instead
     # create a new cluster for the test and fake the configurations to point at
     # it.
@@ -92,10 +91,10 @@ EOF
     [ "$OLD_PORTS" = "$new_ports" ] || fail "actual ports: $new_ports"
 }
 
-# Writes the primary ports from the cluster pointed to by $PGPORT to stdout, one
-# per line, sorted by content ID.
+# Writes the primary and standby ports from the cluster pointed to by $PGPORT to
+# stdout, one per line, sorted by content ID.
 get_ports() {
     PSQL="$GPHOME"/bin/psql
     $PSQL -At postgres \
-        -c "select port from gp_segment_configuration where role = 'p' order by content"
+        -c "select port from gp_segment_configuration where role = 'p' or content = -1 order by content, role"
 }

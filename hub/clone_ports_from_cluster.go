@@ -39,26 +39,40 @@ func clonePortsFromCluster(db *sql.DB, src *cluster.Cluster) (err error) {
 	}
 
 	for _, content := range src.ContentIDs {
-		port := src.Primaries[content].Port
-		role := src.Primaries[content].Role
-		res, err := tx.Exec("UPDATE gp_segment_configuration SET port = $1 WHERE content = $2 AND role = $3",
-			port, content, role)
+		err := updatePort(tx, src.Primaries[content])
 		if err != nil {
-			return xerrors.Errorf("updating segment configuration: %w", err)
+			return err
 		}
 
-		// We should have updated only one row. More than one implies that
-		// gp_segment_configuration has a primary and a mirror up for a single
-		// content ID, and we can't handle mirrors at this point.
-		rows, err := res.RowsAffected()
-		if err != nil {
-			// An error should only occur here if the driver does not support
-			// this call, and we know that the postgres driver does.
-			panic(fmt.Sprintf("retrieving number of rows updated: %v", err))
+		if mirror, ok := src.Mirrors[content]; ok {
+			err := updatePort(tx, mirror)
+			if err != nil {
+				return err
+			}
 		}
-		if rows != 1 {
-			return xerrors.Errorf("updated %d rows for content %d, expected 1", rows, content)
-		}
+	}
+
+	return nil
+}
+
+func updatePort(tx *sql.Tx, seg cluster.SegConfig) error {
+	res, err := tx.Exec("UPDATE gp_segment_configuration SET port = $1 WHERE content = $2 AND role = $3",
+		seg.Port, seg.ContentID, seg.Role)
+	if err != nil {
+		return xerrors.Errorf("updating segment configuration: %w", err)
+	}
+
+	// We should have updated only one row. More than one implies that
+	// gp_segment_configuration has a primary and a mirror up for a single
+	// content ID, and we can't handle mirrors at this point.
+	rows, err := res.RowsAffected()
+	if err != nil {
+		// An error should only occur here if the driver does not support
+		// this call, and we know that the postgres driver does.
+		panic(fmt.Sprintf("retrieving number of rows updated: %v", err))
+	}
+	if rows != 1 {
+		return xerrors.Errorf("updated %d rows for content %d, expected 1", rows, seg.ContentID)
 	}
 
 	return nil

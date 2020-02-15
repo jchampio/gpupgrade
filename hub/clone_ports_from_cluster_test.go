@@ -38,10 +38,13 @@ func TestClonePortsFromCluster(t *testing.T) {
 	src := &cluster.Cluster{
 		ContentIDs: []int{-1, 0, 1, 2},
 		Primaries: map[int]cluster.SegConfig{
-			-1: cluster.SegConfig{Port: 123, Role: "p"},
-			0:  cluster.SegConfig{Port: 234, Role: "p"},
-			1:  cluster.SegConfig{Port: 345, Role: "p"},
-			2:  cluster.SegConfig{Port: 456, Role: "p"},
+			-1: cluster.SegConfig{ContentID: -1, Port: 123, Role: "p"},
+			0:  cluster.SegConfig{ContentID: 0, Port: 234, Role: "p"},
+			1:  cluster.SegConfig{ContentID: 1, Port: 345, Role: "p"},
+			2:  cluster.SegConfig{ContentID: 2, Port: 456, Role: "p"},
+		},
+		Mirrors: map[int]cluster.SegConfig{
+			-1: cluster.SegConfig{ContentID: -1, Port: 789, Role: "m"},
 		},
 	}
 
@@ -57,6 +60,9 @@ func TestClonePortsFromCluster(t *testing.T) {
 			contents.AddRow(content)
 		}
 
+		//XXX: this will ignore the begin/commit statement order
+		mock.MatchExpectationsInOrder(false)
+
 		mock.ExpectBegin()
 		mock.ExpectQuery("SELECT content FROM gp_segment_configuration").
 			WillReturnRows(contents)
@@ -65,17 +71,21 @@ func TestClonePortsFromCluster(t *testing.T) {
 		// Note that ranging over a map doesn't guarantee execution order, so we
 		// range over the contents instead.
 		for _, content := range src.ContentIDs {
-			conf := src.Primaries[content]
-			mock.ExpectExec("UPDATE gp_segment_configuration SET port = (.+) WHERE content = (.+) AND role = (.+)").
-				WithArgs(conf.Port, content, conf.Role).
+			seg := src.Primaries[content]
+			expectPortUpdate(mock, seg).
 				WillReturnResult(sqlmock.NewResult(0, 1))
+
+			if mirror, ok := src.Mirrors[content]; ok {
+				expectPortUpdate(mock, mirror).
+					WillReturnResult(sqlmock.NewResult(0, 1))
+			}
 		}
 
 		mock.ExpectCommit()
 
 		err = ClonePortsFromCluster(db, src)
 		if err != nil {
-			t.Fatalf("returned error %#v", err)
+			t.Errorf("returned error %+v", err)
 		}
 	})
 
@@ -126,8 +136,7 @@ func TestClonePortsFromCluster(t *testing.T) {
 			mock.ExpectBegin()
 			mock.ExpectQuery("SELECT content FROM gp_segment_configuration").
 				WillReturnRows(contents)
-			mock.ExpectExec("UPDATE gp_segment_configuration SET port = (.+) WHERE content = (.+) AND role = (.+)").
-				WithArgs(src.Primaries[-1].Port, -1, "p").
+			expectPortUpdate(mock, src.Primaries[-1]).
 				WillReturnError(ErrSentinel)
 			mock.ExpectRollback()
 		},
@@ -140,15 +149,21 @@ func TestClonePortsFromCluster(t *testing.T) {
 				contents.AddRow(content)
 			}
 
+			mock.MatchExpectationsInOrder(false) // XXX see above
+
 			mock.ExpectBegin()
 			mock.ExpectQuery("SELECT content FROM gp_segment_configuration").
 				WillReturnRows(contents)
 
 			for _, content := range src.ContentIDs {
-				conf := src.Primaries[content]
-				mock.ExpectExec("UPDATE gp_segment_configuration SET port = (.+) WHERE content = (.+) AND role = (.+)").
-					WithArgs(conf.Port, content, conf.Role).
+				seg := src.Primaries[content]
+				expectPortUpdate(mock, seg).
 					WillReturnResult(sqlmock.NewResult(0, 1))
+
+				if mirror, ok := src.Mirrors[content]; ok {
+					expectPortUpdate(mock, mirror).
+						WillReturnResult(sqlmock.NewResult(0, 1))
+				}
 			}
 
 			mock.ExpectCommit().WillReturnError(ErrSentinel)
@@ -237,7 +252,7 @@ func TestClonePortsFromCluster(t *testing.T) {
 			mock.ExpectQuery("SELECT content FROM gp_segment_configuration").
 				WillReturnRows(contents)
 
-			mock.ExpectExec("UPDATE gp_segment_configuration SET port = (.+) WHERE content = (.+) AND role = (.+)").
+			expectPortUpdate(mock, src.Primaries[-1]).
 				WillReturnResult(sqlmock.NewResult(0, 2))
 
 			mock.ExpectRollback()
@@ -279,4 +294,12 @@ func expect(expected error) func(*testing.T, error) {
 			t.Errorf("returned %#v want %#v", actual, expected)
 		}
 	}
+}
+
+// expectPortUpdate is here so we don't have to copy-paste the expected UPDATE
+// statement everywhere.
+func expectPortUpdate(mock sqlmock.Sqlmock, seg cluster.SegConfig) *sqlmock.ExpectedExec {
+	return mock.ExpectExec(
+		"UPDATE gp_segment_configuration SET port = (.+) WHERE content = (.+) AND role = (.+)",
+	).WithArgs(seg.Port, seg.ContentID, seg.Role)
 }

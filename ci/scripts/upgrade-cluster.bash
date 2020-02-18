@@ -73,6 +73,7 @@ sudo ln -s trampoline pg_upgrade
 sudo ln -s trampoline psql
 sudo ln -s trampoline vacuumdb
 
+sudo ln -s trampoline gpinitstandby
 sudo ln -s trampoline gpinitsystem
 sudo ln -s trampoline gpstart
 EOF

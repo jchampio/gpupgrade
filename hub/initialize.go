@@ -111,7 +111,7 @@ func (s *Server) fillClusterConfigsSubStep(_ step.OutStreams, request *idl.Initi
 	s.Target = &utils.Cluster{Cluster: new(cluster.Cluster), BinDir: request.TargetBinDir}
 	s.UseLinkMode = request.UseLinkMode
 
-	ports := make([]int, len(request.Ports))
+	var ports []int
 	for _, p := range request.Ports {
 		ports = append(ports, int(p))
 	}

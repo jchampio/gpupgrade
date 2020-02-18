@@ -91,17 +91,26 @@ expected_datadir() {
         local newdir="${newdirs[$newport]}"
         (( newport++ ))
 
+        if [ "$newport" = 50433 ]; then
+            # This port should be reserved for the standby, which isn't created
+            # during initialize. Skip it.
+            (( newport++ ))
+        fi
+
         [ -n "$newdir" ] || fail "could not find upgraded segment on expected port $newport"
         [ "$newdir" = $(expected_datadir "$olddir") ]
     done
 }
 
 @test "initialize accepts a port range" {
-    local expected_ports="15432,15433,15434,15435"
+    # Note that 15433 is skipped here and added below. It'll be reserved for the
+    # standby.
+    # XXX as usual in these tests, we assume a standard demo cluster.
+    local expected_ports="15432,15434,15435,15436"
     local newport=15432
 
     gpupgrade initialize \
-        --ports $expected_ports \
+        --ports $expected_ports,15433 \
         --verbose \
         --old-bindir "$GPHOME/bin" \
         --new-bindir "$GPHOME/bin" \
@@ -115,7 +124,9 @@ expected_datadir() {
     PGPORT=$newport gpstart -a -d "$newmasterdir"
 
     # save the actual ports
-    local actual_ports=$($PSQL -At -p $newport postgres -c "select string_agg(port::text, ',' order by content) from gp_segment_configuration")
+    local actual_ports=$($PSQL -At -p $newport postgres -c "
+        select string_agg(port::text, ',' order by content) from gp_segment_configuration
+    ")
 
     # verify ports
     if [ "$expected_ports" != "$actual_ports" ]; then

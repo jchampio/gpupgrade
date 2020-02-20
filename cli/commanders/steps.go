@@ -30,13 +30,14 @@ var lines = map[idl.Substep]string{
 	idl.Substep_COPY_MASTER:                       "Copying master to segments...",
 	idl.Substep_UPGRADE_PRIMARIES:                 "Upgrading segments...",
 	idl.Substep_START_TARGET_CLUSTER:              "Starting new cluster...",
-	idl.Substep_FINALIZE_SHUTDOWN_TARGET_CLUSTER:  "Stopping new cluster",
+	idl.Substep_FINALIZE_SHUTDOWN_TARGET_CLUSTER:  "Stopping new cluster...",
 	idl.Substep_FINALIZE_START_TARGET_MASTER:      "Starting new master...",
 	idl.Substep_FINALIZE_UPDATE_CATALOG_WITH_PORT: "Updating new master with port information...",
 	idl.Substep_FINALIZE_SHUTDOWN_TARGET_MASTER:   "Stopping new master...",
 	idl.Substep_FINALIZE_UPDATE_POSTGRESQL_CONF:   "Updating master postgreql.conf...",
 	idl.Substep_FINALIZE_START_TARGET_CLUSTER:     "Starting new cluster...",
 	idl.Substep_FINALIZE_UPGRADE_STANDBY:          "Upgrading standby...",
+	idl.Substep_FINALIZE_UPGRADE_MIRRORS:          "Upgrading mirrors...",
 }
 
 var indicators = map[idl.Status]string{

@@ -35,7 +35,7 @@ teardown() {
 # more finalize steps that actually go through the process of
 # finalizing a cluster (mirrors, etc)
 #
-@test "finalize brings up the standby for the new cluster" {
+@test "finalize brings up the standby and mirrors for the new cluster" {
     local source_mirrors_count=$(number_of_mirrors)
     gpupgrade initialize \
         --old-bindir="$GPHOME/bin" \
@@ -61,7 +61,10 @@ teardown() {
 
 number_of_mirrors() {
     # when the target cluster has finalized, it is running under the same PGPORT as the source cluster
-    psql postgres -c "select count(*) from gp_segment_configuration where role='m' and status='u'" --tuples-only --no-align
+    psql postgres --tuples-only --no-align -c "
+        select count(*) from gp_segment_configuration
+            where role='m' and status='u' and content != -1
+    "
 }
 
 get_standby_status() {

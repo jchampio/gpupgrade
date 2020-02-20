@@ -26,23 +26,33 @@ func (s *Server) Finalize(_ *idl.FinalizeRequest, stream idl.CliToHub_FinalizeSe
 		}
 	}()
 
+	// This runner runs all commands against the target cluster.
+	targetRunner := &greenplumRunner{
+		masterPort:          s.Target.MasterPort(),
+		masterDataDirectory: s.Target.MasterDataDir(),
+		binDir:              s.Target.BinDir,
+	}
+
 	if s.Source.HasStandby() {
 		st.Run(idl.Substep_FINALIZE_UPGRADE_STANDBY, func(streams step.OutStreams) error {
-			greenplumRunner := &greenplumRunner{
-				masterPort:          s.Target.MasterPort(),
-				masterDataDirectory: s.Target.MasterDataDir(),
-				binDir:              s.Target.BinDir,
-				streams:             streams,
-			}
+			// XXX this probably indicates a bad abstraction
+			targetRunner.streams = streams
 
-			return UpgradeStandby(greenplumRunner, StandbyConfig{
+			return UpgradeStandby(targetRunner, StandbyConfig{
 				Port:          s.TargetInitializeConfig.Standby.Port,
 				Hostname:      s.Source.StandbyHostname(),
 				DataDirectory: s.Source.StandbyDataDirectory() + "_upgrade",
 			})
 		})
 	}
-	// add mirrors here
+
+	// TODO only do this if there are mirrors!
+	st.Run(idl.Substep_FINALIZE_UPGRADE_MIRRORS, func(streams step.OutStreams) error {
+		// XXX this probably indicates a bad abstraction
+		targetRunner.streams = streams
+
+		return UpgradeMirrors(s.StateDir, &s.TargetInitializeConfig, targetRunner)
+	})
 
 	st.Run(idl.Substep_FINALIZE_SHUTDOWN_TARGET_CLUSTER, func(streams step.OutStreams) error {
 		return StopCluster(streams, s.Target, false)

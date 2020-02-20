@@ -1,6 +1,9 @@
 package hub
 
-import "github.com/greenplum-db/gpupgrade/utils"
+import (
+	"github.com/greenplum-db/gpupgrade/idl"
+	"github.com/greenplum-db/gpupgrade/utils"
+)
 
 //
 // Build a hub-centric model of the world:
@@ -28,7 +31,7 @@ func MakeHub(config *Config) Hub {
 	var configs []Agent
 	for hostname, agentSegmentPairs := range segmentPairsByHost {
 		configs = append(configs, Agent{
-			hostname:     hostname,
+			AgentClient:  hostname,
 			segmentPairs: agentSegmentPairs,
 		})
 	}
@@ -48,7 +51,8 @@ type Hub struct {
 }
 
 type Agent struct {
-	hostname     string
+	idl.AgentClient
+
 	segmentPairs []SegmentPair
 }
 

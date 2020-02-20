@@ -300,16 +300,6 @@ func (s *Server) AgentConns() ([]*Connection, error) {
 
 	hostnames := s.Source.PrimaryHostnames()
 	for _, host := range hostnames {
-		ctx, cancelFunc := context.WithTimeout(context.Background(), DialTimeout)
-		conn, err := s.grpcDialer(ctx,
-			host+":"+strconv.Itoa(s.AgentPort),
-			grpc.WithInsecure(), grpc.WithBlock())
-		if err != nil {
-			err = errors.Errorf("grpcDialer failed: %s", err.Error())
-			gplog.Error(err.Error())
-			cancelFunc()
-			return nil, err
-		}
 		s.agentConns = append(s.agentConns, &Connection{
 			Conn:          conn,
 			AgentClient:   idl.NewAgentClient(conn),
@@ -319,6 +309,19 @@ func (s *Server) AgentConns() ([]*Connection, error) {
 	}
 
 	return s.agentConns, nil
+}
+
+func connectAgent() (AgentClient, error) {
+	ctx, cancelFunc := context.WithTimeout(context.Background(), DialTimeout)
+	conn, err := s.grpcDialer(ctx,
+		host+":"+strconv.Itoa(s.AgentPort),
+		grpc.WithInsecure(), grpc.WithBlock())
+	if err != nil {
+		err = errors.Errorf("grpcDialer failed: %s", err.Error())
+		gplog.Error(err.Error())
+		cancelFunc()
+		return nil, err
+	}
 }
 
 func EnsureConnsAreReady(agentConns []*Connection) error {

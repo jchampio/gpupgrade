@@ -53,13 +53,14 @@ func (s *Server) Finalize(_ *idl.FinalizeRequest, stream idl.CliToHub_FinalizeSe
 	})
 
 	st.Run(idl.Substep_FINALIZE_SWAP_DATA_DIRECTORIES, func(streams step.OutStreams) error {
-		agentBroker := &AgentBrokerGRPC{
-			context:          stream.Context(),
-			agentConnections: agentConnections,
+		clients := make(map[string]idl.AgentClient)
+		for _, conn := range agentConnections {
+			clients[conn.Hostname] = conn.AgentClient
 		}
-		hub := MakeHub(s.Config)
 
-		return SwapDataDirectories(hub, agentBroker)
+		hub := MakeHub(s.Config, clients)
+
+		return SwapDataDirectories(hub)
 	})
 
 	st.Run(idl.Substep_FINALIZE_START_TARGET_MASTER, func(streams step.OutStreams) error {

@@ -2,14 +2,14 @@ package hub_test
 
 import (
 	"errors"
-	"reflect"
 	"testing"
 
-	"github.com/greenplum-db/gpupgrade/idl"
-
+	"github.com/golang/mock/gomock"
 	"github.com/greenplum-db/gp-common-go-libs/testhelper"
 
 	"github.com/greenplum-db/gpupgrade/hub"
+	"github.com/greenplum-db/gpupgrade/idl"
+	"github.com/greenplum-db/gpupgrade/idl/mock_idl"
 	"github.com/greenplum-db/gpupgrade/utils"
 )
 
@@ -30,19 +30,6 @@ func (s *renameSpy) Call(i int) *renameCall {
 	return s.calls[i-1]
 }
 
-type AgentBrokerSpy struct {
-	t                *testing.T
-	expectedHostname string
-	calls            map[string][]*idl.RenamePair
-}
-
-type failingAgentBroker struct {
-}
-
-func (f *failingAgentBroker) ReconfigureDataDirectories(hostname string, renamePairs []*idl.RenamePair) error {
-	return errors.New("hi, i'm an error")
-}
-
 func TestSwapDataDirectories(t *testing.T) {
 	testhelper.SetupTestLogger() // init gplog
 
@@ -51,6 +38,9 @@ func TestSwapDataDirectories(t *testing.T) {
 	}
 
 	t.Run("it renames data directories for source and target master data dirs", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+
 		spy := &renameSpy{}
 
 		utils.System.Rename = spy.renameFunc()
@@ -70,7 +60,12 @@ func TestSwapDataDirectories(t *testing.T) {
 			Target: target,
 		}
 
-		hub.SwapDataDirectories(hub.MakeHub(config), newAgentBrokerSpy(t))
+		client := mock_idl.NewMockAgentClient(ctrl)
+		client.EXPECT().ReconfigureDataDirectories(gomock.Any(), gomock.Any())
+
+		hub.SwapDataDirectories(hub.MakeHub(config, map[string]idl.AgentClient{
+			"": client,
+		}))
 
 		if spy.TimesCalled() != 2 {
 			t.Errorf("got Rename called %v times, wanted %v times",
@@ -100,6 +95,9 @@ func TestSwapDataDirectories(t *testing.T) {
 	})
 
 	t.Run("it returns an error if the directories cannot be renamed", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+
 		defer afterEach()
 
 		utils.System.Rename = func(oldpath, newpath string) error {
@@ -119,7 +117,12 @@ func TestSwapDataDirectories(t *testing.T) {
 			Target: target,
 		}
 
-		err := hub.SwapDataDirectories(hub.MakeHub(config), newAgentBrokerSpy(t))
+		client := mock_idl.NewMockAgentClient(ctrl)
+		client.EXPECT().ReconfigureDataDirectories(gomock.Any(), gomock.Any())
+
+		err := hub.SwapDataDirectories(hub.MakeHub(config, map[string]idl.AgentClient{
+			"": client,
+		}))
 
 		if err == nil {
 			t.Fatalf("got nil for an error during SwapDataDirectories, wanted a failure to move directories: %+v", err)
@@ -127,6 +130,9 @@ func TestSwapDataDirectories(t *testing.T) {
 	})
 
 	t.Run("it does not modify the cluster state if there is an error", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+
 		defer afterEach()
 
 		utils.System.Rename = func(oldpath, newpath string) error {
@@ -146,7 +152,12 @@ func TestSwapDataDirectories(t *testing.T) {
 			Target: target,
 		}
 
-		err := hub.SwapDataDirectories(hub.MakeHub(config), newAgentBrokerSpy(t))
+		client := mock_idl.NewMockAgentClient(ctrl)
+		client.EXPECT().ReconfigureDataDirectories(gomock.Any(), gomock.Any())
+
+		err := hub.SwapDataDirectories(hub.MakeHub(config, map[string]idl.AgentClient{
+			"": client,
+		}))
 
 		if err == nil {
 			t.Fatalf("got nil for an error during SwapDataDirectories, wanted a failure to move directories: %+v", err)
@@ -164,6 +175,9 @@ func TestSwapDataDirectories(t *testing.T) {
 	})
 
 	t.Run("it tells each agent to reconfigure data directories for the segments", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+
 		spy := &renameSpy{}
 		utils.System.Rename = spy.renameFunc()
 
@@ -182,49 +196,53 @@ func TestSwapDataDirectories(t *testing.T) {
 			Target: target,
 		}
 
-		abSpy := newAgentBrokerSpy(t)
-		h := hub.MakeHub(config)
+		client1 := mock_idl.NewMockAgentClient(ctrl)
+		client1.EXPECT().ReconfigureDataDirectories(gomock.Any(),
+			&idl.ReconfigureDataDirRequest{
+				Pairs: []*idl.RenamePair{
+					{
+						Src: "/some/data/directory/99",
+						Dst: "/some/data/directory/99_old",
+					},
+					{
+						Src: "/some/data/directory_upgrade/99",
+						Dst: "/some/data/directory/99",
+					},
+				},
+			},
+		)
 
-		err := hub.SwapDataDirectories(h, abSpy)
+		client2 := mock_idl.NewMockAgentClient(ctrl)
+		client2.EXPECT().ReconfigureDataDirectories(gomock.Any(),
+			&idl.ReconfigureDataDirRequest{
+				Pairs: []*idl.RenamePair{
+					{
+						Src: "/some/data/directory/100",
+						Dst: "/some/data/directory/100_old",
+					},
+					{
+						Src: "/some/data/directory_upgrade/100",
+						Dst: "/some/data/directory/100",
+					},
+				},
+			},
+		)
 
+		h := hub.MakeHub(config, map[string]idl.AgentClient{
+			"host1": client1,
+			"host2": client2,
+		})
+
+		err := hub.SwapDataDirectories(h)
 		if err != nil {
 			t.Errorf("expected no error, got %#v", err)
 		}
-
-		if abSpy.NumCalls() != 2 {
-			t.Errorf("got %d, expected 2", abSpy.NumCalls())
-		}
-
-		abSpy.assertReconfigureDataDirsCalledWith(
-			"host1",
-			[]*idl.RenamePair{
-				{
-					Src: "/some/data/directory/99",
-					Dst: "/some/data/directory/99_old",
-				},
-				{
-					Src: "/some/data/directory_upgrade/99",
-					Dst: "/some/data/directory/99",
-				},
-			},
-		)
-
-		abSpy.assertReconfigureDataDirsCalledWith(
-			"host2",
-			[]*idl.RenamePair{
-				{
-					Src: "/some/data/directory/100",
-					Dst: "/some/data/directory/100_old",
-				},
-				{
-					Src: "/some/data/directory_upgrade/100",
-					Dst: "/some/data/directory/100",
-				},
-			},
-		)
 	})
 
 	t.Run("it errors out if the call to the agents fails", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+
 		spy := &renameSpy{}
 		utils.System.Rename = spy.renameFunc()
 
@@ -243,23 +261,26 @@ func TestSwapDataDirectories(t *testing.T) {
 			Target: target,
 		}
 
-		abSpy := &failingAgentBroker{}
-		h := hub.MakeHub(config)
+		client1 := mock_idl.NewMockAgentClient(ctrl)
+		client1.EXPECT().ReconfigureDataDirectories(gomock.Any(), gomock.Any()).
+			Return(nil, errors.New("error"))
 
-		err := hub.SwapDataDirectories(h, abSpy)
+		client2 := mock_idl.NewMockAgentClient(ctrl)
+		client2.EXPECT().ReconfigureDataDirectories(gomock.Any(), gomock.Any()).
+			Return(nil, errors.New("error"))
+
+		h := hub.MakeHub(config, map[string]idl.AgentClient{
+			"host1": client1,
+			"host2": client2,
+		})
+
+		err := hub.SwapDataDirectories(h)
 
 		if err == nil {
 			t.Errorf("got no errors from agents, expected an error for each host")
 		}
 	})
 
-}
-
-func newAgentBrokerSpy(t *testing.T) *AgentBrokerSpy {
-	return &AgentBrokerSpy{
-		t:     t,
-		calls: map[string][]*idl.RenamePair{},
-	}
 }
 
 func assertDataDirModified(t *testing.T, newDataDir, expectedDataDir string) {
@@ -300,22 +321,4 @@ func (spy *renameSpy) renameFunc() func(oldpath string, newpath string) error {
 
 		return nil
 	}
-}
-
-func (spy *AgentBrokerSpy) ReconfigureDataDirectories(hostname string, pairs []*idl.RenamePair) error {
-	spy.calls[hostname] = pairs
-	return nil
-}
-
-func (spy *AgentBrokerSpy) assertReconfigureDataDirsCalledWith(expectedHostname string, expectedRenamePairs []*idl.RenamePair) {
-	if !reflect.DeepEqual(spy.calls[expectedHostname], expectedRenamePairs) {
-		spy.t.Errorf("got no calls to agent broker for hostname %v with data dir pairs %v, actually received %+v",
-			expectedHostname,
-			expectedRenamePairs,
-			spy.calls)
-	}
-}
-
-func (spy *AgentBrokerSpy) NumCalls() int {
-	return len(spy.calls)
 }

@@ -1,6 +1,8 @@
 package hub
 
 import (
+	"fmt"
+
 	"github.com/greenplum-db/gpupgrade/idl"
 	"github.com/greenplum-db/gpupgrade/utils"
 )
@@ -10,7 +12,7 @@ import (
 //
 // A hub has agents, agents have segment pairs
 //
-func MakeHub(config *Config) Hub {
+func MakeHub(config *Config, clients map[string]idl.AgentClient) Hub {
 	var segmentPairsByHost = make(map[string][]SegmentPair)
 
 	for contentId, sourceSegment := range config.Source.Primaries {
@@ -30,8 +32,13 @@ func MakeHub(config *Config) Hub {
 
 	var configs []Agent
 	for hostname, agentSegmentPairs := range segmentPairsByHost {
+		client, ok := clients[hostname]
+		if !ok {
+			panic(fmt.Sprintf("no connected client for host %q", hostname))
+		}
+
 		configs = append(configs, Agent{
-			AgentClient:  hostname,
+			AgentClient:  client,
 			segmentPairs: agentSegmentPairs,
 		})
 	}

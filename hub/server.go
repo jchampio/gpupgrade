@@ -300,28 +300,36 @@ func (s *Server) AgentConns() ([]*Connection, error) {
 
 	hostnames := s.Source.PrimaryHostnames()
 	for _, host := range hostnames {
+		addr := host + ":" + strconv.Itoa(s.AgentPort)
+		conn, client, err := connectAgent(addr, s.grpcDialer)
+		if err != nil {
+			return nil, err
+		}
+
 		s.agentConns = append(s.agentConns, &Connection{
 			Conn:          conn,
-			AgentClient:   idl.NewAgentClient(conn),
+			AgentClient:   client,
 			Hostname:      host,
-			CancelContext: cancelFunc,
+			CancelContext: func() {},
 		})
 	}
 
 	return s.agentConns, nil
 }
 
-func connectAgent() (AgentClient, error) {
+func connectAgent(addr string, dialer Dialer) (*grpc.ClientConn, idl.AgentClient, error) {
 	ctx, cancelFunc := context.WithTimeout(context.Background(), DialTimeout)
-	conn, err := s.grpcDialer(ctx,
-		host+":"+strconv.Itoa(s.AgentPort),
+	conn, err := dialer(ctx, addr,
 		grpc.WithInsecure(), grpc.WithBlock())
+
 	if err != nil {
 		err = errors.Errorf("grpcDialer failed: %s", err.Error())
 		gplog.Error(err.Error())
-		cancelFunc()
-		return nil, err
+		cancelFunc() // XXX wait, shouldn't this be deferred?
+		return nil, nil, err
 	}
+
+	return conn, idl.NewAgentClient(conn), nil
 }
 
 func EnsureConnsAreReady(agentConns []*Connection) error {

@@ -1,7 +1,9 @@
 package hub
 
 import (
+	"context"
 	"fmt"
+	"sync"
 
 	"github.com/greenplum-db/gp-common-go-libs/gplog"
 	"github.com/hashicorp/go-multierror"
@@ -10,8 +12,8 @@ import (
 	"github.com/greenplum-db/gpupgrade/utils"
 )
 
-func SwapDataDirectories(hub Hub, agentBroker AgentBroker) error {
-	swapper := finalizer{agentBroker: agentBroker}
+func SwapDataDirectories(hub Hub) error {
+	swapper := finalizer{}
 	swapper.archive(hub.masterPair.source)
 	swapper.publish(hub.masterPair.target, hub.masterPair.source)
 	swapper.swapDirectoriesOnAgents(hub.agents)
@@ -19,8 +21,7 @@ func SwapDataDirectories(hub Hub, agentBroker AgentBroker) error {
 }
 
 type finalizer struct {
-	err         *multierror.Error
-	agentBroker AgentBroker
+	err *multierror.Error
 }
 
 func (f *finalizer) archive(sourceSegment utils.SegConfig) {
@@ -36,17 +37,27 @@ func (f *finalizer) publish(targetSegment utils.SegConfig, sourceSegment utils.S
 func (f *finalizer) swapDirectoriesOnAgents(agents []Agent) {
 	result := make(chan error, len(agents))
 
+	var wg sync.WaitGroup
 	for _, agent := range agents {
 		agent := agent // capture agent variable
 
+		request := &idl.ReconfigureDataDirRequest{
+			Pairs: makeRenamePairs(agent.segmentPairs),
+		}
+
+		wg.Add(1)
 		go func() {
-			result <- f.agentBroker.ReconfigureDataDirectories(agent.hostname,
-				makeRenamePairs(agent.segmentPairs))
+			defer wg.Done()
+
+			_, err := agent.ReconfigureDataDirectories(context.TODO(), request)
+			result <- err
 		}()
 	}
+	wg.Wait()
 
-	for range agents {
-		multierror.Append(f.err, <-result)
+	close(result)
+	for err := range result {
+		multierror.Append(f.err, err)
 	}
 }
 

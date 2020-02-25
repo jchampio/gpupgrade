@@ -5,14 +5,14 @@ import (
 	"io"
 	"path/filepath"
 
-	"github.com/greenplum-db/gpupgrade/utils"
 	"github.com/hashicorp/go-multierror"
-)
 
+	"github.com/greenplum-db/gpupgrade/utils"
+)
 
 func writeGpAddmirrorsConfig(conf *InitializeConfig, out io.Writer) error {
 	for _, m := range conf.Mirrors {
-		_, err := fmt.Fprintf(out, "%d|%s|%d|%s\n", m.ContentID, m.Hostname, m.Port, m.DataDir)
+		_, err := fmt.Fprintf(out, "%d|%s|%d|%s\n", m.ContentID, m.Hostname, m.Port, upgradeDataDir(m.DataDir)) // XXX this should go into the config
 		if err != nil {
 			return err
 		}

@@ -409,3 +409,12 @@ func (s *Server) SaveConfig() (err error) {
 
 	return nil
 }
+
+func getAgentPath() (string, error) {
+	hubPath, err := os.Executable()
+	if err != nil {
+		return "", err
+	}
+
+	return filepath.Join(filepath.Dir(hubPath), "gpupgrade"), nil
+}

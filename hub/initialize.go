@@ -3,7 +3,6 @@ package hub
 import (
 	"context"
 	"fmt"
-	"os"
 	"path/filepath"
 
 	"github.com/greenplum-db/gp-common-go-libs/gplog"
@@ -80,13 +79,4 @@ func (s *Server) InitializeCreateCluster(in *idl.InitializeCreateClusterRequest,
 	})
 
 	return st.Err()
-}
-
-func getAgentPath() (string, error) {
-	hubPath, err := os.Executable()
-	if err != nil {
-		return "", err
-	}
-
-	return filepath.Join(filepath.Dir(hubPath), "gpupgrade"), nil
 }

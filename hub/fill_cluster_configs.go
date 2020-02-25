@@ -3,9 +3,10 @@ package hub
 import (
 	"sort"
 
+	"github.com/greenplum-db/gpupgrade/db"
+
 	"github.com/pkg/errors"
 
-	"github.com/greenplum-db/gpupgrade/db"
 	"github.com/greenplum-db/gpupgrade/idl"
 	"github.com/greenplum-db/gpupgrade/step"
 	"github.com/greenplum-db/gpupgrade/utils"
@@ -13,11 +14,17 @@ import (
 
 // create old/new clusters, write to disk and re-read from disk to make sure it is "durable"
 func (s *Server) fillClusterConfigsSubStep(_ step.OutStreams, request *idl.InitializeRequest) error {
-	conn := db.NewDBConn("localhost", int(request.SourcePort), "template1")
-	defer conn.Close()
+	connection := db.NewDBConn("localhost", int(request.SourcePort), "template1")
 
-	var err error
-	s.Source, err = utils.ClusterFromDB(conn, request.SourceBinDir)
+	err := CheckSourceClusterConfiguration(func() ([]SegmentStatus, error) {
+		return GetSegmentStatuses(connection)
+	})
+
+	if err != nil {
+		return err
+	}
+
+	s.Source, err = utils.ClusterFromDB(connection, request.SourceBinDir)
 	if err != nil {
 		return errors.Wrap(err, "could not retrieve source configuration")
 	}

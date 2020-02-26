@@ -36,7 +36,6 @@ type SegConfig struct {
 	Hostname  string
 	DataDir   string
 	Role      string
-	PreferredRole string
 }
 
 const (
@@ -180,10 +179,6 @@ func NewCluster(segConfigs []SegConfig) (*Cluster, error) {
 	for _, seg := range segConfigs {
 		content := seg.ContentID
 
-		if seg.Role != seg.PreferredRole {
-			return nil, newInvalidSegmentsError(seg, "segment with dbid %d not in preferred role, run gprecoverseg -r to rebalance the cluster", seg.DbID)
-		}
-
 		switch seg.Role {
 		case PrimaryRole:
 			// Check for duplication.
@@ -253,8 +248,7 @@ SELECT
 	s.port,
 	s.hostname,
 	e.fselocation as datadir,
-	s.role,
-	s.preferred_role as preferredrole
+	s.role
 FROM gp_segment_configuration s
 JOIN pg_filespace_entry e ON s.dbid = e.fsedbid
 JOIN pg_filespace f ON e.fsefsoid = f.oid
@@ -268,8 +262,7 @@ SELECT
 	port,
 	hostname,
 	datadir,
-	role,
-	preferred_role as preferredrole
+	role
 FROM gp_segment_configuration
 ORDER BY content;`
 	}

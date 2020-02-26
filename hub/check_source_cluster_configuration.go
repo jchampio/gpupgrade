@@ -1,31 +1,49 @@
 package hub
 
 import (
+	"database/sql"
 	"fmt"
 	"strconv"
 	"strings"
-
-	"github.com/pkg/errors"
-
-	"github.com/greenplum-db/gp-common-go-libs/dbconn"
 )
 
 const ClusterIsUp = "u" // defined by gpdb
+type DbID int
 
 type SegmentStatus struct {
-	IsUp bool
-	DbID int
+	IsUp          bool
+	DbID          DbID
+	Role          string
+	PreferredRole string
 }
 
-type SegmentStatusError struct {
-	DownDbids []int
+type UnbalancedSegmentStatusError struct {
+	UnbalancedDbids []DbID
 }
 
-func (e SegmentStatusError) Error() string {
+func (e UnbalancedSegmentStatusError) Error() string {
+	var dbidStrings []string
+
+	for _, dbid := range e.UnbalancedDbids {
+		dbidStrings = append(dbidStrings, strconv.Itoa(int(dbid)))
+	}
+
+	message := fmt.Sprintf("Could not initialize gpupgrade. These"+
+		" Greenplum segment dbids are not in their preferred role: %v."+
+		" Run gprecoverseg -r to rebalance the cluster.", strings.Join(dbidStrings, ", "))
+
+	return message
+}
+
+type DownSegmentStatusError struct {
+	DownDbids []DbID
+}
+
+func (e DownSegmentStatusError) Error() string {
 	var dbidStrings []string
 
 	for _, dbid := range e.DownDbids {
-		dbidStrings = append(dbidStrings, strconv.Itoa(dbid))
+		dbidStrings = append(dbidStrings, strconv.Itoa(int(dbid)))
 	}
 
 	message := fmt.Sprintf("Could not initialize gpupgrade. These"+
@@ -35,73 +53,107 @@ func (e SegmentStatusError) Error() string {
 	return message
 }
 
-func GetSegmentStatuses(connection *dbconn.DBConn) ([]SegmentStatus, error) {
+func NewUnbalancedSegmentStatusError(segments []SegmentStatus) error {
+	var dbids []DbID
+
+	for _, segment := range segments {
+		dbids = append(dbids, segment.DbID)
+	}
+
+	return UnbalancedSegmentStatusError{dbids}
+}
+
+func GetSegmentStatuses(connection *sql.DB) ([]SegmentStatus, error) {
 	statuses := []SegmentStatus{}
 
-	err := withinConnection(connection, func() error {
-		results := make([]struct {
-			Dbid   int
-			Status string
-		}, 0)
+	type result struct {
+		Dbid          DbID
+		Status        string
+		Role          string
+		PreferredRole string
+	}
 
-		err := connection.Select(&results,
-			"select dbid as Dbid, status as Status from gp_segment_configuration")
+	results := make([]result, 0)
 
-		if err != nil {
-			return err
-		}
+	rows, err := connection.Query("select dbid as Dbid, status as Status, role as Role, preferred_role as PreferredRole from gp_segment_configuration")
+	if err != nil {
+		return nil, err
+	}
 
-		for _, result := range results {
-			statuses = append(statuses, SegmentStatus{
-				IsUp: result.Status == ClusterIsUp,
-				DbID: result.Dbid,
-			})
-		}
+	for rows.Next() {
+		r := result{}
+		err = rows.Scan(&r.Dbid, &r.Status, &r.Role, &r.PreferredRole)
+		results = append(results, r)
+	}
 
-		return nil
-	})
+	if err != nil {
+		return nil, err
+	}
+
+	for _, result := range results {
+		statuses = append(statuses, SegmentStatus{
+			IsUp:          result.Status == ClusterIsUp,
+			DbID:          result.Dbid,
+			Role:          result.Role,
+			PreferredRole: result.PreferredRole,
+		})
+	}
 
 	return statuses, err
 }
 
 func CheckSourceClusterConfiguration(getSegmentStatuses func() ([]SegmentStatus, error)) error {
+	var statuses []SegmentStatus
+
 	statuses, err := getSegmentStatuses()
 
 	if err != nil {
 		return err
 	}
 
-	downSegments := filterSegments(statuses, func(status SegmentStatus) bool {
-		return !status.IsUp
-	})
+	if err := checkForDownSegments(statuses); err != nil {
+		return err
+	}
 
-	if len(downSegments) > 0 {
-		return NewSegmentStatusError(downSegments)
+	if err := checkForUnbalancedSegments(statuses); err != nil {
+		return err
 	}
 
 	return nil
 }
 
-func NewSegmentStatusError(downSegments []SegmentStatus) error {
-	var downDbids []int
+func checkForUnbalancedSegments(statuses []SegmentStatus) error {
+	unbalancedSegments := filterSegments(statuses, func(status SegmentStatus) bool {
+		return status.PreferredRole != status.Role
+	})
+
+	if len(unbalancedSegments) > 0 {
+		return NewUnbalancedSegmentStatusError(unbalancedSegments)
+	}
+
+	return nil
+}
+
+func checkForDownSegments(statuses []SegmentStatus) error {
+	downSegments := filterSegments(statuses, func(status SegmentStatus) bool {
+		return !status.IsUp
+	})
+
+	if len(downSegments) > 0 {
+		return NewDownSegmentStatusError(downSegments)
+	}
+
+	return nil
+}
+
+func NewDownSegmentStatusError(downSegments []SegmentStatus) error {
+	var downDbids []DbID
 
 	for _, downSegment := range downSegments {
 		downDbids = append(downDbids, downSegment.DbID)
 	}
 
-	return SegmentStatusError{downDbids}
-}
-
-func withinConnection(connection *dbconn.DBConn, operation func() error) error {
-	err := connection.Connect(1)
-
-	if err != nil {
-		return errors.Wrap(err, "couldn't connect to cluster")
-	}
-
-	defer connection.Close()
-
-	return operation()
+	return DownSegmentStatusError{downDbids}
 }
 
 func filterSegments(segments []SegmentStatus, filterMatches func(status SegmentStatus) bool) []SegmentStatus {

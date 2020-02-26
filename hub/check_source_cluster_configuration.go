@@ -1,24 +1,17 @@
 package hub
 
 import (
-	"database/sql"
 	"fmt"
 	"strconv"
 	"strings"
+
+	"github.com/hashicorp/go-multierror"
+
+	"github.com/greenplum-db/gpupgrade/hub/sourcedb"
 )
 
-const ClusterIsUp = "u" // defined by gpdb
-type DbID int
-
-type SegmentStatus struct {
-	IsUp          bool
-	DbID          DbID
-	Role          string
-	PreferredRole string
-}
-
 type UnbalancedSegmentStatusError struct {
-	UnbalancedDbids []DbID
+	UnbalancedDbids []sourcedb.DBID
 }
 
 func (e UnbalancedSegmentStatusError) Error() string {
@@ -36,7 +29,17 @@ func (e UnbalancedSegmentStatusError) Error() string {
 }
 
 type DownSegmentStatusError struct {
-	DownDbids []DbID
+	DownDbids []sourcedb.DBID
+}
+
+func NewDownSegmentStatusError(downSegments []sourcedb.SegmentStatus) error {
+	var downDbids []sourcedb.DBID
+
+	for _, downSegment := range downSegments {
+		downDbids = append(downDbids, downSegment.DbID)
+	}
+
+	return DownSegmentStatusError{downDbids}
 }
 
 func (e DownSegmentStatusError) Error() string {
@@ -53,8 +56,8 @@ func (e DownSegmentStatusError) Error() string {
 	return message
 }
 
-func NewUnbalancedSegmentStatusError(segments []SegmentStatus) error {
-	var dbids []DbID
+func NewUnbalancedSegmentStatusError(segments []sourcedb.SegmentStatus) error {
+	var dbids []sourcedb.DBID
 
 	for _, segment := range segments {
 		dbids = append(dbids, segment.DbID)
@@ -63,67 +66,28 @@ func NewUnbalancedSegmentStatusError(segments []SegmentStatus) error {
 	return UnbalancedSegmentStatusError{dbids}
 }
 
-func GetSegmentStatuses(connection *sql.DB) ([]SegmentStatus, error) {
-	statuses := []SegmentStatus{}
+func CheckSourceClusterConfiguration(sourceDatabase sourcedb.Database) error {
+	errors := &multierror.Error{}
 
-	type result struct {
-		Dbid          DbID
-		Status        string
-		Role          string
-		PreferredRole string
-	}
-
-	results := make([]result, 0)
-
-	rows, err := connection.Query("select dbid as Dbid, status as Status, role as Role, preferred_role as PreferredRole from gp_segment_configuration")
-	if err != nil {
-		return nil, err
-	}
-
-	for rows.Next() {
-		r := result{}
-		err = rows.Scan(&r.Dbid, &r.Status, &r.Role, &r.PreferredRole)
-		results = append(results, r)
-	}
-
-	if err != nil {
-		return nil, err
-	}
-
-	for _, result := range results {
-		statuses = append(statuses, SegmentStatus{
-			IsUp:          result.Status == ClusterIsUp,
-			DbID:          result.Dbid,
-			Role:          result.Role,
-			PreferredRole: result.PreferredRole,
-		})
-	}
-
-	return statuses, err
-}
-
-func CheckSourceClusterConfiguration(getSegmentStatuses func() ([]SegmentStatus, error)) error {
-	var statuses []SegmentStatus
-
-	statuses, err := getSegmentStatuses()
+	statuses, err := sourceDatabase.GetSegmentStatuses()
 
 	if err != nil {
 		return err
 	}
 
 	if err := checkForDownSegments(statuses); err != nil {
-		return err
+		errors = multierror.Append(errors, err)
 	}
 
 	if err := checkForUnbalancedSegments(statuses); err != nil {
-		return err
+		errors = multierror.Append(errors, err)
 	}
 
-	return nil
+	return errors.ErrorOrNil()
 }
 
-func checkForUnbalancedSegments(statuses []SegmentStatus) error {
-	unbalancedSegments := filterSegments(statuses, func(status SegmentStatus) bool {
+func checkForUnbalancedSegments(statuses []sourcedb.SegmentStatus) error {
+	unbalancedSegments := filterSegments(statuses, func(status sourcedb.SegmentStatus) bool {
 		return status.PreferredRole != status.Role
 	})
 
@@ -134,8 +98,8 @@ func checkForUnbalancedSegments(statuses []SegmentStatus) error {
 	return nil
 }
 
-func checkForDownSegments(statuses []SegmentStatus) error {
-	downSegments := filterSegments(statuses, func(status SegmentStatus) bool {
+func checkForDownSegments(statuses []sourcedb.SegmentStatus) error {
+	downSegments := filterSegments(statuses, func(status sourcedb.SegmentStatus) bool {
 		return !status.IsUp
 	})
 
@@ -146,18 +110,8 @@ func checkForDownSegments(statuses []SegmentStatus) error {
 	return nil
 }
 
-func NewDownSegmentStatusError(downSegments []SegmentStatus) error {
-	var downDbids []DbID
-
-	for _, downSegment := range downSegments {
-		downDbids = append(downDbids, downSegment.DbID)
-	}
-
-	return DownSegmentStatusError{downDbids}
-}
-
-func filterSegments(segments []SegmentStatus, filterMatches func(status SegmentStatus) bool) []SegmentStatus {
-	var downSegments []SegmentStatus
+func filterSegments(segments []sourcedb.SegmentStatus, filterMatches func(status sourcedb.SegmentStatus) bool) []sourcedb.SegmentStatus {
+	var downSegments []sourcedb.SegmentStatus
 
 	for _, segment := range segments {
 		if filterMatches(segment) {

@@ -17,7 +17,7 @@ type receiver interface {
 	Recv() (*idl.Message, error)
 }
 
-var lines = map[idl.Substep]string{
+var SubstepDescriptions = map[idl.Substep]string{
 	idl.Substep_CONFIG:                            "Retrieving configs...",
 	idl.Substep_START_AGENTS:                      "Starting agents...",
 	idl.Substep_CREATE_TARGET_CONFIG:              "Generating new cluster configuration...",
@@ -197,7 +197,7 @@ func UILoop(stream receiver, verbose bool) error {
 // FormatStatus panics if it doesn't have a string representation for a given
 // protobuf code.
 func FormatStatus(status *idl.SubstepStatus) string {
-	line, ok := lines[status.Step]
+	line, ok := SubstepDescriptions[status.Step]
 	if !ok {
 		panic(fmt.Sprintf("unexpected step %#v", status.Step))
 	}

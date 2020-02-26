@@ -1,13 +1,13 @@
 package hub
 
 import (
-	"database/sql"
-	"fmt"
 	"sort"
 
-	"github.com/greenplum-db/gpupgrade/db"
-
 	"github.com/pkg/errors"
+
+	"github.com/greenplum-db/gpupgrade/hub/sourcedb"
+
+	"github.com/greenplum-db/gpupgrade/db"
 
 	"github.com/greenplum-db/gpupgrade/idl"
 	"github.com/greenplum-db/gpupgrade/step"
@@ -15,15 +15,13 @@ import (
 )
 
 // create old/new clusters, write to disk and re-read from disk to make sure it is "durable"
-func FillClusterConfigsSubStep(config *Config, _ step.OutStreams, request *idl.InitializeRequest, saveConfig func() error) error {
-	sourcePort := int(request.SourcePort)
-
-	if err := CheckSourceClusterConfiguration(SegmentStatusDataSource(sourcePort)); err != nil {
+func FillClusterConfigsSubStep(config *Config, sourceDatabase sourcedb.Database, _ step.OutStreams, request *idl.InitializeRequest, saveConfig func() error) error {
+	if err := CheckSourceClusterConfiguration(sourceDatabase); err != nil {
 		return err
 	}
 
-	connection := db.NewDBConn("localhost", sourcePort, "template1")
-	source, err := utils.ClusterFromDB(connection, request.SourceBinDir)
+	conn := db.NewDBConn("localhost", int(request.SourcePort), "template1")
+	source, err := utils.ClusterFromDB(conn, request.SourceBinDir)
 	if err != nil {
 		return errors.Wrap(err, "could not retrieve source configuration")
 	}
@@ -47,23 +45,6 @@ func FillClusterConfigsSubStep(config *Config, _ step.OutStreams, request *idl.I
 	}
 
 	return nil
-}
-
-func SegmentStatusDataSource(port int) func() ([]SegmentStatus, error) {
-	return func() ([]SegmentStatus, error) {
-		connURI := fmt.Sprintf(
-			"postgresql://localhost:%d/template1?gp_session_role=utility&allow_system_table_mods=true&search_path=",
-			port)
-
-		db, err := sql.Open("pgx", connURI)
-		if err != nil {
-			return nil, err
-		}
-
-		defer db.Close()
-
-		return GetSegmentStatuses(db)
-	}
 }
 
 func assignPorts(source *utils.Cluster, ports []int) (PortAssignments, error) {

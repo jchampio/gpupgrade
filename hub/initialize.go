@@ -8,11 +8,22 @@ import (
 	"github.com/greenplum-db/gp-common-go-libs/gplog"
 	"github.com/hashicorp/go-multierror"
 
+	"github.com/greenplum-db/gpupgrade/hub/sourcedb"
+
 	"github.com/greenplum-db/gpupgrade/idl"
 	"github.com/greenplum-db/gpupgrade/step"
 )
 
 func (s *Server) Initialize(in *idl.InitializeRequest, stream idl.CliToHub_InitializeServer) (err error) {
+	sourceDatabase := sourcedb.Initialize()
+	err = sourceDatabase.Connect(int(in.SourcePort))
+
+	if err != nil {
+		return err
+	}
+
+	defer sourceDatabase.Close()
+
 	st, err := step.Begin(s.StateDir, "initialize", stream)
 	if err != nil {
 		return err
@@ -29,7 +40,7 @@ func (s *Server) Initialize(in *idl.InitializeRequest, stream idl.CliToHub_Initi
 	}()
 
 	st.Run(idl.Substep_CONFIG, func(stream step.OutStreams) error {
-		return FillClusterConfigsSubStep(s.Config, stream, in, s.SaveConfig)
+		return FillClusterConfigsSubStep(s.Config, sourceDatabase, stream, in, s.SaveConfig)
 	})
 
 	st.Run(idl.Substep_START_AGENTS, func(_ step.OutStreams) error {

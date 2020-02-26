@@ -15,7 +15,7 @@ import (
 )
 
 // create old/new clusters, write to disk and re-read from disk to make sure it is "durable"
-func (s *Server) fillClusterConfigsSubStep(_ step.OutStreams, request *idl.InitializeRequest) error {
+func FillClusterConfigsSubStep(config *Config, _ step.OutStreams, request *idl.InitializeRequest, saveConfig func() error) error {
 	sourcePort := int(request.SourcePort)
 
 	if err := CheckSourceClusterConfiguration(SegmentStatusDataSource(sourcePort)); err != nil {
@@ -28,21 +28,21 @@ func (s *Server) fillClusterConfigsSubStep(_ step.OutStreams, request *idl.Initi
 		return errors.Wrap(err, "could not retrieve source configuration")
 	}
 
-	s.Source = source
-	s.Target = &utils.Cluster{BinDir: request.TargetBinDir}
-	s.UseLinkMode = request.UseLinkMode
+	config.Source = source
+	config.Target = &utils.Cluster{BinDir: request.TargetBinDir}
+	config.UseLinkMode = request.UseLinkMode
 
 	var ports []int
 	for _, p := range request.Ports {
 		ports = append(ports, int(p))
 	}
 
-	s.TargetPorts, err = assignPorts(s.Source, ports)
+	config.TargetPorts, err = assignPorts(config.Source, ports)
 	if err != nil {
 		return err
 	}
 
-	if err := s.SaveConfig(); err != nil {
+	if err := saveConfig(); err != nil {
 		return err
 	}
 

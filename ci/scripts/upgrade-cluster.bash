@@ -86,6 +86,27 @@ time ssh mdw bash <<EOF
     source ${GPHOME_OLD}/greenplum_path.sh
     export PGOPTIONS='--client-min-messages=warning'
     unxz < /tmp/dump.sql.xz | psql -f - postgres
+
+    psql -f - postgres <<ENDSQL
+CREATE TABLE customer_addresses_dim (
+    customer_address_id integer NOT NULL,
+    customer_id integer NOT NULL,
+    valid_from_timestamp timestamp without time zone DEFAULT now() NOT NULL,
+    valid_to_timestamp timestamp without time zone,
+    house_number character varying(20),
+    street_name character varying(150),
+    appt_suite_no character varying(50),
+    city character varying(200),
+    state_code character varying(2),
+    zip_code character varying(5),
+    zip_plus_four character varying(10),
+    country character varying(10),
+    phone_number character varying(20)
+)
+WITH (appendonly=true, compresstype=quicklz, orientation=row) DISTRIBUTED BY (customer_id);
+ALTER TABLE ONLY customer_addresses_dim ALTER COLUMN customer_id SET STATISTICS 1000;
+ALTER TABLE ONLY customer_addresses_dim ALTER COLUMN valid_to_timestamp SET STATISTICS 1000;
+ENDSQL
 EOF
 
 # Dump the old cluster for later comparison.

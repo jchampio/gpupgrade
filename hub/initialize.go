@@ -9,7 +9,6 @@ import (
 	"github.com/hashicorp/go-multierror"
 
 	"github.com/greenplum-db/gpupgrade/hub/sourcedb"
-
 	"github.com/greenplum-db/gpupgrade/idl"
 	"github.com/greenplum-db/gpupgrade/step"
 )

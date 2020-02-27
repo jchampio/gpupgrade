@@ -5,10 +5,8 @@ import (
 
 	"github.com/pkg/errors"
 
-	"github.com/greenplum-db/gpupgrade/hub/sourcedb"
-
 	"github.com/greenplum-db/gpupgrade/db"
-
+	"github.com/greenplum-db/gpupgrade/hub/sourcedb"
 	"github.com/greenplum-db/gpupgrade/idl"
 	"github.com/greenplum-db/gpupgrade/step"
 	"github.com/greenplum-db/gpupgrade/utils"

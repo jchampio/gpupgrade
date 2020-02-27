@@ -6,12 +6,10 @@ import (
 	"testing"
 
 	"github.com/hashicorp/go-multierror"
-
-	"github.com/greenplum-db/gpupgrade/hub/sourcedb"
-
 	"golang.org/x/xerrors"
 
 	"github.com/greenplum-db/gpupgrade/hub"
+	"github.com/greenplum-db/gpupgrade/hub/sourcedb"
 )
 
 func TestSegmentStatusError_Error(t *testing.T) {

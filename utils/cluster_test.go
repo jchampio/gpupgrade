@@ -11,14 +11,13 @@ import (
 	"strings"
 	"testing"
 
+	sqlmock "github.com/DATA-DOG/go-sqlmock"
 	"github.com/greenplum-db/gp-common-go-libs/dbconn"
+	"github.com/greenplum-db/gp-common-go-libs/testhelper"
+	"golang.org/x/xerrors"
 
 	"github.com/greenplum-db/gpupgrade/testutils"
 	"github.com/greenplum-db/gpupgrade/utils"
-
-	sqlmock "github.com/DATA-DOG/go-sqlmock"
-	"github.com/greenplum-db/gp-common-go-libs/testhelper"
-	"golang.org/x/xerrors"
 )
 
 func TestCluster(t *testing.T) {

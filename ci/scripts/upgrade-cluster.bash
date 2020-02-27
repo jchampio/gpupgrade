@@ -91,13 +91,10 @@ time ssh mdw bash <<EOF
 CREATE TABLE customer_addresses_dim (
     customer_address_id integer NOT NULL,
     customer_id integer NOT NULL,
-    valid_from_timestamp timestamp without time zone DEFAULT now() NOT NULL,
-    valid_to_timestamp timestamp without time zone,
     phone_number character varying(20)
 )
 WITH (appendonly=true, compresstype=quicklz, orientation=row) DISTRIBUTED BY (customer_id);
 ALTER TABLE ONLY customer_addresses_dim ALTER COLUMN customer_id SET STATISTICS 1000;
-ALTER TABLE ONLY customer_addresses_dim ALTER COLUMN valid_to_timestamp SET STATISTICS 1000;
 ENDSQL
 EOF
 

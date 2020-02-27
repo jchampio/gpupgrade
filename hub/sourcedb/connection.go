@@ -6,7 +6,7 @@ import (
 	"fmt"
 )
 
-const connectionString = "postgresql://localhost:%d/template1?gp_session_role=utility&allow_system_table_mods=true&search_path="
+const connectionString = "postgresql://localhost:%d/template1?gp_session_role=utility&search_path="
 
 func (d *database) Connect(port int) error {
 	connection, err := sql.Open("pgx", fmt.Sprintf(connectionString, port))

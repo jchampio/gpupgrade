@@ -128,6 +128,10 @@ func ClonePortsFromCluster(db *sql.DB, src *utils.Cluster) (err error) {
 		return err
 	}
 
+	_, err = tx.Exec("SET allow_system_table_mods = true")
+	if err != nil {
+		return xerrors.Errorf("updating segment configuration: %w", err)
+	}
 	for _, content := range src.ContentIDs {
 		err := updatePort(tx, src.Primaries[content])
 		if err != nil {

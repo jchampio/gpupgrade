@@ -89,12 +89,9 @@ time ssh mdw bash <<EOF
 
     psql -f - postgres <<ENDSQL
 CREATE TABLE customer_addresses_dim (
-    customer_address_id integer NOT NULL,
-    customer_id integer NOT NULL,
     phone_number character varying(20)
 )
 WITH (appendonly=true, compresstype=quicklz, orientation=row) DISTRIBUTED BY (customer_id);
-ALTER TABLE ONLY customer_addresses_dim ALTER COLUMN customer_id SET STATISTICS 1000;
 ENDSQL
 EOF
 

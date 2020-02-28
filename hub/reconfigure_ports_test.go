@@ -66,9 +66,6 @@ func TestClonePortsFromCluster(t *testing.T) {
 		mock.ExpectQuery("SELECT content FROM gp_segment_configuration").
 			WillReturnRows(contents)
 
-		mock.ExpectExec("SET allow_system_table_mods = true").
-			WillReturnResult(sqlmock.NewResult(0, 0))
-
 		// We want one port update for every segment.
 		// Note that ranging over a map doesn't guarantee execution order, so we
 		// range over the contents instead.
@@ -138,8 +135,6 @@ func TestClonePortsFromCluster(t *testing.T) {
 			mock.ExpectBegin()
 			mock.ExpectQuery("SELECT content FROM gp_segment_configuration").
 				WillReturnRows(contents)
-			mock.ExpectExec("SET allow_system_table_mods = true").
-				WillReturnResult(sqlmock.NewResult(0, 0))
 			expectPortUpdate(mock, src.Primaries[-1]).
 				WillReturnError(ErrSentinel)
 			mock.ExpectRollback()
@@ -158,9 +153,6 @@ func TestClonePortsFromCluster(t *testing.T) {
 			mock.ExpectBegin()
 			mock.ExpectQuery("SELECT content FROM gp_segment_configuration").
 				WillReturnRows(contents)
-
-			mock.ExpectExec("SET allow_system_table_mods = true").
-				WillReturnResult(sqlmock.NewResult(0, 0))
 
 			for _, content := range src.ContentIDs {
 				seg := src.Primaries[content]
@@ -258,9 +250,6 @@ func TestClonePortsFromCluster(t *testing.T) {
 			mock.ExpectBegin()
 			mock.ExpectQuery("SELECT content FROM gp_segment_configuration").
 				WillReturnRows(contents)
-
-			mock.ExpectExec("SET allow_system_table_mods = true").
-				WillReturnResult(sqlmock.NewResult(0, 0))
 
 			expectPortUpdate(mock, src.Primaries[-1]).
 				WillReturnResult(sqlmock.NewResult(0, 2))

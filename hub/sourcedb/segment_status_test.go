@@ -22,8 +22,7 @@ func TestGetSegmentStatuses(t *testing.T) {
 			WithArgs(Up).
 			WillReturnRows(rows)
 
-		sourceDb := NewDatabase(connection)
-		statuses, err := sourceDb.GetSegmentStatuses()
+		statuses, err := GetSegmentStatuses(connection)
 
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)

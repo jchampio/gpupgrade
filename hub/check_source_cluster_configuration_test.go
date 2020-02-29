@@ -1,7 +1,6 @@
 package hub_test
 
 import (
-	"errors"
 	"strings"
 	"testing"
 
@@ -32,55 +31,29 @@ func TestUnbalancedSegmentStatusError_Error(t *testing.T) {
 	})
 }
 
-func TestCheckSourceClusterConfiguration(t *testing.T) {
+func TestSegmentStatusErrors(t *testing.T) {
 	t.Run("it passes when when all segments are up", func(t *testing.T) {
-		sourceDatabase := &mockSourceDatabase{
-			func(sourcedb.Database) ([]sourcedb.SegmentStatus, error) {
-				return []sourcedb.SegmentStatus{
-					{DbID: 0, IsUp: true},
-					{DbID: 1, IsUp: true},
-					{DbID: 2, IsUp: true},
-				}, nil
-			},
+		sourceDatabase := []sourcedb.SegmentStatus{
+			{DbID: 0, IsUp: true},
+			{DbID: 1, IsUp: true},
+			{DbID: 2, IsUp: true},
 		}
 
-		err := hub.CheckSourceClusterConfiguration(sourceDatabase)
-
+		err := hub.SegmentStatusErrors(sourceDatabase)
 		if err != nil {
-			t.Errorf("got no completion message, expected substep to complete without errors")
-		}
-	})
-
-	t.Run("it returns an error if it fails to query for statuses", func(t *testing.T) {
-		queryError := errors.New("some error while querying")
-
-		sourceDatabase := mockSourceDatabase{func(sourcedb.Database) ([]sourcedb.SegmentStatus, error) {
-			return []sourcedb.SegmentStatus{}, queryError
-		}}
-
-		err := hub.CheckSourceClusterConfiguration(sourceDatabase)
-
-		if err == nil {
-			t.Fatalf("got no error, expected an error")
-		}
-
-		if !strings.Contains(err.Error(), queryError.Error()) {
-			t.Errorf("got %q, expected an error to get bubbled up from the failed query %q",
-				err, queryError)
+			t.Errorf("got unexpected error %+v", err)
 		}
 	})
 
 	t.Run("it returns an error if any of the segments are not in their preferred role", func(t *testing.T) {
-		sourceDatabase := mockSourceDatabase{func(sourcedb.Database) ([]sourcedb.SegmentStatus, error) {
-			return []sourcedb.SegmentStatus{
-				makeBalanced(1),
-				makeUnbalanced(2),
-				makeBalanced(3),
-				makeUnbalanced(4),
-			}, nil
-		}}
+		sourceDatabase := []sourcedb.SegmentStatus{
+			makeBalanced(1),
+			makeUnbalanced(2),
+			makeBalanced(3),
+			makeUnbalanced(4),
+		}
 
-		err := hub.CheckSourceClusterConfiguration(sourceDatabase)
+		err := hub.SegmentStatusErrors(sourceDatabase)
 
 		if err == nil {
 			t.Fatalf("got no errors for step, expected segment status error")
@@ -131,16 +104,14 @@ func TestCheckSourceClusterConfiguration(t *testing.T) {
 	})
 
 	t.Run("it returns an error if any of the segments are down", func(t *testing.T) {
-		sourceDatabase := mockSourceDatabase{func(sourcedb.Database) ([]sourcedb.SegmentStatus, error) {
-			return []sourcedb.SegmentStatus{
-				{DbID: 0, IsUp: true},
-				{DbID: 1, IsUp: false},
-				{DbID: 2, IsUp: true},
-				{DbID: 99, IsUp: false},
-			}, nil
-		}}
+		sourceDatabase := []sourcedb.SegmentStatus{
+			{DbID: 0, IsUp: true},
+			{DbID: 1, IsUp: false},
+			{DbID: 2, IsUp: true},
+			{DbID: 99, IsUp: false},
+		}
 
-		err := hub.CheckSourceClusterConfiguration(sourceDatabase)
+		err := hub.SegmentStatusErrors(sourceDatabase)
 
 		if err == nil {
 			t.Fatalf("got no errors for step, expected segment status error")
@@ -185,14 +156,12 @@ func TestCheckSourceClusterConfiguration(t *testing.T) {
 	})
 
 	t.Run("it returns both unbalanced errors and down errors at the same time", func(t *testing.T) {
-		sourceDatabase := mockSourceDatabase{func(sourcedb.Database) ([]sourcedb.SegmentStatus, error) {
-			return []sourcedb.SegmentStatus{
-				{DbID: 1, IsUp: false},
-				makeUnbalanced(2),
-			}, nil
-		}}
+		sourceDatabase := []sourcedb.SegmentStatus{
+			{DbID: 1, IsUp: false},
+			makeUnbalanced(2),
+		}
 
-		err := hub.CheckSourceClusterConfiguration(sourceDatabase)
+		err := hub.SegmentStatusErrors(sourceDatabase)
 
 		if err == nil {
 			t.Fatalf("got no errors for step, expected segment status error")
@@ -237,10 +206,29 @@ func makeUnbalanced(dbid sourcedb.DBID) sourcedb.SegmentStatus {
 	}
 }
 
-type mockSourceDatabase struct {
-	getSegmentStatuses func(sourcedb.Database) ([]sourcedb.SegmentStatus, error)
-}
+func TestCheckSourceClusterConfiguration(t *testing.T) {
+	// TODO: add simple integration path, and find the appropriate place for the
+	// below test
 
-func (m mockSourceDatabase) GetSegmentStatuses() ([]sourcedb.SegmentStatus, error) {
-	return m.getSegmentStatuses(m)
+	// XXX this doesn't appear to be adding coverage
+	/*
+		t.Run("it returns an error if it fails to query for statuses", func(t *testing.T) {
+			queryError := errors.New("some error while querying")
+
+			sourceDatabase := mockSourceDatabase{func(sourcedb.Database) ([]sourcedb.SegmentStatus, error) {
+				return []sourcedb.SegmentStatus{}, queryError
+			}}
+
+			err := hub.CheckSourceClusterConfiguration(sourceDatabase)
+
+			if err == nil {
+				t.Fatalf("got no error, expected an error")
+			}
+
+			if !strings.Contains(err.Error(), queryError.Error()) {
+				t.Errorf("got %q, expected an error to get bubbled up from the failed query %q",
+					err, queryError)
+			}
+		})
+	*/
 }

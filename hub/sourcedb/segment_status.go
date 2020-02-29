@@ -24,10 +24,6 @@ type SegmentStatus struct {
 	PreferredRole Role
 }
 
-func (d *database) GetSegmentStatuses() ([]SegmentStatus, error) {
-	return GetSegmentStatuses(d.connection)
-}
-
 func GetSegmentStatuses(connection *sql.DB) ([]SegmentStatus, error) {
 	statuses := make([]SegmentStatus, 0)
 

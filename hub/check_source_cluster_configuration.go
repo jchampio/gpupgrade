@@ -1,6 +1,7 @@
 package hub
 
 import (
+	"database/sql"
 	"fmt"
 	"strconv"
 	"strings"
@@ -66,14 +67,17 @@ func NewUnbalancedSegmentStatusError(segments []sourcedb.SegmentStatus) error {
 	return UnbalancedSegmentStatusError{dbids}
 }
 
-func CheckSourceClusterConfiguration(db sourcedb.Database) error {
-	errors := &multierror.Error{}
-
-	statuses, err := db.GetSegmentStatuses()
-
+func CheckSourceClusterConfiguration(conn *sql.DB) error {
+	statuses, err := sourcedb.GetSegmentStatuses(conn)
 	if err != nil {
 		return err
 	}
+
+	return SegmentStatusErrors(statuses)
+}
+
+func SegmentStatusErrors(statuses []sourcedb.SegmentStatus) error {
+	errors := &multierror.Error{}
 
 	if err := checkForDownSegments(statuses); err != nil {
 		errors = multierror.Append(errors, err)

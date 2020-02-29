@@ -18,6 +18,6 @@ type database struct {
 	connection *sql.DB
 }
 
-func Initialize() *database {
-	return &database{}
+func NewDatabase(connection *sql.DB) *database {
+	return &database{connection}
 }

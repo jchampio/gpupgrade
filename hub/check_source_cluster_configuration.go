@@ -66,10 +66,10 @@ func NewUnbalancedSegmentStatusError(segments []sourcedb.SegmentStatus) error {
 	return UnbalancedSegmentStatusError{dbids}
 }
 
-func CheckSourceClusterConfiguration(sourceDatabase sourcedb.Database) error {
+func CheckSourceClusterConfiguration(db sourcedb.Database) error {
 	errors := &multierror.Error{}
 
-	statuses, err := sourceDatabase.GetSegmentStatuses()
+	statuses, err := db.GetSegmentStatuses()
 
 	if err != nil {
 		return err

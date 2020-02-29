@@ -1,5 +1,7 @@
 package sourcedb
 
+import "database/sql"
+
 type DBID int
 type Role string
 
@@ -23,12 +25,10 @@ type SegmentStatus struct {
 }
 
 func (d *database) GetSegmentStatuses() ([]SegmentStatus, error) {
-	connection, err := d.Connection()
+	return GetSegmentStatuses(d.connection)
+}
 
-	if err != nil {
-		return nil, err
-	}
-
+func GetSegmentStatuses(connection *sql.DB) ([]SegmentStatus, error) {
 	statuses := make([]SegmentStatus, 0)
 
 	rows, err := connection.Query(`

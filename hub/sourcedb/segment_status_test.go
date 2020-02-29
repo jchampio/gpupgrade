@@ -22,8 +22,7 @@ func TestGetSegmentStatuses(t *testing.T) {
 			WithArgs(Up).
 			WillReturnRows(rows)
 
-		sourceDb := Initialize()
-		sourceDb.SetConnection(connection)
+		sourceDb := NewDatabase(connection)
 		statuses, err := sourceDb.GetSegmentStatuses()
 
 		if err != nil {

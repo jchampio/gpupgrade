@@ -135,6 +135,26 @@ func (mr *MockAgentClientMockRecorder) StopAgent(ctx, in interface{}, opts ...in
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StopAgent", reflect.TypeOf((*MockAgentClient)(nil).StopAgent), varargs...)
 }
 
+// UpdateRecoveryConfs mocks base method
+func (m *MockAgentClient) UpdateRecoveryConfs(ctx context.Context, in *idl.UpdateRecoveryConfsRequest, opts ...grpc.CallOption) (*idl.UpdateRecoveryConfsReply, error) {
+	m.ctrl.T.Helper()
+	varargs := []interface{}{ctx, in}
+	for _, a := range opts {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "UpdateRecoveryConfs", varargs...)
+	ret0, _ := ret[0].(*idl.UpdateRecoveryConfsReply)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// UpdateRecoveryConfs indicates an expected call of UpdateRecoveryConfs
+func (mr *MockAgentClientMockRecorder) UpdateRecoveryConfs(ctx, in interface{}, opts ...interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]interface{}{ctx, in}, opts...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateRecoveryConfs", reflect.TypeOf((*MockAgentClient)(nil).UpdateRecoveryConfs), varargs...)
+}
+
 // MockAgentServer is a mock of AgentServer interface
 type MockAgentServer struct {
 	ctrl     *gomock.Controller
@@ -231,4 +251,19 @@ func (m *MockAgentServer) StopAgent(arg0 context.Context, arg1 *idl.StopAgentReq
 func (mr *MockAgentServerMockRecorder) StopAgent(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StopAgent", reflect.TypeOf((*MockAgentServer)(nil).StopAgent), arg0, arg1)
+}
+
+// UpdateRecoveryConfs mocks base method
+func (m *MockAgentServer) UpdateRecoveryConfs(arg0 context.Context, arg1 *idl.UpdateRecoveryConfsRequest) (*idl.UpdateRecoveryConfsReply, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateRecoveryConfs", arg0, arg1)
+	ret0, _ := ret[0].(*idl.UpdateRecoveryConfsReply)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// UpdateRecoveryConfs indicates an expected call of UpdateRecoveryConfs
+func (mr *MockAgentServerMockRecorder) UpdateRecoveryConfs(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateRecoveryConfs", reflect.TypeOf((*MockAgentServer)(nil).UpdateRecoveryConfs), arg0, arg1)
 }

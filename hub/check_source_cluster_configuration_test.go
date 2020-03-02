@@ -10,6 +10,7 @@ import (
 	"golang.org/x/xerrors"
 
 	"github.com/greenplum-db/gpupgrade/hub"
+	"github.com/greenplum-db/gpupgrade/testutils"
 )
 
 func TestSegmentStatusError_Error(t *testing.T) {
@@ -215,7 +216,7 @@ func TestCheckSourceClusterConfiguration(t *testing.T) {
 		if err != nil {
 			t.Fatalf("creating sqlmock: %+v", err)
 		}
-		defer finishMock(sqlmock, t)
+		defer testutils.FinishMock(sqlmock, t)
 
 		rows := sqlmock.
 			NewRows([]string{"dbid", "is_up", "role", "preferred_role"}).
@@ -233,7 +234,7 @@ func TestCheckSourceClusterConfiguration(t *testing.T) {
 		if err != nil {
 			t.Fatalf("creating sqlmock: %+v", err)
 		}
-		defer finishMock(sqlmock, t)
+		defer testutils.FinishMock(sqlmock, t)
 
 		expected := errors.New("sdkfjlsdfd")
 		sqlmock.ExpectQuery(".*").WillReturnError(expected)
@@ -251,7 +252,7 @@ func TestGetSegmentStatuses(t *testing.T) {
 		if err != nil {
 			t.Fatalf("creating sqlmock: %+v", err)
 		}
-		defer finishMock(sqlmock, t)
+		defer testutils.FinishMock(sqlmock, t)
 
 		rows := sqlmock.
 			NewRows([]string{"dbid", "is_up", "role", "preferred_role"}).
@@ -291,7 +292,7 @@ func TestGetSegmentStatuses(t *testing.T) {
 		if err != nil {
 			t.Fatalf("creating sqlmock: %+v", err)
 		}
-		defer finishMock(sqlmock, t)
+		defer testutils.FinishMock(sqlmock, t)
 
 		expected := errors.New("ahhhh")
 		sqlmock.ExpectQuery(".*").WillReturnError(expected)
@@ -307,7 +308,7 @@ func TestGetSegmentStatuses(t *testing.T) {
 		if err != nil {
 			t.Fatalf("creating sqlmock: %+v", err)
 		}
-		defer finishMock(sqlmock, t)
+		defer testutils.FinishMock(sqlmock, t)
 
 		rows := sqlmock.
 			NewRows([]string{"dbid", "is_up", "role", "preferred_role"}).
@@ -332,7 +333,7 @@ func TestGetSegmentStatuses(t *testing.T) {
 		if err != nil {
 			t.Fatalf("creating sqlmock: %+v", err)
 		}
-		defer finishMock(sqlmock, t)
+		defer testutils.FinishMock(sqlmock, t)
 
 		expected := errors.New("Next() failed")
 		rows := sqlmock.

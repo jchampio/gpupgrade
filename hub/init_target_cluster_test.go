@@ -144,6 +144,9 @@ func TestCreateSegmentDataDirectories(t *testing.T) {
 		{ContentID: -1, DbID: 1, Port: 15432, Hostname: "localhost", DataDir: "/data/qddir/seg-1", Role: "p"},
 		{ContentID: 0, DbID: 2, Port: 25432, Hostname: "host1", DataDir: "/data/dbfast1/seg1", Role: "p"},
 		{ContentID: 1, DbID: 3, Port: 25433, Hostname: "host2", DataDir: "/data/dbfast2/seg2", Role: "p"},
+		{ContentID: -1, DbID: 4, Port: 15433, Hostname: "host3", DataDir: "/data/qddir/seg-1", Role: "m"},
+		{ContentID: 0, DbID: 5, Port: 35432, Hostname: "host3", DataDir: "/data/dbfast1/seg1", Role: "m"},
+		{ContentID: 1, DbID: 6, Port: 35433, Hostname: "host3", DataDir: "/data/dbfast2/seg2", Role: "m"},
 	})
 
 	client := mock_idl.NewMockAgentClient(ctrl)
@@ -163,9 +166,13 @@ func TestCreateSegmentDataDirectories(t *testing.T) {
 		},
 	).Return(nil, expected)
 
+	// should not receive any connections as it contains only mirrors
+	mirrorClient := mock_idl.NewMockAgentClient(ctrl)
+
 	agentConns := []*Connection{
 		{nil, client, "host1", nil},
 		{nil, failedClient, "host2", nil},
+		{nil, mirrorClient, "host3", nil},
 	}
 
 	err := CreateSegmentDataDirectories(agentConns, c)

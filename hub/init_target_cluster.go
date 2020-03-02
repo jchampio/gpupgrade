@@ -234,14 +234,22 @@ func CreateSegmentDataDirectories(agentConns []*Connection, cluster *utils.Clust
 	errChan := make(chan error, len(agentConns))
 
 	for _, conn := range agentConns {
-		wg.Add(1)
+		conn := conn
 
+		// Selects all primaries belonging to this agent's host.
+		primaries := func(seg *utils.SegConfig) bool {
+			return seg.Hostname == conn.Hostname &&
+				(seg.Role == utils.PrimaryRole && seg.ContentID != -1)
+		}
+
+		wg.Add(1)
 		go func(c *Connection) {
 			defer wg.Done()
 
-			segments, err := cluster.SegmentsOn(c.Hostname)
-			if err != nil {
-				errChan <- err
+			segments := cluster.SelectSegments(primaries)
+			if len(segments) == 0 {
+				// This can happen if a host contains only a standby and/or
+				// mirrors.
 				return
 			}
 
@@ -253,7 +261,7 @@ func CreateSegmentDataDirectories(agentConns []*Connection, cluster *utils.Clust
 				req.Datadirs = append(req.Datadirs, datadir)
 			}
 
-			_, err = c.AgentClient.CreateSegmentDataDirectories(context.Background(), req)
+			_, err := c.AgentClient.CreateSegmentDataDirectories(context.Background(), req)
 			if err != nil {
 				gplog.Error("Error creating segment data directories on host %s: %s",
 					c.Hostname, err.Error())

@@ -49,12 +49,18 @@ func checkDiskSpace(ctx context.Context, cluster *utils.Cluster, agents []*Conne
 		agent := agents[i]
 		wg.Add(1)
 
+		// We want to check disk space for the standby, primaries, and mirrors.
+		notMaster := func(seg *utils.SegConfig) bool {
+			return seg.Hostname == agent.Hostname &&
+				!(seg.ContentID == -1 && seg.Role == "p")
+		}
+
 		go func() {
 			defer wg.Done()
 
-			segments, err := cluster.SegmentsOn(agent.Hostname)
-			if err != nil {
-				errs <- xerrors.Errorf("finding segments on host %s: %w", agent.Hostname, err)
+			segments := cluster.SelectSegments(notMaster)
+			if len(segments) == 0 {
+				errs <- utils.UnknownHostError{agent.Hostname}
 				return
 			}
 

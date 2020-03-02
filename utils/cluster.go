@@ -68,6 +68,10 @@ func ClusterFromDB(conn *dbconn.DBConn, binDir string) (*Cluster, error) {
 	return c, nil
 }
 
+func (s *SegConfig) IsStandby() bool {
+	return s.ContentID == -1 && s.Role == "m"
+}
+
 func (c *Cluster) MasterDataDir() string {
 	return c.GetDirForContent(-1)
 }
@@ -95,6 +99,16 @@ func (c *Cluster) StandbyHostname() string {
 
 func (c *Cluster) StandbyDataDirectory() string {
 	return c.Mirrors[-1].DataDir
+}
+
+// Returns true if we have at least one mirror that is not a standby
+func (c *Cluster) HasMirrors() bool {
+	for contentID := range c.ContentIDs {
+		if _, ok := c.Mirrors[contentID]; ok && contentID != -1 {
+			return true
+		}
+	}
+	return false
 }
 
 // XXX This does not provide mirror hostnames yet.
@@ -142,23 +156,15 @@ func (u UnknownHostError) Is(err error) bool {
 	return err == ErrUnknownHost
 }
 
-// SegmentsOn returns the configurations of segments that are running on a given
-// host excluding the master. An error of type ErrUnknownHost will be returned
-// for unknown hostnames.
-func (c Cluster) SegmentsOn(hostname string) ([]SegConfig, error) {
+func FilterSegmentsOnHost(segmentsToFilter []SegConfig, hostname string) []SegConfig {
 	var segments []SegConfig
-	for _, contentID := range c.ContentIDs {
-		segment := c.Primaries[contentID]
-		if segment.Hostname == hostname && segment.ContentID != -1 {
+	for _, segment := range segmentsToFilter {
+		if segment.Hostname == hostname {
 			segments = append(segments, segment)
 		}
 	}
 
-	if len(segments) == 0 {
-		return nil, UnknownHostError{hostname}
-	}
-
-	return segments, nil
+	return segments
 }
 
 // SelectSegments returns a list of all segments that match the given selector

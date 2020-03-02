@@ -12,6 +12,7 @@ import (
 	"github.com/hashicorp/go-multierror"
 	"golang.org/x/xerrors"
 
+	"github.com/greenplum-db/gpupgrade/testutils"
 	"github.com/greenplum-db/gpupgrade/utils"
 
 	. "github.com/greenplum-db/gpupgrade/hub"
@@ -23,28 +24,16 @@ var (
 	ErrRollback = fmt.Errorf("rollback failed")
 )
 
-// finishMock is a defer function to make the sqlmock API a little bit more like
-// gomock. Use it like this:
-//
-//     db, mock, err := sqlmock.New()
-//     if err != nil {
-//         t.Fatalf("couldn't create sqlmock: %v", err)
-//     }
-//     defer finishMock(mock, t)
-//
-func finishMock(mock sqlmock.Sqlmock, t *testing.T) {
-	if err := mock.ExpectationsWereMet(); err != nil {
-		t.Errorf("%v", err)
-	}
-}
-
 func TestUpdateCatalog(t *testing.T) {
 	src, err := utils.NewCluster([]utils.SegConfig{
 		{ContentID: -1, Port: 123, Role: utils.PrimaryRole},
 		{ContentID: -1, Port: 789, Role: utils.MirrorRole},
 		{ContentID: 0, Port: 234, Role: utils.PrimaryRole},
+		{ContentID: 0, Port: 111, Role: utils.MirrorRole},
 		{ContentID: 1, Port: 345, Role: utils.PrimaryRole},
+		{ContentID: 1, Port: 222, Role: utils.MirrorRole},
 		{ContentID: 2, Port: 456, Role: utils.PrimaryRole},
+		{ContentID: 2, Port: 333, Role: utils.MirrorRole},
 	})
 
 	if err != nil {
@@ -99,7 +88,7 @@ func TestUpdateCatalog(t *testing.T) {
 		if err != nil {
 			t.Fatalf("couldn't create sqlmock: %v", err)
 		}
-		defer finishMock(mock, t)
+		defer testutils.FinishMock(mock, t)
 
 		contents := sqlmock.NewRows([]string{"content"})
 		for _, content := range src.ContentIDs {
@@ -121,13 +110,10 @@ func TestUpdateCatalog(t *testing.T) {
 			expectCatalogUpdate(mock, seg).
 				WillReturnResult(sqlmock.NewResult(0, 1))
 
-			// TODO: Uncomment it when target cluster handle mirror and standby
-			// port and data directory renaming.
-			// See the corresponding section in update_catalog.go
-			//if mirror, ok := src.Mirrors[content]; ok {
-			//	expectCatalogUpdate(mock, mirror).
-			//		WillReturnResult(sqlmock.NewResult(0, 1))
-			//}
+			if mirror, ok := src.Mirrors[content]; ok {
+				expectCatalogUpdate(mock, mirror).
+					WillReturnResult(sqlmock.NewResult(0, 1))
+			}
 		}
 
 		mock.ExpectCommit()
@@ -209,11 +195,10 @@ func TestUpdateCatalog(t *testing.T) {
 				expectCatalogUpdate(mock, seg).
 					WillReturnResult(sqlmock.NewResult(0, 1))
 
-				// XXX See above
-				//if mirror, ok := src.Mirrors[content]; ok {
-				//	expectCatalogUpdate(mock, mirror).
-				//		WillReturnResult(sqlmock.NewResult(0, 1))
-				//}
+				if mirror, ok := src.Mirrors[content]; ok {
+					expectCatalogUpdate(mock, mirror).
+						WillReturnResult(sqlmock.NewResult(0, 1))
+				}
 			}
 
 			mock.ExpectCommit().WillReturnError(ErrSentinel)
@@ -321,7 +306,7 @@ func TestUpdateCatalog(t *testing.T) {
 			if err != nil {
 				t.Fatalf("couldn't create sqlmock: %v", err)
 			}
-			defer finishMock(mock, t)
+			defer testutils.FinishMock(mock, t)
 
 			// prepare() sets up any mock expectations.
 			c.prepare(mock)

@@ -103,14 +103,15 @@ expected_datadir() {
 }
 
 @test "initialize accepts a port range" {
-    # Note that 15433 is skipped here and added below. It'll be reserved for the
-    # standby.
+    # We need to have enough ports available for the master, standby, and mirrors.
     # XXX as usual in these tests, we assume a standard demo cluster.
     local expected_ports="15432,15434,15435,15436"
+    local mirror_ports="15437,15438,15439"
+    local standby_port=15433
     local newport=15432
 
     gpupgrade initialize \
-        --ports $expected_ports,15433 \
+        --ports $expected_ports,$standby_port,$mirror_ports \
         --verbose \
         --old-bindir "$GPHOME/bin" \
         --new-bindir "$GPHOME/bin" \

@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"database/sql"
 	"io/ioutil"
 	"os"
 	"os/user"
@@ -44,6 +45,7 @@ type SystemFunctions struct {
 	FilePathGlob func(pattern string) ([]string, error)
 	Create       func(name string) (*os.File, error)
 	Mkdir        func(name string, perm os.FileMode) error
+	SqlOpen      func(driverName, dataSourceName string) (*sql.DB, error)
 }
 
 func InitializeSystemFunctions() *SystemFunctions {
@@ -66,6 +68,7 @@ func InitializeSystemFunctions() *SystemFunctions {
 		WriteFile:    ioutil.WriteFile,
 		Create:       os.Create,
 		Mkdir:        os.Mkdir,
+		SqlOpen:      sql.Open,
 	}
 }
 

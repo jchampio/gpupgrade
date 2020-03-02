@@ -65,6 +65,12 @@ func (m *MockAgentServer) CheckDiskSpace(context.Context, *idl.CheckSegmentDiskS
 	return &idl.CheckDiskSpaceReply{}, nil
 }
 
+func (m *MockAgentServer) UpdateRecoveryConfs(ctx context.Context, request *idl.UpdateRecoveryConfsRequest) (*idl.UpdateRecoveryConfsReply, error) {
+	m.increaseCalls()
+
+	return &idl.UpdateRecoveryConfsReply{}, nil
+}
+
 func (m *MockAgentServer) UpgradePrimaries(ctx context.Context, in *idl.UpgradePrimariesRequest) (*idl.UpgradePrimariesReply, error) {
 	m.increaseCalls()
 

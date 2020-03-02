@@ -8,17 +8,19 @@ import (
 	"github.com/greenplum-db/gpupgrade/utils"
 )
 
+// TODO remove in favor of MustCreateCluster
 func CreateMultinodeSampleCluster(baseDir string) *utils.Cluster {
 	return &utils.Cluster{
 		ContentIDs: []int{-1, 0, 1},
 		Primaries: map[int]utils.SegConfig{
-			-1: {ContentID: -1, DbID: 1, Port: 15432, Hostname: "localhost", DataDir: baseDir + "/seg-1"},
-			0:  {ContentID: 0, DbID: 2, Port: 25432, Hostname: "host1", DataDir: baseDir + "/seg1"},
-			1:  {ContentID: 1, DbID: 3, Port: 25433, Hostname: "host2", DataDir: baseDir + "/seg2"},
+			-1: {ContentID: -1, DbID: 1, Port: 15432, Hostname: "localhost", DataDir: baseDir + "/seg-1", Role: "p"},
+			0:  {ContentID: 0, DbID: 2, Port: 25432, Hostname: "host1", DataDir: baseDir + "/seg1", Role: "p"},
+			1:  {ContentID: 1, DbID: 3, Port: 25433, Hostname: "host2", DataDir: baseDir + "/seg2", Role: "p"},
 		},
 	}
 }
 
+// TODO remove in favor of MustCreateCluster
 func CreateMultinodeSampleClusterPair(baseDir string) (*utils.Cluster, *utils.Cluster) {
 	gpdbVersion := dbconn.NewVersion("6.0.0")
 

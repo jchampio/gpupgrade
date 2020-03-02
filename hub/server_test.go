@@ -5,6 +5,7 @@ import (
 	"net"
 	"os"
 	"reflect"
+	"sort"
 	"strconv"
 	"testing"
 
@@ -50,6 +51,11 @@ var _ = Describe("Hub", func() {
 	BeforeEach(func() {
 		agentA, mockDialer, hubToAgentPort = mock_agent.NewMockAgentServer()
 		source, target = testutils.CreateMultinodeSampleClusterPair("/tmp")
+		source.Mirrors = map[int]utils.SegConfig{
+			-1: {ContentID: -1, DbID: 1, Port: 15433, Hostname: "standby-host", DataDir: "/seg-1"},
+			0:  {ContentID: 0, DbID: 2, Port: 25434, Hostname: "mirror-host1", DataDir: "/seg1"},
+			1:  {ContentID: 1, DbID: 3, Port: 25435, Hostname: "mirror-host2", DataDir: "/seg2"},
+		}
 		useLinkMode = false
 		conf = &hub.Config{source, target, hub.InitializeConfig{}, cliToHubPort, hubToAgentPort, useLinkMode}
 	})
@@ -142,7 +148,9 @@ var _ = Describe("Hub", func() {
 		for _, conn := range conns {
 			allHosts = append(allHosts, conn.Hostname)
 		}
-		Expect(allHosts).To(ConsistOf([]string{"host1", "host2"}))
+		Expect(allHosts).To(ConsistOf([]string{
+			"host1", "host2", "standby-host", "mirror-host1", "mirror-host2",
+		}))
 	})
 
 	It("saves grpc connections for future calls", func() {
@@ -271,4 +279,49 @@ func TestHubSaveConfig(t *testing.T) {
 			}
 		}
 	})
+}
+
+func TestAgentHosts(t *testing.T) {
+	cases := []struct {
+		name     string
+		cluster  *utils.Cluster
+		expected []string // must be in alphabetical order
+	}{{
+		"master excluded",
+		hub.MustCreateCluster(t, []utils.SegConfig{
+			{ContentID: -1, Hostname: "mdw", Role: "p"},
+			{ContentID: 0, Hostname: "sdw1", Role: "p"},
+			{ContentID: 1, Hostname: "sdw1", Role: "p"},
+		}),
+		[]string{"sdw1"},
+	}, {
+		"master included if another segment is with it",
+		hub.MustCreateCluster(t, []utils.SegConfig{
+			{ContentID: -1, Hostname: "mdw", Role: "p"},
+			{ContentID: 0, Hostname: "mdw", Role: "p"},
+		}),
+		[]string{"mdw"},
+	}, {
+		"mirror and standby hosts are handled",
+		hub.MustCreateCluster(t, []utils.SegConfig{
+			{ContentID: -1, Hostname: "mdw", Role: "p"},
+			{ContentID: -1, Hostname: "smdw", Role: "m"},
+			{ContentID: 0, Hostname: "sdw1", Role: "p"},
+			{ContentID: 0, Hostname: "sdw1", Role: "m"},
+			{ContentID: 1, Hostname: "sdw1", Role: "p"},
+			{ContentID: 1, Hostname: "sdw2", Role: "m"},
+		}),
+		[]string{"sdw1", "sdw2", "smdw"},
+	}}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			actual := hub.AgentHosts(c.cluster)
+			sort.Strings(actual) // order not guaranteed
+
+			if !reflect.DeepEqual(actual, c.expected) {
+				t.Errorf("got %q want %q", actual, c.expected)
+			}
+		})
+	}
 }

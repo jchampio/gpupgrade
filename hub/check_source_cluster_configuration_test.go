@@ -207,28 +207,5 @@ func makeUnbalanced(dbid sourcedb.DBID) sourcedb.SegmentStatus {
 }
 
 func TestCheckSourceClusterConfiguration(t *testing.T) {
-	// TODO: add simple integration path, and find the appropriate place for the
-	// below test
-
-	// XXX this doesn't appear to be adding coverage
-	/*
-		t.Run("it returns an error if it fails to query for statuses", func(t *testing.T) {
-			queryError := errors.New("some error while querying")
-
-			sourceDatabase := mockSourceDatabase{func(sourcedb.Database) ([]sourcedb.SegmentStatus, error) {
-				return []sourcedb.SegmentStatus{}, queryError
-			}}
-
-			err := hub.CheckSourceClusterConfiguration(sourceDatabase)
-
-			if err == nil {
-				t.Fatalf("got no error, expected an error")
-			}
-
-			if !strings.Contains(err.Error(), queryError.Error()) {
-				t.Errorf("got %q, expected an error to get bubbled up from the failed query %q",
-					err, queryError)
-			}
-		})
-	*/
+	// TODO: add simple integration path
 }

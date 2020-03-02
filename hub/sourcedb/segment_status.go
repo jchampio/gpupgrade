@@ -42,6 +42,8 @@ func GetSegmentStatuses(connection *sql.DB) ([]SegmentStatus, error) {
 		statuses = append(statuses, r)
 	}
 
+	// XXX error handling not done per row, and rows not Close()d
+
 	if err != nil {
 		return nil, err
 	}

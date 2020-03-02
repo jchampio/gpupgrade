@@ -1,14 +1,26 @@
 package sourcedb
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/DATA-DOG/go-sqlmock"
+	"golang.org/x/xerrors"
 )
+
+func finishMock(mock sqlmock.Sqlmock, t *testing.T) {
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("%v", err)
+	}
+}
 
 func TestGetSegmentStatuses(t *testing.T) {
 	t.Run("it returns segment statuses", func(t *testing.T) {
 		connection, sqlmock, err := sqlmock.New()
+		if err != nil {
+			t.Fatalf("creating sqlmock: %+v", err)
+		}
+		defer finishMock(sqlmock, t)
 
 		rows := sqlmock.
 			NewRows([]string{"dbid", "is_up", "role", "preferred_role"}).
@@ -40,6 +52,22 @@ func TestGetSegmentStatuses(t *testing.T) {
 		second := statuses[1]
 		if second.DbID != 2 || second.IsUp != false || second.Role != Primary || second.PreferredRole != Mirror {
 			t.Errorf("segment status not populated correctly: %+v", second)
+		}
+	})
+
+	t.Run("it returns an error if it fails to query for statuses", func(t *testing.T) {
+		connection, sqlmock, err := sqlmock.New()
+		if err != nil {
+			t.Fatalf("creating sqlmock: %+v", err)
+		}
+		defer finishMock(sqlmock, t)
+
+		expected := errors.New("ahhhh")
+		sqlmock.ExpectQuery(".*").WillReturnError(expected)
+
+		_, err = GetSegmentStatuses(connection)
+		if !xerrors.Is(err, expected) {
+			t.Errorf("got error %#v, want %#v", err, expected)
 		}
 	})
 }

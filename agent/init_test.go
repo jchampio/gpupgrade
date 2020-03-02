@@ -39,3 +39,7 @@ func SetExecCommand(command exectest.Command) {
 func SetRsyncCommand(command exectest.Command) {
 	rsyncCommand = command
 }
+
+func SetSedCommand(command exectest.Command) {
+	sedCommand = command
+}

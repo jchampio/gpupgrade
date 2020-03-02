@@ -62,6 +62,27 @@ func TestAssignPorts(t *testing.T) {
 				{ContentID: 2, DbID: 4, Hostname: "sdw1", DataDir: "/data/dbfast3_upgrade/seg3", Role: "p", PreferredRole: "p", Port: 50435},
 			}},
 	}, {
+		name: "when using default ports, it sets up mirrors as expected in the InitializeConfig",
+		cluster: MustCreateCluster(t, []utils.SegConfig{
+			{ContentID: -1, DbID: 1, Hostname: "mdw", DataDir: "/data/qddir/seg-1", Role: "p", PreferredRole: "p"},
+			{ContentID: 0, DbID: 2, Hostname: "sdw1", DataDir: "/data/dbfast1/seg1", Role: "p", PreferredRole: "p"},
+			{ContentID: 1, DbID: 3, Hostname: "sdw1", DataDir: "/data/dbfast2/seg2", Role: "p", PreferredRole: "p"},
+			{ContentID: 0, DbID: 4, Hostname: "sdw1", DataDir: "/data/dbfast_mirror1/seg1", Role: "m", PreferredRole: "m"},
+			{ContentID: 1, DbID: 5, Hostname: "sdw1", DataDir: "/data/dbfast_mirror2/seg2", Role: "m", PreferredRole: "m"},
+		}),
+		ports: []int{},
+		expected: InitializeConfig{
+			Master: utils.SegConfig{ContentID: -1, DbID: 1, Hostname: "mdw", DataDir: "/data/qddir_upgrade/seg-1", Role: "p", PreferredRole: "p", Port: 50432},
+			Primaries: []utils.SegConfig{
+				{ContentID: 0, DbID: 2, Hostname: "sdw1", DataDir: "/data/dbfast1_upgrade/seg1", Role: "p", PreferredRole: "p", Port: 50433},
+				{ContentID: 1, DbID: 3, Hostname: "sdw1", DataDir: "/data/dbfast2_upgrade/seg2", Role: "p", PreferredRole: "p", Port: 50434},
+			},
+			Mirrors: []utils.SegConfig{
+				{ContentID: 0, DbID: 4, Hostname: "sdw1", DataDir: "/data/dbfast_mirror1_upgrade/seg1", Role: "m", PreferredRole: "m", Port: 50435},
+				{ContentID: 1, DbID: 5, Hostname: "sdw1", DataDir: "/data/dbfast_mirror2_upgrade/seg2", Role: "m", PreferredRole: "m", Port: 50436},
+			},
+		},
+	}, {
 		name: "provides a standby port",
 		cluster: MustCreateCluster(t, []utils.SegConfig{
 			{ContentID: -1, DbID: 1, Hostname: "mdw", DataDir: "/data/qddir/seg-1", Role: "p", PreferredRole: "p"},
@@ -71,7 +92,7 @@ func TestAssignPorts(t *testing.T) {
 		ports: []int{},
 		expected: InitializeConfig{
 			Master:    utils.SegConfig{ContentID: -1, DbID: 1, Hostname: "mdw", DataDir: "/data/qddir_upgrade/seg-1", Role: "p", PreferredRole: "p", Port: 50432},
-			Standby:   utils.SegConfig{ContentID: -1, DbID: 2, Hostname: "smdw", DataDir: "/data/qddir_upgrade/seg-1", Role: "m", PreferredRole: "m", Port: 50433},
+			Standby:   utils.SegConfig{ContentID: -1, DbID: 2, Hostname: "smdw", DataDir: "/data/qddir/seg-1_upgrade", Role: "m", PreferredRole: "m", Port: 50433},
 			Primaries: []utils.SegConfig{{ContentID: 0, DbID: 3, Hostname: "sdw1", DataDir: "/data/dbfast1_upgrade/seg1", Role: "p", PreferredRole: "p", Port: 50434}},
 		},
 	}, {
@@ -84,7 +105,7 @@ func TestAssignPorts(t *testing.T) {
 		ports: []int{},
 		expected: InitializeConfig{
 			Master:    utils.SegConfig{ContentID: -1, DbID: 1, Hostname: "mdw", DataDir: "/data/qddir_upgrade/seg-1", Role: "p", PreferredRole: "p", Port: 50432},
-			Standby:   utils.SegConfig{ContentID: -1, DbID: 2, Hostname: "mdw", DataDir: "/data/qddir_upgrade/seg-1", Role: "m", PreferredRole: "m", Port: 50433},
+			Standby:   utils.SegConfig{ContentID: -1, DbID: 2, Hostname: "mdw", DataDir: "/data/qddir/seg-1_upgrade", Role: "m", PreferredRole: "m", Port: 50433},
 			Primaries: []utils.SegConfig{{ContentID: 0, DbID: 3, Hostname: "sdw1", DataDir: "/data/dbfast1_upgrade/seg1", Role: "p", PreferredRole: "p", Port: 50434}},
 		},
 	}, {
@@ -97,7 +118,7 @@ func TestAssignPorts(t *testing.T) {
 		ports: []int{},
 		expected: InitializeConfig{
 			Master:    utils.SegConfig{ContentID: -1, DbID: 1, Hostname: "mdw", DataDir: "/data/qddir_upgrade/seg-1", Role: "p", PreferredRole: "p", Port: 50432},
-			Standby:   utils.SegConfig{ContentID: -1, DbID: 2, Hostname: "mdw", DataDir: "/data/qddir_upgrade/seg-1", Role: "m", PreferredRole: "m", Port: 50433},
+			Standby:   utils.SegConfig{ContentID: -1, DbID: 2, Hostname: "mdw", DataDir: "/data/qddir/seg-1_upgrade", Role: "m", PreferredRole: "m", Port: 50433},
 			Primaries: []utils.SegConfig{{ContentID: 0, DbID: 3, Hostname: "mdw", DataDir: "/data/dbfast1_upgrade/seg1", Role: "p", PreferredRole: "p", Port: 50434}},
 		},
 	}, {
@@ -110,7 +131,7 @@ func TestAssignPorts(t *testing.T) {
 		ports: []int{1, 2, 3},
 		expected: InitializeConfig{
 			Master:    utils.SegConfig{ContentID: -1, DbID: 1, Hostname: "mdw", DataDir: "/data/qddir_upgrade/seg-1", Role: "p", PreferredRole: "p", Port: 1},
-			Standby:   utils.SegConfig{ContentID: -1, DbID: 2, Hostname: "mdw", DataDir: "/data/qddir_upgrade/seg-1", Role: "m", PreferredRole: "m", Port: 2},
+			Standby:   utils.SegConfig{ContentID: -1, DbID: 2, Hostname: "mdw", DataDir: "/data/qddir/seg-1_upgrade", Role: "m", PreferredRole: "m", Port: 2},
 			Primaries: []utils.SegConfig{{ContentID: 0, DbID: 3, Hostname: "mdw", DataDir: "/data/dbfast1_upgrade/seg1", Role: "p", PreferredRole: "p", Port: 3}},
 		},
 	}, {
@@ -128,11 +149,16 @@ func TestAssignPorts(t *testing.T) {
 		ports: []int{1, 2, 3, 4, 5},
 		expected: InitializeConfig{
 			Master:  utils.SegConfig{ContentID: -1, DbID: 1, Hostname: "mdw", DataDir: "/data/qddir_upgrade/seg-1", Role: "p", PreferredRole: "p", Port: 1},
-			Standby: utils.SegConfig{ContentID: -1, DbID: 2, Hostname: "mdw", DataDir: "/data/qddir_upgrade/seg-1", Role: "m", PreferredRole: "m", Port: 2},
+			Standby: utils.SegConfig{ContentID: -1, DbID: 2, Hostname: "mdw", DataDir: "/data/qddir/seg-1_upgrade", Role: "m", PreferredRole: "m", Port: 2},
 			Primaries: []utils.SegConfig{
 				{ContentID: 0, DbID: 3, Hostname: "sdw1", DataDir: "/data/dbfast1_upgrade/seg1", Role: "p", PreferredRole: "p", Port: 3},
 				{ContentID: 1, DbID: 4, Hostname: "sdw2", DataDir: "/data/dbfast2_upgrade/seg2", Role: "p", PreferredRole: "p", Port: 3},
 				{ContentID: 2, DbID: 5, Hostname: "sdw3", DataDir: "/data/dbfast3_upgrade/seg3", Role: "p", PreferredRole: "p", Port: 3},
+			},
+			Mirrors: []utils.SegConfig{
+				{ContentID: 0, DbID: 6, Hostname: "sdw2", DataDir: "/data/dbfast_mirror1_upgrade/seg1", Role: "m", PreferredRole: "m", Port: 4},
+				{ContentID: 1, DbID: 7, Hostname: "sdw3", DataDir: "/data/dbfast_mirror2_upgrade/seg2", Role: "m", PreferredRole: "m", Port: 4},
+				{ContentID: 2, DbID: 8, Hostname: "sdw1", DataDir: "/data/dbfast_mirror3_upgrade/seg3", Role: "m", PreferredRole: "m", Port: 4},
 			},
 		},
 	}}
@@ -193,6 +219,14 @@ func TestAssignPorts(t *testing.T) {
 			{ContentID: -1, DbID: 1, Hostname: "mdw", DataDir: "/data/qddir/seg-1", Role: "p", PreferredRole: "p"},
 			{ContentID: -1, DbID: 2, Hostname: "smdw", DataDir: "/data/qddir/seg-1", Role: "m", PreferredRole: "m"},
 			{ContentID: 0, DbID: 3, Hostname: "sdw1", DataDir: "/data/dbfast1/seg1", Role: "p", PreferredRole: "p"},
+		}),
+		ports: []int{15433, 15434},
+	}, {
+		name: "errors when there are not enough ports for the mirrors",
+		cluster: MustCreateCluster(t, []utils.SegConfig{
+			{ContentID: -1, DbID: 1, Hostname: "mdw", DataDir: "/data/qddir/seg-1", Role: "p", PreferredRole: "p"},
+			{ContentID: 0, DbID: 2, Hostname: "sdw1", DataDir: "/data/dbfast1/seg1", Role: "p", PreferredRole: "p"},
+			{ContentID: 0, DbID: 3, Hostname: "sdw1", DataDir: "/data/dbfast_mirror1/seg1", Role: "m", PreferredRole: "m"},
 		}),
 		ports: []int{15433, 15434},
 	}, {

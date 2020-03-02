@@ -2,6 +2,7 @@ package testutils
 
 import (
 	"fmt"
+	"testing"
 
 	"github.com/greenplum-db/gpupgrade/utils"
 
@@ -9,6 +10,21 @@ import (
 	"github.com/greenplum-db/gp-common-go-libs/dbconn"
 	"github.com/greenplum-db/gp-common-go-libs/testhelper"
 )
+
+// finishMock is a defer function to make the sqlmock API a little bit more like
+// gomock. Use it like this:
+//
+//     db, mock, err := sqlmock.New()
+//     if err != nil {
+//         t.Fatalf("couldn't create sqlmock: %v", err)
+//     }
+//     defer finishMock(mock, t)
+//
+func FinishMock(mock sqlmock.Sqlmock, t *testing.T) {
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("%v", err)
+	}
+}
 
 // MockSegmentConfiguration returns a set of sqlmock.Rows that contains the
 // expected response to a gp_segment_configuration query.

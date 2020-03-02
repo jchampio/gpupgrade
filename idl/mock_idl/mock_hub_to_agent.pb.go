@@ -5,9 +5,9 @@
 package mock_idl
 
 import (
+	context "context"
 	gomock "github.com/golang/mock/gomock"
 	idl "github.com/greenplum-db/gpupgrade/idl"
-	context "golang.org/x/net/context"
 	grpc "google.golang.org/grpc"
 	reflect "reflect"
 )
@@ -37,7 +37,6 @@ func (m *MockAgentClient) EXPECT() *MockAgentClientMockRecorder {
 
 // CheckDiskSpace mocks base method
 func (m *MockAgentClient) CheckDiskSpace(ctx context.Context, in *idl.CheckSegmentDiskSpaceRequest, opts ...grpc.CallOption) (*idl.CheckDiskSpaceReply, error) {
-	m.ctrl.T.Helper()
 	varargs := []interface{}{ctx, in}
 	for _, a := range opts {
 		varargs = append(varargs, a)
@@ -50,14 +49,12 @@ func (m *MockAgentClient) CheckDiskSpace(ctx context.Context, in *idl.CheckSegme
 
 // CheckDiskSpace indicates an expected call of CheckDiskSpace
 func (mr *MockAgentClientMockRecorder) CheckDiskSpace(ctx, in interface{}, opts ...interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
 	varargs := append([]interface{}{ctx, in}, opts...)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CheckDiskSpace", reflect.TypeOf((*MockAgentClient)(nil).CheckDiskSpace), varargs...)
 }
 
 // UpgradePrimaries mocks base method
 func (m *MockAgentClient) UpgradePrimaries(ctx context.Context, in *idl.UpgradePrimariesRequest, opts ...grpc.CallOption) (*idl.UpgradePrimariesReply, error) {
-	m.ctrl.T.Helper()
 	varargs := []interface{}{ctx, in}
 	for _, a := range opts {
 		varargs = append(varargs, a)
@@ -70,14 +67,12 @@ func (m *MockAgentClient) UpgradePrimaries(ctx context.Context, in *idl.UpgradeP
 
 // UpgradePrimaries indicates an expected call of UpgradePrimaries
 func (mr *MockAgentClientMockRecorder) UpgradePrimaries(ctx, in interface{}, opts ...interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
 	varargs := append([]interface{}{ctx, in}, opts...)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpgradePrimaries", reflect.TypeOf((*MockAgentClient)(nil).UpgradePrimaries), varargs...)
 }
 
 // CreateSegmentDataDirectories mocks base method
 func (m *MockAgentClient) CreateSegmentDataDirectories(ctx context.Context, in *idl.CreateSegmentDataDirRequest, opts ...grpc.CallOption) (*idl.CreateSegmentDataDirReply, error) {
-	m.ctrl.T.Helper()
 	varargs := []interface{}{ctx, in}
 	for _, a := range opts {
 		varargs = append(varargs, a)
@@ -90,14 +85,12 @@ func (m *MockAgentClient) CreateSegmentDataDirectories(ctx context.Context, in *
 
 // CreateSegmentDataDirectories indicates an expected call of CreateSegmentDataDirectories
 func (mr *MockAgentClientMockRecorder) CreateSegmentDataDirectories(ctx, in interface{}, opts ...interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
 	varargs := append([]interface{}{ctx, in}, opts...)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateSegmentDataDirectories", reflect.TypeOf((*MockAgentClient)(nil).CreateSegmentDataDirectories), varargs...)
 }
 
 // RenameDirectories mocks base method
 func (m *MockAgentClient) RenameDirectories(ctx context.Context, in *idl.RenameDirectoriesRequest, opts ...grpc.CallOption) (*idl.RenameDirectoriesReply, error) {
-	m.ctrl.T.Helper()
 	varargs := []interface{}{ctx, in}
 	for _, a := range opts {
 		varargs = append(varargs, a)
@@ -110,14 +103,12 @@ func (m *MockAgentClient) RenameDirectories(ctx context.Context, in *idl.RenameD
 
 // RenameDirectories indicates an expected call of RenameDirectories
 func (mr *MockAgentClientMockRecorder) RenameDirectories(ctx, in interface{}, opts ...interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
 	varargs := append([]interface{}{ctx, in}, opts...)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RenameDirectories", reflect.TypeOf((*MockAgentClient)(nil).RenameDirectories), varargs...)
 }
 
 // StopAgent mocks base method
 func (m *MockAgentClient) StopAgent(ctx context.Context, in *idl.StopAgentRequest, opts ...grpc.CallOption) (*idl.StopAgentReply, error) {
-	m.ctrl.T.Helper()
 	varargs := []interface{}{ctx, in}
 	for _, a := range opts {
 		varargs = append(varargs, a)
@@ -130,9 +121,26 @@ func (m *MockAgentClient) StopAgent(ctx context.Context, in *idl.StopAgentReques
 
 // StopAgent indicates an expected call of StopAgent
 func (mr *MockAgentClientMockRecorder) StopAgent(ctx, in interface{}, opts ...interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
 	varargs := append([]interface{}{ctx, in}, opts...)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StopAgent", reflect.TypeOf((*MockAgentClient)(nil).StopAgent), varargs...)
+}
+
+// UpdateRecoveryConfs mocks base method
+func (m *MockAgentClient) UpdateRecoveryConfs(ctx context.Context, in *idl.UpdateRecoveryConfsRequest, opts ...grpc.CallOption) (*idl.UpdateRecoveryConfsReply, error) {
+	varargs := []interface{}{ctx, in}
+	for _, a := range opts {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "UpdateRecoveryConfs", varargs...)
+	ret0, _ := ret[0].(*idl.UpdateRecoveryConfsReply)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// UpdateRecoveryConfs indicates an expected call of UpdateRecoveryConfs
+func (mr *MockAgentClientMockRecorder) UpdateRecoveryConfs(ctx, in interface{}, opts ...interface{}) *gomock.Call {
+	varargs := append([]interface{}{ctx, in}, opts...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateRecoveryConfs", reflect.TypeOf((*MockAgentClient)(nil).UpdateRecoveryConfs), varargs...)
 }
 
 // MockAgentServer is a mock of AgentServer interface
@@ -160,7 +168,6 @@ func (m *MockAgentServer) EXPECT() *MockAgentServerMockRecorder {
 
 // CheckDiskSpace mocks base method
 func (m *MockAgentServer) CheckDiskSpace(arg0 context.Context, arg1 *idl.CheckSegmentDiskSpaceRequest) (*idl.CheckDiskSpaceReply, error) {
-	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "CheckDiskSpace", arg0, arg1)
 	ret0, _ := ret[0].(*idl.CheckDiskSpaceReply)
 	ret1, _ := ret[1].(error)
@@ -169,13 +176,11 @@ func (m *MockAgentServer) CheckDiskSpace(arg0 context.Context, arg1 *idl.CheckSe
 
 // CheckDiskSpace indicates an expected call of CheckDiskSpace
 func (mr *MockAgentServerMockRecorder) CheckDiskSpace(arg0, arg1 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CheckDiskSpace", reflect.TypeOf((*MockAgentServer)(nil).CheckDiskSpace), arg0, arg1)
 }
 
 // UpgradePrimaries mocks base method
 func (m *MockAgentServer) UpgradePrimaries(arg0 context.Context, arg1 *idl.UpgradePrimariesRequest) (*idl.UpgradePrimariesReply, error) {
-	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "UpgradePrimaries", arg0, arg1)
 	ret0, _ := ret[0].(*idl.UpgradePrimariesReply)
 	ret1, _ := ret[1].(error)
@@ -184,13 +189,11 @@ func (m *MockAgentServer) UpgradePrimaries(arg0 context.Context, arg1 *idl.Upgra
 
 // UpgradePrimaries indicates an expected call of UpgradePrimaries
 func (mr *MockAgentServerMockRecorder) UpgradePrimaries(arg0, arg1 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpgradePrimaries", reflect.TypeOf((*MockAgentServer)(nil).UpgradePrimaries), arg0, arg1)
 }
 
 // CreateSegmentDataDirectories mocks base method
 func (m *MockAgentServer) CreateSegmentDataDirectories(arg0 context.Context, arg1 *idl.CreateSegmentDataDirRequest) (*idl.CreateSegmentDataDirReply, error) {
-	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "CreateSegmentDataDirectories", arg0, arg1)
 	ret0, _ := ret[0].(*idl.CreateSegmentDataDirReply)
 	ret1, _ := ret[1].(error)
@@ -199,13 +202,11 @@ func (m *MockAgentServer) CreateSegmentDataDirectories(arg0 context.Context, arg
 
 // CreateSegmentDataDirectories indicates an expected call of CreateSegmentDataDirectories
 func (mr *MockAgentServerMockRecorder) CreateSegmentDataDirectories(arg0, arg1 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateSegmentDataDirectories", reflect.TypeOf((*MockAgentServer)(nil).CreateSegmentDataDirectories), arg0, arg1)
 }
 
 // RenameDirectories mocks base method
 func (m *MockAgentServer) RenameDirectories(arg0 context.Context, arg1 *idl.RenameDirectoriesRequest) (*idl.RenameDirectoriesReply, error) {
-	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "RenameDirectories", arg0, arg1)
 	ret0, _ := ret[0].(*idl.RenameDirectoriesReply)
 	ret1, _ := ret[1].(error)
@@ -214,13 +215,11 @@ func (m *MockAgentServer) RenameDirectories(arg0 context.Context, arg1 *idl.Rena
 
 // RenameDirectories indicates an expected call of RenameDirectories
 func (mr *MockAgentServerMockRecorder) RenameDirectories(arg0, arg1 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RenameDirectories", reflect.TypeOf((*MockAgentServer)(nil).RenameDirectories), arg0, arg1)
 }
 
 // StopAgent mocks base method
 func (m *MockAgentServer) StopAgent(arg0 context.Context, arg1 *idl.StopAgentRequest) (*idl.StopAgentReply, error) {
-	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "StopAgent", arg0, arg1)
 	ret0, _ := ret[0].(*idl.StopAgentReply)
 	ret1, _ := ret[1].(error)
@@ -229,6 +228,18 @@ func (m *MockAgentServer) StopAgent(arg0 context.Context, arg1 *idl.StopAgentReq
 
 // StopAgent indicates an expected call of StopAgent
 func (mr *MockAgentServerMockRecorder) StopAgent(arg0, arg1 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StopAgent", reflect.TypeOf((*MockAgentServer)(nil).StopAgent), arg0, arg1)
+}
+
+// UpdateRecoveryConfs mocks base method
+func (m *MockAgentServer) UpdateRecoveryConfs(arg0 context.Context, arg1 *idl.UpdateRecoveryConfsRequest) (*idl.UpdateRecoveryConfsReply, error) {
+	ret := m.ctrl.Call(m, "UpdateRecoveryConfs", arg0, arg1)
+	ret0, _ := ret[0].(*idl.UpdateRecoveryConfsReply)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// UpdateRecoveryConfs indicates an expected call of UpdateRecoveryConfs
+func (mr *MockAgentServerMockRecorder) UpdateRecoveryConfs(arg0, arg1 interface{}) *gomock.Call {
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateRecoveryConfs", reflect.TypeOf((*MockAgentServer)(nil).UpdateRecoveryConfs), arg0, arg1)
 }

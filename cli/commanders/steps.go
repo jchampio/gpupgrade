@@ -8,14 +8,13 @@ import (
 	"path/filepath"
 	"strconv"
 
-	"github.com/greenplum-db/gpupgrade/hub"
-	"github.com/greenplum-db/gpupgrade/utils"
-
 	"github.com/greenplum-db/gp-common-go-libs/gplog"
 	"github.com/pkg/errors"
 	"golang.org/x/xerrors"
 
+	"github.com/greenplum-db/gpupgrade/hub"
 	"github.com/greenplum-db/gpupgrade/idl"
+	"github.com/greenplum-db/gpupgrade/utils"
 )
 
 type receiver interface {
@@ -36,10 +35,12 @@ var lines = map[idl.Substep]string{
 	idl.Substep_UPGRADE_PRIMARIES:                                 "Upgrading primary segments...",
 	idl.Substep_START_TARGET_CLUSTER:                              "Starting target cluster...",
 	idl.Substep_FINALIZE_UPGRADE_STANDBY:                          "Upgrading standby...",
-	idl.Substep_FINALIZE_SHUTDOWN_TARGET_CLUSTER:                  "Stopping new cluster",
+	idl.Substep_FINALIZE_UPGRADE_MIRRORS:                          "Upgrading mirrors...",
+	idl.Substep_FINALIZE_SHUTDOWN_TARGET_CLUSTER:                  "Stopping new cluster...",
 	idl.Substep_FINALIZE_UPDATE_TARGET_CATALOG_AND_CLUSTER_CONFIG: "Updating new master catalog...",
 	idl.Substep_FINALIZE_RENAME_DATA_DIRECTORIES:                  "Renaming data directories...",
 	idl.Substep_FINALIZE_UPDATE_TARGET_CONF_FILES:                 "Updating new master postgreql.conf and gpperfmon.conf files...",
+	idl.Substep_FINALIZE_UPDATE_RECOVERY_CONFS:                    "Updating recovery.conf files on mirrors...",
 	idl.Substep_FINALIZE_START_TARGET_CLUSTER:                     "Starting new cluster...",
 }
 
@@ -95,7 +96,7 @@ func Execute(client idl.CliToHubClient, verbose bool) error {
 	if err != nil {
 		return xerrors.Errorf("Execute: %w", err)
 	}
-	
+
 	path := filepath.Join(utils.GetStateDir(), hub.ConfigFileName)
 	conf := &hub.Config{}
 	err = hub.LoadConfig(conf, path)

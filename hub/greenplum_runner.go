@@ -5,6 +5,7 @@ import (
 	"os/exec"
 	"path/filepath"
 
+	"github.com/greenplum-db/gp-common-go-libs/gplog"
 	"github.com/kballard/go-shellquote"
 
 	"github.com/greenplum-db/gpupgrade/step"
@@ -21,6 +22,7 @@ func (e *greenplumRunner) Run(utilityName string, arguments ...string) error {
 	script := shellquote.Join(arguments...)
 
 	withGreenplumPath := fmt.Sprintf("source %s/../greenplum_path.sh && %s", e.binDir, script)
+	gplog.Debug(withGreenplumPath)
 
 	command := exec.Command("bash", "-c", withGreenplumPath)
 	command.Env = append(command.Env, fmt.Sprintf("%v=%v", "MASTER_DATA_DIRECTORY", e.masterDataDirectory))

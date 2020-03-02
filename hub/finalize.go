@@ -1,11 +1,11 @@
 package hub
 
 import (
+	"context"
 	"fmt"
 
-	"github.com/hashicorp/go-multierror"
-
 	"github.com/greenplum-db/gp-common-go-libs/gplog"
+	"github.com/hashicorp/go-multierror"
 
 	"github.com/greenplum-db/gpupgrade/idl"
 	"github.com/greenplum-db/gpupgrade/step"
@@ -27,28 +27,50 @@ func (s *Server) Finalize(_ *idl.FinalizeRequest, stream idl.CliToHub_FinalizeSe
 		}
 	}()
 
+	// This runner runs all commands against the target cluster.
+	targetRunner := &greenplumRunner{
+		masterPort:          s.Target.MasterPort(),
+		masterDataDirectory: s.Target.MasterDataDir(),
+		binDir:              s.Target.BinDir,
+	}
+
 	if s.Source.HasStandby() {
 		st.Run(idl.Substep_FINALIZE_UPGRADE_STANDBY, func(streams step.OutStreams) error {
-			greenplumRunner := &greenplumRunner{
-				masterPort:          s.Target.MasterPort(),
-				masterDataDirectory: s.Target.MasterDataDir(),
-				binDir:              s.Target.BinDir,
-				streams:             streams,
-			}
+			// XXX this probably indicates a bad abstraction
+			targetRunner.streams = streams
 
 			// TODO: Persist the standby to config.json and update the
 			//  source & target clusters.
-			return UpgradeStandby(greenplumRunner, StandbyConfig{
-				Port:          s.TargetInitializeConfig.Standby.Port,
-				Hostname:      s.Source.StandbyHostname(),
-				DataDirectory: s.Source.StandbyDataDirectory() + "_upgrade",
+			// todo: replace StandbyConfig with SegInfo and pass the TargetInitializeConfig.Standby directly in
+			standby := s.TargetInitializeConfig.Standby
+			return UpgradeStandby(targetRunner, StandbyConfig{
+				Port:          standby.Port,
+				Hostname:      standby.Hostname,
+				DataDirectory: standby.DataDir,
 			})
+		})
+	}
+
+	if s.Source.HasMirrors() {
+		st.Run(idl.Substep_FINALIZE_UPGRADE_MIRRORS, func(streams step.OutStreams) error {
+			// XXX this probably indicates a bad abstraction
+			targetRunner.streams = streams
+
+			return UpgradeMirrors(s.StateDir, s.Target.MasterPort(), &s.TargetInitializeConfig, targetRunner)
 		})
 	}
 
 	st.Run(idl.Substep_FINALIZE_SHUTDOWN_TARGET_CLUSTER, func(streams step.OutStreams) error {
 		return StopCluster(streams, s.Target, false)
 	})
+
+	if s.Source.HasMirrors() {
+		// We perform recovery.conf migration BEFORE the catalog update so that
+		// we still have access to the target's temporary ports.
+		st.Run(idl.Substep_FINALIZE_UPDATE_RECOVERY_CONFS, func(streams step.OutStreams) error {
+			return UpdateRecoveryConfs(context.Background(), s.agentConns, s.Source, s.Target, s.TargetInitializeConfig)
+		})
+	}
 
 	st.Run(idl.Substep_FINALIZE_UPDATE_TARGET_CATALOG_AND_CLUSTER_CONFIG, func(streams step.OutStreams) error {
 		return s.UpdateCatalogAndClusterConfig(streams)

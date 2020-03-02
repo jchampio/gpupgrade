@@ -202,7 +202,7 @@ func (s *Server) Stop(closeAgentConns bool) {
 }
 
 func (s *Server) RestartAgents(ctx context.Context, in *idl.RestartAgentsRequest) (*idl.RestartAgentsReply, error) {
-	restartedHosts, err := RestartAgents(ctx, nil, s.Source.GetHostnames(), s.AgentPort, s.StateDir)
+	restartedHosts, err := RestartAgents(ctx, nil, AgentHosts(s.Source), s.AgentPort, s.StateDir)
 	return &idl.RestartAgentsReply{AgentHosts: restartedHosts}, err
 }
 
@@ -298,7 +298,7 @@ func (s *Server) AgentConns() ([]*Connection, error) {
 		return s.agentConns, nil
 	}
 
-	hostnames := s.Source.PrimaryHostnames()
+	hostnames := AgentHosts(s.Source)
 	for _, host := range hostnames {
 		ctx, cancelFunc := context.WithTimeout(context.Background(), DialTimeout)
 		conn, err := s.grpcDialer(ctx,
@@ -353,9 +353,10 @@ func (s *Server) closeAgentConns() {
 }
 
 type InitializeConfig struct {
-	Standby    utils.SegConfig
-	Master	   utils.SegConfig
-	Primaries  []utils.SegConfig
+	Standby   utils.SegConfig
+	Master    utils.SegConfig
+	Primaries []utils.SegConfig
+	Mirrors   []utils.SegConfig
 }
 
 // Config contains all the information that will be persisted to/loaded from
@@ -364,8 +365,8 @@ type Config struct {
 	Source *utils.Cluster
 	Target *utils.Cluster
 
-	// TargetPorts is the list of temporary ports to be used for the target
-	// cluster. It's assigned during initial configuration.
+	// TargetInitializeConfig contains all the info needed to initialize the
+	// target cluster's master, standby, primaries and mirrors.
 	TargetInitializeConfig InitializeConfig
 
 	Port        int
@@ -423,4 +424,22 @@ func LoadConfig(conf *Config, path string) error {
 	}
 
 	return nil
+}
+
+func AgentHosts(c *utils.Cluster) []string {
+	uniqueHosts := make(map[string]bool)
+
+	notMaster := func(seg *utils.SegConfig) bool {
+		return !(seg.ContentID == -1 && seg.Role == "p")
+	}
+
+	for _, seg := range c.SelectSegments(notMaster) {
+		uniqueHosts[seg.Hostname] = true
+	}
+
+	hosts := make([]string, 0)
+	for host := range uniqueHosts {
+		hosts = append(hosts, host)
+	}
+	return hosts
 }

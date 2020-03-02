@@ -69,7 +69,7 @@ delete_finalized_cluster() {
     # Look up the master port (fourth line of the postmaster PID file).
     local port=$(awk 'NR == 4 { print $0 }' < "$masterdir/postmaster.pid")
 
-    local gpdeletesystem="$GPHOME_NEW"/bin/gpdeletesystem
+    local gpdeletesystem="$GPHOME"/bin/gpdeletesystem
 
     # XXX gpdeletesystem returns 1 if there are warnings. There are always
     # warnings. So we ignore the exit code...

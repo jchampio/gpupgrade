@@ -38,7 +38,7 @@ func (s *Server) Initialize(in *idl.InitializeRequest, stream idl.CliToHub_Initi
 	})
 
 	st.Run(idl.Substep_START_AGENTS, func(_ step.OutStreams) error {
-		_, err := RestartAgents(context.Background(), nil, s.Source.GetHostnames(), s.AgentPort, s.StateDir)
+		_, err := RestartAgents(context.Background(), nil, AgentHosts(s.Source), s.AgentPort, s.StateDir)
 		return err
 	})
 
@@ -119,10 +119,20 @@ func (s *Server) fillClusterConfigsSubStep(_ step.OutStreams, request *idl.Initi
 
 func AssignDatadirsAndPorts(source *utils.Cluster, ports []int) (InitializeConfig, error) {
 	if len(ports) == 0 {
-		return assignDatadirsAndDefaultPorts(source), nil
-	}
+		port := 50432
+		// 2 -> one port for the master and standby
+		numberOfSegements := len(source.Mirrors) + len(source.Primaries) + 2
+		if (numberOfSegements + port) > 65535 {
+			numberOfSegements = 65535 - port
+		}
 
-	ports = sanitize(ports)
+		for i := 0; i < numberOfSegements; i++ {
+			ports = append(ports, port)
+			port++
+		}
+	} else {
+		ports = sanitize(ports)
+	}
 
 	return assignDatadirsAndCustomPorts(source, ports)
 }
@@ -150,7 +160,7 @@ func assignDatadirsAndCustomPorts(source *utils.Cluster, ports []int) (Initializ
 			return InitializeConfig{}, errors.New("not enough ports")
 		}
 		standby.Port = ports[nextPortIndex]
-		standby.DataDir = upgradeDataDir(standby.DataDir)
+		standby.DataDir = standby.DataDir + "_upgrade"
 		targetInitializeConfig.Standby = standby
 		nextPortIndex++
 	}
@@ -183,6 +193,32 @@ func assignDatadirsAndCustomPorts(source *utils.Cluster, ports []int) (Initializ
 		targetInitializeConfig.Primaries = append(targetInitializeConfig.Primaries, segment)
 	}
 
+	for _, content := range source.ContentIDs {
+		// Skip the standby segment
+		if content == -1 {
+			continue
+		}
+
+		if segment, ok := source.Mirrors[content]; ok {
+			if portIndex, ok := portIndexByHost[segment.Hostname]; ok {
+				if portIndex > len(ports)-1 {
+					return InitializeConfig{}, errors.New("not enough ports")
+				}
+				segment.Port = ports[portIndex]
+				portIndexByHost[segment.Hostname]++
+			} else {
+				if nextPortIndex > len(ports)-1 {
+					return InitializeConfig{}, errors.New("not enough ports")
+				}
+				segment.Port = ports[nextPortIndex]
+				portIndexByHost[segment.Hostname] = nextPortIndex + 1
+			}
+			segment.DataDir = upgradeDataDir(segment.DataDir)
+
+			targetInitializeConfig.Mirrors = append(targetInitializeConfig.Mirrors, segment)
+		}
+	}
+
 	return targetInitializeConfig, nil
 }
 
@@ -201,55 +237,6 @@ func sanitize(ports []int) []int {
 	}
 
 	return dedupe
-}
-
-// defaultPorts generates the minimum temporary port range necessary to handle a
-// cluster of the given topology. The first port in the list is meant to be used
-// for the master.
-func assignDatadirsAndDefaultPorts(source *utils.Cluster) InitializeConfig {
-	targetInitializeConfig := InitializeConfig{}
-
-	nextPort := 50432
-
-	if master, ok := source.Primaries[-1]; ok {
-		// Reserve a port for the master.
-		master.Port = nextPort
-		master.DataDir = upgradeDataDir(master.DataDir)
-		targetInitializeConfig.Master = master
-		nextPort++
-	}
-
-	if standby, ok := source.Mirrors[-1]; ok {
-		// Reserve a port for the standby.
-		standby.Port = nextPort
-		standby.DataDir = upgradeDataDir(standby.DataDir)
-		targetInitializeConfig.Standby = standby
-		nextPort++
-	}
-
-	portByHost := make(map[string]int)
-
-	for _, content := range source.ContentIDs {
-		// Skip the master segment
-		if content == -1 {
-			continue
-		}
-
-		segment := source.Primaries[content]
-
-		if port, ok := portByHost[segment.Hostname]; ok {
-			segment.Port = port
-			portByHost[segment.Hostname]++
-		} else {
-			segment.Port = nextPort
-			portByHost[segment.Hostname] = nextPort + 1
-		}
-		segment.DataDir = upgradeDataDir(segment.DataDir)
-
-		targetInitializeConfig.Primaries = append(targetInitializeConfig.Primaries, segment)
-	}
-
-	return targetInitializeConfig
 }
 
 func getAgentPath() (string, error) {

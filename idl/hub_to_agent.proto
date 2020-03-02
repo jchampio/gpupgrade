@@ -10,6 +10,7 @@ service Agent {
   rpc CreateSegmentDataDirectories (CreateSegmentDataDirRequest) returns (CreateSegmentDataDirReply) {}
   rpc RenameDirectories (RenameDirectoriesRequest) returns (RenameDirectoriesReply) {}
   rpc StopAgent (StopAgentRequest) returns (StopAgentReply) {}
+  rpc UpdateRecoveryConfs(UpdateRecoveryConfsRequest) returns (UpdateRecoveryConfsReply) {}
 }
 
 message UpgradePrimariesRequest {
@@ -34,7 +35,7 @@ message DataDirPair {
 message UpgradePrimariesReply {}
 
 message CreateSegmentDataDirRequest {
-	repeated string datadirs = 1;
+    repeated string datadirs = 1;
 }
 
 message CreateSegmentDataDirReply {}
@@ -56,4 +57,16 @@ message StopAgentReply {}
 message CheckSegmentDiskSpaceRequest {
     CheckDiskSpaceRequest request = 1;
     repeated string datadirs = 2;
+}
+
+message UpdateRecoveryConfsRequest {
+    repeated RecoveryConfInfo RecoveryConfInfos = 1;
+}
+
+message UpdateRecoveryConfsReply {}
+
+message RecoveryConfInfo {
+    int32  TargetPrimaryPort   = 1;
+    int32  SourcePrimaryPort   = 2;
+    string TargetMirrorDataDir = 3;
 }

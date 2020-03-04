@@ -163,7 +163,8 @@ outputContains() {
             --old-bindir="$GPHOME"/bin \
             --new-bindir="$GPHOME"/bin \
             --old-port="${PGPORT}" \
-            --stop-before-cluster-creation 3>&-
+            --stop-before-cluster-creation \
+            --verbose 3>&-
 
         # Trace which command we're on to make debugging easier.
         echo "\$ gpupgrade initialize $opts ... -> $status"
@@ -210,7 +211,8 @@ wait_for_port_change() {
         --new-bindir="$GPHOME/bin" \
         --old-port="${PGPORT}" \
         --disk-free-ratio 0 \
-        --stop-before-cluster-creation 3>&-
+        --stop-before-cluster-creation \
+        --verbose 3>&-
     [ "$status" -ne 0 ] || fail "expected start_agent substep to fail with port already in use: $output"
 
     release_held_port
@@ -220,7 +222,8 @@ wait_for_port_change() {
         --new-bindir="$GPHOME/bin" \
         --old-port="${PGPORT}" \
         --disk-free-ratio 0 \
-        --stop-before-cluster-creation 3>&-
+        --stop-before-cluster-creation \
+        --verbose 3>&-
     [ "$status" -eq 0 ] || fail "expected start_agent substep to succeed: $output"
 }
 
@@ -229,7 +232,8 @@ wait_for_port_change() {
         --old-bindir="$GPHOME/bin" \
         --new-bindir="$GPHOME/bin" \
         --old-port="${PGPORT}" \
-        --disk-free-ratio 0 3>&-
+        --disk-free-ratio 0 \
+        --verbose 3>&-
 
     set_target_cluster_var_for_teardown
     TEARDOWN_FUNCTIONS+=( teardown_target_cluster )
@@ -241,7 +245,8 @@ wait_for_port_change() {
         --old-bindir="$GPHOME/bin" \
         --new-bindir="$GPHOME/bin" \
         --old-port="${PGPORT}" \
-        --disk-free-ratio 0 3>&-
+        --disk-free-ratio 0 \
+        --verbose 3>&-
 
     # Other substeps are skipped when marked completed in the state dir,
     # for check_upgrade, we always run it.
@@ -265,7 +270,8 @@ wait_for_port_change() {
         --old-bindir="$GPHOME/bin" \
         --new-bindir="$GPHOME/bin" \
         --old-port="${PGPORT}"\
-        --disk-free-ratio 0 3>&-
+        --disk-free-ratio 0 \
+        --verbose 3>&-
 
     set_target_cluster_var_for_teardown
     TEARDOWN_FUNCTIONS+=( teardown_target_cluster )
@@ -277,5 +283,6 @@ wait_for_port_change() {
         --old-bindir="$GPHOME/bin" \
         --new-bindir="$GPHOME/bin" \
         --old-port="${PGPORT}"\
-        --disk-free-ratio 0 3>&-
+        --disk-free-ratio 0 \
+        --verbose 3>&-
 }

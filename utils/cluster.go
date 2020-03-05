@@ -161,6 +161,26 @@ func (c Cluster) SegmentsOn(hostname string) ([]SegConfig, error) {
 	return segments, nil
 }
 
+// SelectSegments returns a list of all segments that match the given selector
+// function. Segments are visited in order of ascending content ID (primaries
+// before mirrors).
+func (c Cluster) SelectSegments(selector func(*SegConfig) bool) []SegConfig {
+	var matches []SegConfig
+
+	for _, content := range c.ContentIDs {
+		seg := c.Primaries[content]
+		if selector(&seg) {
+			matches = append(matches, seg)
+		}
+
+		if seg, ok := c.Mirrors[content]; ok && selector(&seg) {
+			matches = append(matches, seg)
+		}
+	}
+
+	return matches
+}
+
 // ErrInvalidSegments is returned by NewCluster if the segment configuration
 // array does not map to a valid cluster.
 var ErrInvalidSegments = errors.New("invalid segment configuration")

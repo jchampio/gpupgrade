@@ -401,3 +401,34 @@ func TestClusterFromDB(t *testing.T) {
 		}
 	})
 }
+
+func TestSelectSegments(t *testing.T) {
+	segs := []utils.SegConfig{
+		{ContentID: 1, Role: "p"},
+		{ContentID: 2, Role: "p"},
+		{ContentID: 3, Role: "p"},
+		{ContentID: 3, Role: "m"},
+	}
+	cluster, err := utils.NewCluster(segs)
+	if err != nil {
+		t.Fatalf("creating test cluster: %+v", err)
+	}
+
+	// Ensure all segments are visited correctly.
+	selectAll := func(_ *utils.SegConfig) bool { return true }
+	results := cluster.SelectSegments(selectAll)
+
+	if !reflect.DeepEqual(results, segs) {
+		t.Errorf("SelectSegments(*) = %+v, want %+v", results, segs)
+	}
+
+	// Test a simple selector.
+	moreThanOne := func(c *utils.SegConfig) bool { return c.ContentID > 1 }
+	results = cluster.SelectSegments(moreThanOne)
+
+	expected := []utils.SegConfig{segs[1], segs[2], segs[3]}
+	if !reflect.DeepEqual(results, expected) {
+		t.Errorf("SelectSegments(ContentID > 1) = %+v, want %+v", results, expected)
+	}
+
+}

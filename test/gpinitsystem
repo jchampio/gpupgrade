@@ -122,23 +122,24 @@ main() {
 
     local dir="$CACHEDIR/cache.$hash"
 
-    if [ ! -f "$dir/valid" ]; then
-        log "cache miss"
+    if [ -f "$dir/valid" ]; then
+        log "cache hit"
 
-        # Run the actual gpinitsystem.
-        gpinitsystem.bak "$@"
-
-        if [ -z "$hash" -o -z "$inputfile" ]; then
-            # We can't cache this run, so we're done.
-            exit 0
-        fi
-
-        cache_cluster "$inputfile" "$dir"
+        restore_cluster "$inputfile" "$dir"
         exit 0
     fi
 
-    log "cache hit"
-    restore_cluster "$inputfile" "$dir"
+    log "cache miss"
+
+    # Run the actual gpinitsystem.
+    gpinitsystem.bak "$@"
+
+    if [ -z "$hash" -o -z "$inputfile" ]; then
+        # We can't cache this run, so we're done.
+        exit 0
+    fi
+
+    cache_cluster "$inputfile" "$dir"
 }
 
 main "$@"

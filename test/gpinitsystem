@@ -45,6 +45,33 @@ cache() {
     cp -pR "$datadir"/ "$subdir"
 }
 
+cache_cluster() {
+    local inputfile="$1"
+    local cache="$2"
+
+    # Clear out any previous caches.
+    rm -rf "$CACHEDIR/cache.*"
+
+    source "$inputfile"
+    local master_datadir="$(datadir $QD_PRIMARY_ARRAY)"
+
+    # Bring the cluster down before copying. It's restarted before we exit
+    # the utility.
+    gpstop -a -d "$master_datadir"
+
+    cache "$cache" "$master_datadir"
+
+    for seg in "${PRIMARY_ARRAY[@]}"; do
+        local seg_datadir="$(datadir $seg)"
+        cache "$cache" "$seg_datadir"
+    done
+
+    gpstart -a -d "$master_datadir"
+
+    # Mark the cache ready for use.
+    touch "$cache/valid"
+}
+
 restore() {
     local cachedir=$1
     local datadir=$2
@@ -53,6 +80,24 @@ restore() {
 
     mkdir "$datadir" # fail if it already exists
     cp -pR "$subdir"/ "$datadir"
+}
+
+restore_cluster() {
+    local inputfile="$1"
+    local cache="$2"
+
+    source "$inputfile"
+
+    local master_datadir="$(datadir $QD_PRIMARY_ARRAY)"
+    restore "$cache" "$master_datadir"
+
+    for seg in "${PRIMARY_ARRAY[@]}"; do
+        local seg_datadir="$(datadir $seg)"
+        restore "$cache" "$seg_datadir"
+    done
+
+    # Bring the cluster up to match gpinitsystem behavior.
+    gpstart -a -d "$master_datadir"
 }
 
 main() {
@@ -88,44 +133,12 @@ main() {
             exit 0
         fi
 
-        # Clear out any previous caches.
-        rm -rf "$CACHEDIR/cache.*"
-
-        source "$inputfile"
-        local master_datadir="$(datadir $QD_PRIMARY_ARRAY)"
-
-        # Bring the cluster down before copying. It's restarted before we exit
-        # the utility.
-        gpstop -a -d "$master_datadir"
-
-        cache "$dir" "$master_datadir"
-
-        for seg in "${PRIMARY_ARRAY[@]}"; do
-            local seg_datadir="$(datadir $seg)"
-            cache "$dir" "$seg_datadir"
-        done
-
-        gpstart -a -d "$master_datadir"
-
-        # Mark the cache ready for use.
-        touch "$dir/valid"
+        cache_cluster "$inputfile" "$dir"
         exit 0
     fi
 
-    # Cache hit. Restore all segments from the cache.
     log "cache hit"
-    source "$inputfile"
-
-    local master_datadir="$(datadir $QD_PRIMARY_ARRAY)"
-    restore "$dir" "$master_datadir"
-
-    for seg in "${PRIMARY_ARRAY[@]}"; do
-        local seg_datadir="$(datadir $seg)"
-        restore "$dir" "$seg_datadir"
-    done
-
-    # Bring the cluster up to match gpinitsystem behavior.
-    gpstart -a -d "$master_datadir"
+    restore_cluster "$inputfile" "$dir"
 }
 
 main "$@"

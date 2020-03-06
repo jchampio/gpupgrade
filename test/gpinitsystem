@@ -50,7 +50,7 @@ cache_cluster() {
     local cache="$2"
 
     # Clear out any previous caches.
-    rm -rf "$CACHEDIR/cache.*"
+    rm -rf "$CACHEDIR"/cache.*
 
     source "$inputfile"
     local master_datadir="$(datadir $QD_PRIMARY_ARRAY)"
@@ -132,7 +132,11 @@ main() {
     log "cache miss"
 
     # Run the actual gpinitsystem.
-    gpinitsystem.bak "$@"
+    if ! gpinitsystem.bak "$@"; then
+        local err=$?
+        log "failed to run gpinitsystem.bak"
+        exit $err
+    fi
 
     if [ -z "$hash" -o -z "$inputfile" ]; then
         # We can't cache this run, so we're done.

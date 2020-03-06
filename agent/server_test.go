@@ -36,10 +36,7 @@ var _ = Describe("Server", func() {
 
 		exists = func() bool {
 			_, err := os.Stat(dir)
-			if os.IsNotExist(err) {
-				return false
-			}
-			return true
+			return !os.IsNotExist(err)
 		}
 	})
 

@@ -70,6 +70,8 @@ cache_cluster() {
 
     # Mark the cache ready for use.
     touch "$cache/valid"
+
+    log "cached cluster $master_datadir at $cache"
 }
 
 restore() {
@@ -98,6 +100,8 @@ restore_cluster() {
 
     # Bring the cluster up to match gpinitsystem behavior.
     gpstart -a -d "$master_datadir"
+
+    log "restored $cache to cluster $master_datadir"
 }
 
 main() {
@@ -113,8 +117,13 @@ main() {
         esac
     done
 
+    # Compute the arguments hash for this run.
     local hash=
-    if [ -n "$HASHPROG" -a -n "$inputfile" ]; then
+    if [ -z "$HASHPROG" ]; then
+        log "not cacheable: no hash program available"
+    elif [ -z "$inputfile" ]; then
+        log "not cacheable: no -I input file given"
+    else
         # Hash the contents and arguments.
         hash=$(echo "$@" | cat - "$inputfile" | "$HASHPROG" | cut -d' ' -f1)
         log "cache hash: $hash"
@@ -138,8 +147,9 @@ main() {
         exit $err
     fi
 
-    if [ -z "$hash" -o -z "$inputfile" ]; then
+    if [ -z "$hash" ]; then
         # We can't cache this run, so we're done.
+        log "skipping cache (see above)"
         exit 0
     fi
 

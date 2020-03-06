@@ -32,7 +32,6 @@ var (
 	client      *mock_idl.MockAgentClient
 	port        int
 	dir         string
-	hubConf     *hub.Config
 	source      *utils.Cluster
 	target      *utils.Cluster
 	testHub     *hub.Server

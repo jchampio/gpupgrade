@@ -141,11 +141,11 @@ main() {
     log "cache miss"
 
     # Run the actual gpinitsystem.
-    if ! gpinitsystem.bak "$@"; then
+    gpinitsystem.bak "$@" || {
         local err=$?
-        log "failed to run gpinitsystem.bak"
+        log "failed to run gpinitsystem.bak: exit code $err"
         exit $err
-    fi
+    }
 
     if [ -z "$hash" ]; then
         # We can't cache this run, so we're done.

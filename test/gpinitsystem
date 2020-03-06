@@ -107,6 +107,7 @@ restore_cluster() {
 main() {
     local inputfile=
 
+    log "-- $(date)"
     log "called with args: $@"
 
     while getopts ":I:" opt; do

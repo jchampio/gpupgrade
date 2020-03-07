@@ -110,7 +110,8 @@ require_gnu_stat() {
 # Creates a new directory (the path will be contained in the STATE_DIR global)
 # and exports the GPUPGRADE_HOME variable to point to a location inside it.
 setup_state_directory() {
-    STATE_DIR=`mktemp -d /tmp/gpupgrade.XXXXXX`
+    STATE_DIR=/tmp/gpupgrade.test
+    mkdir -p "$STATE_DIR"
     export GPUPGRADE_HOME="${STATE_DIR}/gpupgrade"
 }
 

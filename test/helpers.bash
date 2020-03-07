@@ -106,3 +106,10 @@ require_gnu_stat() {
     local version=$($STAT --version || true)
     [[ $version = *"GNU coreutils"* ]] || skip "GNU stat is required for this test"
 }
+
+# Creates a new directory (the path will be contained in the STATE_DIR global)
+# and exports the GPUPGRADE_HOME variable to point to a location inside it.
+setup_test_directory() {
+    STATE_DIR=`mktemp -d /tmp/gpupgrade.XXXXXX`
+    export GPUPGRADE_HOME="${STATE_DIR}/gpupgrade"
+}

@@ -5,8 +5,7 @@ load helpers
 setup() {
     skip_if_no_gpdb
 
-    STATE_DIR=`mktemp -d`
-    export GPUPGRADE_HOME="${STATE_DIR}/gpupgrade"
+    setup_test_directory
 
     gpupgrade kill-services
 

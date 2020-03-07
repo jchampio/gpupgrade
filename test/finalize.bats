@@ -11,7 +11,7 @@ setup() {
 
     PSQL="$GPHOME_NEW/bin/psql --no-align --tuples-only postgres"
 
-    setup_state_dir
+    setup_test_directory
 
     gpupgrade kill-services
 }
@@ -79,11 +79,6 @@ teardown() {
     local actual_standby_status=$(gpstate -d "${new_datadir}")
     local standby_status_line=$(get_standby_status "$actual_standby_status")
     [[ $standby_status_line == *"Standby host passive"* ]] || fail "expected standby to be up and in passive mode, got **** ${actual_standby_status} ****"
-}
-
-setup_state_dir() {
-    STATE_DIR=$(mktemp -d /tmp/gpupgrade.XXXXXX)
-    export GPUPGRADE_HOME="${STATE_DIR}/gpupgrade"
 }
 
 teardown_new_cluster() {

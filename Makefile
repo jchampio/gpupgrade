@@ -148,3 +148,29 @@ set-pipeline:
 
 expose-pipeline:
 	fly --target $(FLY_TARGET) expose-pipeline --pipeline $(PIPELINE_NAME)
+
+.PHONY: accelerate-tests decelerate-tests require-gphome
+
+accelerate-tests decelerate-tests: require-gphome
+
+accelerate-tests:
+	@if [ -f "$(GPHOME)/bin/gpinitsystem.bak" ]; then \
+		echo Already accelerated.; \
+		false; \
+	fi
+
+	cp "$(GPHOME)/bin/gpinitsystem" "$(GPHOME)/bin/gpinitsystem.bak"
+	cp ./test/gpinitsystem "$(GPHOME)/bin/gpinitsystem"
+
+decelerate-tests:
+	@if [ ! -f "$(GPHOME)/bin/gpinitsystem.bak" ]; then \
+		echo Not currently accelerated.; \
+		false; \
+	fi
+
+	mv "$(GPHOME)/bin/gpinitsystem.bak" "$(GPHOME)/bin/gpinitsystem"
+
+require-gphome:
+ifeq ($(GPHOME),)
+	$(error Set GPHOME before running this recipe.)
+endif

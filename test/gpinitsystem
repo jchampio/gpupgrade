@@ -4,6 +4,7 @@
 # if, and only if, all of the following are true:
 #
 # - The arguments passed to gpinitsystem are identical to the last run.
+# - The -a option to gpinitsystem is used (to avoid prompts).
 # - The -I input option to gpinitsystem is used, and the contents of that file
 #   are identical to the last run.
 #
@@ -106,14 +107,21 @@ restore_cluster() {
 
 main() {
     local inputfile=
+    local automatic=0
 
     log "-- $(date)"
     log "called with args: $@"
 
-    while getopts ":I:" opt; do
+    while getopts ":aI:-:" opt; do
         case "$opt" in
+            a)
+                automatic=1
+                ;;
             I)
                 inputfile="$OPTARG"
+                ;;
+            -)
+                # long option; ignore
                 ;;
         esac
     done
@@ -124,6 +132,8 @@ main() {
         log "not cacheable: no hash program available"
     elif [ -z "$inputfile" ]; then
         log "not cacheable: no -I input file given"
+    elif (( ! $automatic )); then
+        log "not cacheable: no -a option given"
     else
         # Hash the contents and arguments.
         hash=$(echo "$@" | cat - "$inputfile" | "$HASHPROG" | cut -d' ' -f1)

@@ -11,9 +11,7 @@ setup() {
 
     PSQL="$GPHOME_NEW/bin/psql --no-align --tuples-only postgres"
 
-    setup_test_directory
-
-    gpupgrade kill-services
+    common_setup
 }
 
 teardown() {

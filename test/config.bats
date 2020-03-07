@@ -5,9 +5,7 @@ load helpers
 setup() {
     skip_if_no_gpdb
 
-    setup_test_directory
-
-    gpupgrade kill-services
+    common_setup
 
     # XXX We use $PWD here instead of a real binary directory because
     # `make check` is expected to test the locally built binaries, not the

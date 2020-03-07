@@ -5,7 +5,7 @@ load helpers
 setup() {
     skip_if_no_gpdb
 
-    setup_test_directory
+    common_setup
 
     # If this variable is set (to a master data directory), teardown() will call
     # gpdeletesystem on this cluster.
@@ -15,7 +15,6 @@ setup() {
     HELD_PORT_PID=
     AGENT_PORT=
 
-    gpupgrade kill-services
     gpupgrade initialize \
         --old-bindir="${GPHOME}/bin" \
         --new-bindir="${GPHOME}/bin" \

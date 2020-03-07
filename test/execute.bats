@@ -5,9 +5,7 @@ load helpers
 setup() {
     skip_if_no_gpdb
 
-    setup_test_directory
-
-    gpupgrade kill-services
+    common_setup
 
     # If this variable is set (to a master data directory), teardown() will call
     # gpdeletesystem on this cluster.

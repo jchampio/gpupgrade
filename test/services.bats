@@ -5,9 +5,7 @@ load helpers
 setup() {
     skip_if_no_gpdb
 
-    setup_test_directory
-
-    gpupgrade kill-services
+    common_setup
 
     gpupgrade initialize \
         --old-bindir="${GPHOME}/bin" \

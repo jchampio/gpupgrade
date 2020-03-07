@@ -32,5 +32,6 @@ su gpadmin -c '
 
     # Note that installcheck is currently destructive.
     make install
+    make accelerate-tests
     make installcheck
 '

@@ -8,6 +8,10 @@
 # - The -I input option to gpinitsystem is used, and the contents of that file
 #   are identical to the last run.
 #
+# Note that for a cache to be created, gpinitsystem must exit with code 0 (since
+# otherwise we don't know if the cluster was correctly initialized). In practice
+# that means you may need to use --ignore-warnings with e.g. GPDB6.
+#
 # BUGS:
 # - Mirrors are ignored. This only works for upgrade scenarios.
 #

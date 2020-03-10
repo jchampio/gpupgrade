@@ -5,11 +5,14 @@ package step
 import (
 	"io/ioutil"
 
+	"golang.org/x/xerrors"
+
 	"github.com/greenplum-db/gpupgrade/idl"
 )
 
 type DoubleRunner struct {
-	Err error
+	Err          error
+	DoubleErrors []error
 
 	streams OutStreams
 }
@@ -24,10 +27,17 @@ func (d *DoubleRunner) Run(substep idl.Substep, f func(OutStreams) error) {
 		return
 	}
 
-	d.Err = f(d.streams)
-	if d.Err != nil {
+	err := f(d.streams)
+	if err != nil {
+		// First run should succeed.
+		d.Err = xerrors.Errorf("substep %s: first run: %w", substep, err)
 		return
 	}
 
-	d.Err = f(d.streams)
+	err = f(d.streams)
+	if err != nil {
+		// Second run might not. Save it for later analysis.
+		err = xerrors.Errorf("substep %s: second run: %w", substep, err)
+		d.DoubleErrors = append(d.DoubleErrors, err)
+	}
 }

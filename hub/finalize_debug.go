@@ -3,6 +3,8 @@
 package hub
 
 import (
+	multierror "github.com/hashicorp/go-multierror"
+
 	"github.com/greenplum-db/gpupgrade/idl"
 	"github.com/greenplum-db/gpupgrade/step"
 )
@@ -12,5 +14,15 @@ func (s *Server) TestFinalizeIdempotence(_ *idl.FinalizeRequest, stream idl.Debu
 
 	s.RunFinalizeSubsteps(runner)
 
-	return runner.Err
+	var err error
+
+	for _, derr := range runner.DoubleErrors {
+		err = multierror.Append(err, derr).ErrorOrNil()
+	}
+
+	if runner.Err != nil {
+		err = multierror.Append(err, runner.Err).ErrorOrNil()
+	}
+
+	return err
 }

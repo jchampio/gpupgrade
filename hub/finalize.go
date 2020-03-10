@@ -28,6 +28,18 @@ func (s *Server) Finalize(_ *idl.FinalizeRequest, stream idl.CliToHub_FinalizeSe
 		}
 	}()
 
+	s.RunFinalizeSubsteps(st)
+
+	return st.Err()
+}
+
+type substepRunner interface {
+	// Run executes a substep with the given code by invoking the provided
+	// implementation callback.
+	Run(idl.Substep, func(step.OutStreams) error)
+}
+
+func (s *Server) RunFinalizeSubsteps(st substepRunner) {
 	// This runner runs all commands against the target cluster.
 	targetRunner := &greenplumRunner{
 		masterPort:          s.Target.MasterPort(),
@@ -100,6 +112,4 @@ func (s *Server) Finalize(_ *idl.FinalizeRequest, stream idl.CliToHub_FinalizeSe
 
 		return nil
 	})
-
-	return st.Err()
 }

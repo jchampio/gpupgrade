@@ -109,6 +109,7 @@ func (s *Server) Start() error {
 	s.mu.Unlock()
 
 	idl.RegisterCliToHubServer(server, s)
+	RegisterPlugins(server, s)
 	reflection.Register(server)
 
 	if s.daemon {

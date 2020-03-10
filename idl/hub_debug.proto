@@ -1,0 +1,9 @@
+syntax = "proto3";
+
+package idl;
+
+import "cli_to_hub.proto";
+
+service DebugHub {
+    rpc TestFinalizeIdempotence(FinalizeRequest) returns (stream Message) {}
+}

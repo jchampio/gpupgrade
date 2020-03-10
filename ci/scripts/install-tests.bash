@@ -28,10 +28,10 @@ su gpadmin -c '
 
     cd $GOPATH/src/github.com/greenplum-db/gpupgrade
     make
+    make accelerate-tests
     make check --keep-going
 
     # Note that installcheck is currently destructive.
     make install
-    make accelerate-tests
     make installcheck
 '

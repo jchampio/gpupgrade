@@ -97,6 +97,8 @@ EOF
 dump_sql $MASTER_PORT /tmp/old.sql
 
 # Now do the upgrade.
+echo "failing early"
+exit 1
 time ssh mdw bash <<EOF
     set -eux -o pipefail
 

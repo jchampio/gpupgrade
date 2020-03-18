@@ -85,7 +85,7 @@ for host in "${hosts[@]}"; do
 done
 
 # Install the Bash completion.
-scp cli/bash/bash-completion.sh "gpadmin@$host:~"
+scp cli/bash/bash-completion.sh gpadmin@mdw:~
 
 echo 'Loading SQL dump into source cluster...'
 time ssh mdw bash <<EOF

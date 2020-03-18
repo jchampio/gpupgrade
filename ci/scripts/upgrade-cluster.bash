@@ -134,7 +134,7 @@ EOF
 
     # Preinstall the TPC-H utility so we can modify it a bit.
     yum -y install git || true
-    mkdir /pivotalguru/TPC-H
+    mkdir -p /pivotalguru/TPC-H
     chown gpadmin /pivotalguru/TPC-H
     su -c "cd /pivotalguru/TPC-H; git clone --depth=1 //github.com/pivotalguru/TPC-H" gpadmin
 

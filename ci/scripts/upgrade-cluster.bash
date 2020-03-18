@@ -111,6 +111,8 @@ time ssh centos@mdw bash <<< '
     sudo su root
     set -eux -o pipefail
 
+    yum -y install bash-completion || true
+
     cd
     curl https://raw.githubusercontent.com/pivotalguru/TPC-H/master/tpch.sh > tpch.sh
     chmod 755 tpch.sh

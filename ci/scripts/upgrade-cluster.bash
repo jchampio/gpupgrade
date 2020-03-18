@@ -96,9 +96,58 @@ EOF
 # Dump the old cluster for later comparison.
 dump_sql $MASTER_PORT /tmp/old.sql
 
-# Now do the upgrade.
+# Install TPC-H.
+time ssh mdw 'cat >> ~/.bashrc' <<EOF
+source /usr/local/greenplum-db-5*/greenplum_path.sh
+export MASTER_DATA_DIRECTORY=/data/gpdata/master/gpseg-1
+EOF
+time ssh mdw createdb gpadmin
+
+time ssh centos@mdw bash <<< '
+    sudo su root
+    set -eux -o pipefail
+
+    cd
+    curl https://raw.githubusercontent.com/pivotalguru/TPC-H/master/tpch.sh > tpch.sh
+    chmod 755 tpch.sh
+
+    cat > tpch_variables.sh <<EOF
+REPO="TPC-H"
+REPO_URL="https://github.com/pivotalguru/TPC-H"
+ADMIN_USER="gpadmin"
+INSTALL_DIR="/pivotalguru"
+EXPLAIN_ANALYZE="false"
+RANDOM_DISTRIBUTION="false"
+MULTI_USER_COUNT="5"
+GEN_DATA_SCALE="1"
+SINGLE_USER_ITERATIONS="1"
+RUN_COMPILE_TPCH="false"
+RUN_GEN_DATA="false"
+RUN_INIT="true"
+RUN_DDL="true"
+RUN_LOAD="true"
+RUN_SQL="false"
+RUN_SINGLE_USER_REPORT="false"
+RUN_MULTI_USER="false"
+RUN_MULTI_USER_REPORT="false"
+EOF
+
+    # Preinstall the TPC-H utility so we can modify it a bit.
+    yum -y install git || true
+    mkdir /pivotalguru/TPC-H
+    chown gpadmin /pivotalguru/TPC-H
+    su -c "cd /pivotalguru/TPC-H; git clone --depth=1 //github.com/pivotalguru/TPC-H" gpadmin
+
+    # Do not run the reports.
+    rm -rf /pivotalguru/TPC-H/0{5..8}*
+
+    ./tpch.sh
+'
+
 echo "failing early"
 exit 1
+
+
 time ssh mdw bash <<EOF
     set -eux -o pipefail
 

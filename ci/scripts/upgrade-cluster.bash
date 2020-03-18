@@ -84,6 +84,9 @@ for host in "${hosts[@]}"; do
     ssh centos@$host "sudo mv /tmp/gpupgrade /usr/local/bin"
 done
 
+# Install the Bash completion.
+scp cli/bash/bash-completion.sh "gpadmin@$host:~"
+
 echo 'Loading SQL dump into source cluster...'
 time ssh mdw bash <<EOF
     set -eux -o pipefail
@@ -100,6 +103,7 @@ dump_sql $MASTER_PORT /tmp/old.sql
 time ssh mdw 'cat >> ~/.bashrc' <<EOF
 source /usr/local/greenplum-db-5*/greenplum_path.sh
 export MASTER_DATA_DIRECTORY=/data/gpdata/master/gpseg-1
+source ~/bash-completion.sh
 EOF
 time ssh mdw createdb gpadmin
 

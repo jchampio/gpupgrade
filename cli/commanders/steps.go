@@ -19,8 +19,8 @@ type receiver interface {
 }
 
 type substepText struct {
-	HelpText   string
 	OutputText string
+	HelpText   string
 }
 
 var SubstepDescriptions = map[idl.Substep]substepText{

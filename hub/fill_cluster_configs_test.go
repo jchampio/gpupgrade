@@ -4,7 +4,10 @@ import (
 	"reflect"
 	"testing"
 
+	sqlmock "github.com/DATA-DOG/go-sqlmock"
+
 	cluster2 "github.com/greenplum-db/gpupgrade/greenplum"
+	"github.com/greenplum-db/gpupgrade/idl"
 )
 
 func TestAssignPorts(t *testing.T) {
@@ -248,4 +251,27 @@ func TestAssignPorts(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestFillClusterConfigsSubStep(t *testing.T) {
+	t.Run("assigns an UpgradeID on the config", func(t *testing.T) {
+		config := &Config{}
+		mockSaveConfig := func() error {
+			return nil
+		}
+		conn, mockDB, err := sqlmock.New()
+		if err != nil {
+			t.Fatalf("error creating sqlmock %+v", err)
+		}
+		mockDB.
+			err = FillClusterConfigsSubStep(config, conn, nil, &idl.InitializeRequest{}, mockSaveConfig)
+
+		if err != nil {
+			t.Errorf("FillClusterConfigsSubStep returned unexpected error: %+v", err)
+		}
+
+		if config.UpgradeID == 0 {
+			t.Errorf("Got UpgradeID 0")
+		}
+	})
 }

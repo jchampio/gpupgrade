@@ -1,6 +1,7 @@
 package hub
 
 import (
+	"database/sql"
 	"fmt"
 	"io/ioutil"
 	"path"
@@ -61,10 +62,18 @@ func (s *Server) CreateTargetCluster(stream step.OutStreams) error {
 		return err
 	}
 
-	conn := db.NewDBConn("localhost", s.TargetInitializeConfig.Master.Port, "template1")
-	defer conn.Close()
+	// TODO: attach the target connection pool somewhere and pass it into the
+	// unit as opposed to this unstubbable one-shot
+	connString := "postgresql://localhost:%d/template1?search_path="
+	connString = fmt.Sprintf(connString, s.TargetInitializeConfig.Master.Port)
 
-	s.Target, err = greenplum.ClusterFromDB(conn, s.Target.BinDir)
+	db, err := sql.Open("pgx", connString)
+	if err != nil {
+		return xerrors.Errorf("connecting to target cluster: %w", err)
+	}
+	defer db.Close() // XXX ignoring error
+
+	s.Target, err = greenplum.ClusterFromDB(db, s.Target.BinDir)
 	if err != nil {
 		return errors.Wrap(err, "could not retrieve target configuration")
 	}

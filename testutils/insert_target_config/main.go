@@ -10,11 +10,14 @@
 package main
 
 import (
+	"database/sql"
+	"fmt"
 	"io"
 	"log"
+	"net/url"
 	"os"
-
-	"github.com/greenplum-db/gp-common-go-libs/dbconn"
+	"os/user"
+	"strconv"
 
 	"github.com/greenplum-db/gpupgrade/greenplum"
 	"github.com/greenplum-db/gpupgrade/hub"
@@ -43,8 +46,10 @@ func main() {
 	}
 
 	// populate the contents of target cluster to config
-	conn := dbconn.NewDBConnFromEnvironment("postgres")
-	config.Target, err = greenplum.ClusterFromDB(conn, binDir)
+	db := DBFromEnv("postgres")
+	defer db.Close()
+
+	config.Target, err = greenplum.ClusterFromDB(db, binDir)
 	config.TargetInitializeConfig, err = hub.AssignDatadirsAndPorts(config.Source, []int{})
 	if err != nil {
 		log.Fatal(err)
@@ -68,4 +73,41 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+}
+
+func DBFromEnv(dbname string) *sql.DB {
+	if dbname == "" {
+		log.Fatal("no database provided")
+	}
+
+	username := os.Getenv("PGUSER")
+	if username == "" {
+		currentUser, _ := user.Current()
+		username = currentUser.Username
+	}
+
+	host := os.Getenv("PGHOST")
+	if host == "" {
+		host, _ = os.Hostname()
+	}
+
+	port, err := strconv.Atoi(os.Getenv("PGPORT"))
+	if err != nil {
+		port = 5432
+	}
+
+	postgresURL := url.URL{
+		Scheme:   "postgresql",
+		User:     url.User(username),
+		Host:     fmt.Sprintf("%s:%d", host, port),
+		Path:     "/" + dbname,
+		RawQuery: "gp_session_role=utility&search_path=",
+	}
+
+	db, err := sql.Open("pgx", postgresURL.String())
+	if err != nil {
+		log.Fatalf("connecting to cluster: %v", err)
+	}
+
+	return db
 }

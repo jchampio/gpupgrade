@@ -8,7 +8,6 @@ import (
 	"os"
 	"reflect"
 	"sort"
-	"strings"
 	"testing"
 
 	sqlmock "github.com/DATA-DOG/go-sqlmock"
@@ -165,6 +164,8 @@ func TestCluster(t *testing.T) {
 	}
 }
 
+// TODO: these tests would be better served executing against an actual SQL
+// engine rather than mocking out a specific implementation.
 func TestGetSegmentConfiguration(t *testing.T) {
 	testhelper.SetupTestLogger() // init gplog
 
@@ -175,52 +176,49 @@ func TestGetSegmentConfiguration(t *testing.T) {
 	}{{
 		"single-host, single-segment",
 		[][]driver.Value{
-			{"0", "localhost", "/data/gpseg0"},
+			{"1", "0", "15432", "localhost", "/data/gpseg0", "p"},
 		},
 		[]greenplum.SegConfig{
-			{ContentID: 0, Hostname: "localhost", DataDir: "/data/gpseg0"},
+			{DbID: 1, ContentID: 0, Port: 15432, Hostname: "localhost", DataDir: "/data/gpseg0", Role: "p"},
 		},
 	}, {
 		"single-host, multi-segment",
 		[][]driver.Value{
-			{"0", "localhost", "/data/gpseg0"},
-			{"1", "localhost", "/data/gpseg1"},
+			{"1", "0", "15432", "localhost", "/data/gpseg0", "p"},
+			{"2", "1", "15433", "localhost", "/data/gpseg1", "p"},
 		},
 		[]greenplum.SegConfig{
-			{ContentID: 0, Hostname: "localhost", DataDir: "/data/gpseg0"},
-			{ContentID: 1, Hostname: "localhost", DataDir: "/data/gpseg1"},
+			{DbID: 1, ContentID: 0, Port: 15432, Hostname: "localhost", DataDir: "/data/gpseg0", Role: "p"},
+			{DbID: 2, ContentID: 1, Port: 15433, Hostname: "localhost", DataDir: "/data/gpseg1", Role: "p"},
 		},
 	}, {
 		"multi-host, multi-segment",
 		[][]driver.Value{
-			{"0", "localhost", "/data/gpseg0"},
-			{"1", "localhost", "/data/gpseg1"},
-			{"2", "remotehost", "/data/gpseg2"},
+			{"1", "0", "15432", "localhost", "/data/gpseg0", "p"},
+			{"2", "1", "15433", "localhost", "/data/gpseg1", "p"},
+			{"3", "2", "15434", "remotehost", "/data/gpseg2", "m"},
 		},
 		[]greenplum.SegConfig{
-			{ContentID: 0, Hostname: "localhost", DataDir: "/data/gpseg0"},
-			{ContentID: 1, Hostname: "localhost", DataDir: "/data/gpseg1"},
-			{ContentID: 2, Hostname: "remotehost", DataDir: "/data/gpseg2"},
+			{DbID: 1, ContentID: 0, Port: 15432, Hostname: "localhost", DataDir: "/data/gpseg0", Role: "p"},
+			{DbID: 2, ContentID: 1, Port: 15433, Hostname: "localhost", DataDir: "/data/gpseg1", Role: "p"},
+			{DbID: 3, ContentID: 2, Port: 15434, Hostname: "remotehost", DataDir: "/data/gpseg2", Role: "m"},
 		},
 	}}
 
 	for _, c := range cases {
 		t.Run(fmt.Sprintf("%s cluster", c.name), func(t *testing.T) {
 			// Set up the connection to return the expected rows.
-			rows := sqlmock.NewRows([]string{"contentid", "hostname", "datadir"})
+			rows := sqlmock.NewRows([]string{"dbid", "contentid", "port", "hostname", "datadir", "role"})
 			for _, row := range c.rows {
 				rows.AddRow(row...)
 			}
 
-			connection, mock := testhelper.CreateAndConnectMockDB(1)
-			mock.ExpectQuery("SELECT (.*)").WillReturnRows(rows)
-			defer func() {
-				if err := mock.ExpectationsWereMet(); err != nil {
-					t.Errorf("%v", err)
-				}
-			}()
+			db, ctrl := sqlmockDB(t)
+			defer ctrl.Finish()
 
-			results, err := greenplum.GetSegmentConfiguration(connection)
+			ctrl.ExpectQuery("SELECT (.*)").WillReturnRows(rows)
+
+			results, err := greenplum.GetSegmentConfiguration(db, dbconn.NewVersion("6.0.0"))
 			if err != nil {
 				t.Errorf("returned error %+v", err)
 			}
@@ -259,64 +257,42 @@ func TestPrimaryHostnames(t *testing.T) {
 }
 
 func TestClusterFromDB(t *testing.T) {
-	testStateDir, err := ioutil.TempDir("", "")
-	if err != nil {
-		t.Errorf("got error when creating tempdir: %+v", err)
-	}
-
-	testhelper.SetupTestLogger()
-
-	defer func() {
-		os.RemoveAll(testStateDir)
-	}()
-
-	t.Run("returns an error if connection fails", func(t *testing.T) {
-		connErr := errors.New("connection failed")
-		conn := dbconn.NewDBConnFromEnvironment("testdb")
-		conn.Driver = testhelper.TestDriver{ErrToReturn: connErr}
-
-		actualCluster, err := greenplum.ClusterFromDB(conn, "")
-
-		if err == nil {
-			t.Errorf("Expected an error, but got nil")
-		}
-		if actualCluster != nil {
-			t.Errorf("Expected cluster to be nil, but got %#v", actualCluster)
-		}
-		if !strings.Contains(err.Error(), connErr.Error()) {
-			t.Errorf("Expected error: %+v got: %+v", connErr.Error(), err.Error())
-		}
-	})
-
 	t.Run("returns an error if the segment configuration query fails", func(t *testing.T) {
-		conn, mock := testutils.CreateMockDBConn()
-		testhelper.ExpectVersionQuery(mock, "5.3.4")
+		db, ctrl := sqlmockDB(t)
+		defer ctrl.Finish()
+
+		expectVersionQuery(ctrl, "5.3.4")
 
 		queryErr := errors.New("failed to get segment configuration")
-		mock.ExpectQuery("SELECT .* FROM gp_segment_configuration").WillReturnError(queryErr)
+		ctrl.ExpectQuery("SELECT .* FROM gp_segment_configuration").
+			WillReturnError(queryErr)
 
-		actualCluster, err := greenplum.ClusterFromDB(conn, "")
-
+		_, err := greenplum.ClusterFromDB(db, "")
 		if err == nil {
 			t.Errorf("Expected an error, but got nil")
 		}
-		if actualCluster != nil {
-			t.Errorf("Expected cluster to be nil, but got %#v", actualCluster)
-		}
-		if !strings.Contains(err.Error(), queryErr.Error()) {
-			t.Errorf("Expected error: %+v got: %+v", queryErr.Error(), err.Error())
+
+		if !xerrors.Is(err, queryErr) {
+			t.Errorf("returned error %#v, want %#v", err, queryErr)
 		}
 	})
 
 	t.Run("populates a cluster using DB information", func(t *testing.T) {
-		conn, mock := testutils.CreateMockDBConn()
+		db, ctrl := sqlmockDB(t)
+		defer ctrl.Finish()
 
-		testhelper.ExpectVersionQuery(mock, "5.3.4")
-		mock.ExpectQuery("SELECT .* FROM gp_segment_configuration").WillReturnRows(testutils.MockSegmentConfiguration())
+		versionRows := sqlmock.NewRows([]string{"version"}).
+			AddRow("PostgreSQL 8.3.24 (Greenplum Database 5.3.4) on x86_64-apple-darwin18.7.0, compiled by Apple clang version 11.0.0 (clang-1100.0.33.17), 64-bit compiled on Mar 11 2020 12:10:06")
+
+		ctrl.ExpectQuery("SELECT version()").
+			WillReturnRows(versionRows)
+
+		ctrl.ExpectQuery("SELECT .* FROM gp_segment_configuration").
+			WillReturnRows(testutils.MockSegmentConfiguration())
 
 		binDir := "/usr/local/gpdb/bin"
 
-		actualCluster, err := greenplum.ClusterFromDB(conn, binDir)
+		actualCluster, err := greenplum.ClusterFromDB(db, binDir)
 		if err != nil {
 			t.Errorf("got unexpected error: %+v", err)
 		}

@@ -1,7 +1,8 @@
 package greenplum
 
 import (
-	"github.com/greenplum-db/gp-common-go-libs/dbconn"
+	"database/sql"
+
 	"github.com/greenplum-db/gp-common-go-libs/gplog"
 )
 
@@ -27,9 +28,9 @@ func (s *SegConfig) IsStandby() bool {
 	return s.ContentID == -1 && s.Role == "m"
 }
 
-func GetSegmentConfiguration(connection *dbconn.DBConn) ([]SegConfig, error) {
+func GetSegmentConfiguration(db *sql.DB, version Version) ([]SegConfig, error) {
 	query := ""
-	if connection.Version.Before("6") {
+	if version.Before("6") {
 		query = `
 SELECT
 	s.dbid,
@@ -56,16 +57,33 @@ FROM gp_segment_configuration
 ORDER BY content;`
 	}
 
-	results := make([]SegConfig, 0)
-	err := connection.Select(&results, query)
+	var results []SegConfig
+
+	rows, err := db.Query(query)
 	if err != nil {
 		return nil, err
 	}
+
+	for rows.Next() {
+		var seg SegConfig
+
+		err := rows.Scan(&seg.DbID, &seg.ContentID, &seg.Port, &seg.Hostname, &seg.DataDir, &seg.Role)
+		if err != nil {
+			return nil, err
+		}
+
+		results = append(results, seg)
+	}
+
+	if rows.Err() != nil {
+		return nil, rows.Err()
+	}
+
 	return results, nil
 }
 
-func MustGetSegmentConfiguration(connection *dbconn.DBConn) []SegConfig {
-	segConfigs, err := GetSegmentConfiguration(connection)
+func MustGetSegmentConfiguration(db *sql.DB, version Version) []SegConfig {
+	segConfigs, err := GetSegmentConfiguration(db, version)
 	gplog.FatalOnError(err)
 	return segConfigs
 }

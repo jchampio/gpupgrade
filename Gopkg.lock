@@ -394,6 +394,7 @@
   analyzer-version = 1
   input-imports = [
     "github.com/DATA-DOG/go-sqlmock",
+    "github.com/blang/semver",
     "github.com/cloudfoundry/gosigar",
     "github.com/golang/mock/gomock",
     "github.com/golang/mock/mockgen",

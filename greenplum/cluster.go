@@ -1,6 +1,7 @@
 package greenplum
 
 import (
+	"database/sql"
 	"fmt"
 	"os/exec"
 
@@ -31,19 +32,18 @@ type Cluster struct {
 	Version dbconn.GPDBVersion
 }
 
-// ClusterFromDB will create a Cluster by querying the passed DBConn for
+// ClusterFromDB will create a Cluster by querying the passed sql.DB for
 // information. You must pass the cluster's binary directory, since it cannot be
 // divined from the database.
-func ClusterFromDB(conn *dbconn.DBConn, binDir string) (*Cluster, error) {
-	err := conn.Connect(1)
+func ClusterFromDB(db *sql.DB, binDir string) (*Cluster, error) {
+	version, err := VersionFromDB(db)
 	if err != nil {
-		return nil, errors.Wrap(err, "couldn't connect to cluster")
+		return nil, err
 	}
-	defer conn.Close()
 
-	segments, err := GetSegmentConfiguration(conn)
+	segments, err := GetSegmentConfiguration(db, version)
 	if err != nil {
-		return nil, errors.Wrap(err, "couldn't retrieve segment configuration")
+		return nil, xerrors.Errorf("retrieving segment configuration: %w", err)
 	}
 
 	c, err := NewCluster(segments)
@@ -51,7 +51,7 @@ func ClusterFromDB(conn *dbconn.DBConn, binDir string) (*Cluster, error) {
 		return nil, err
 	}
 
-	c.Version = conn.Version
+	c.Version = version
 	c.BinDir = binDir
 
 	return c, nil

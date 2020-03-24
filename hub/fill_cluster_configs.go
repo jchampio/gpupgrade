@@ -8,22 +8,18 @@ import (
 
 	"github.com/pkg/errors"
 
-	"github.com/greenplum-db/gpupgrade/db"
 	"github.com/greenplum-db/gpupgrade/greenplum"
 	"github.com/greenplum-db/gpupgrade/idl"
 	"github.com/greenplum-db/gpupgrade/step"
 )
 
 // create source/target clusters, write to disk and re-read from disk to make sure it is "durable"
-func (s *Server) FillClusterConfigsSubStep(config *Config, conn *sql.DB, _ step.OutStreams, request *idl.InitializeRequest, saveConfig func() error) error {
-	if err := CheckSourceClusterConfiguration(conn); err != nil {
+func (s *Server) FillClusterConfigsSubStep(config *Config, db *sql.DB, _ step.OutStreams, request *idl.InitializeRequest, saveConfig func() error) error {
+	if err := CheckSourceClusterConfiguration(db); err != nil {
 		return err
 	}
 
-	// XXX ugly; we should just use the conn we're passed, but our DbConn
-	// concept (which isn't really used) gets in the way
-	dbconn := db.NewDBConn("localhost", int(request.SourcePort), "template1")
-	source, err := greenplum.ClusterFromDB(dbconn, request.SourceBinDir)
+	source, err := greenplum.ClusterFromDB(db, request.SourceBinDir)
 	if err != nil {
 		return errors.Wrap(err, "could not retrieve source configuration")
 	}

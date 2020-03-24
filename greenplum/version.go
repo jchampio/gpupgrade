@@ -44,21 +44,9 @@ func VersionFromDB(db *sql.DB) (Version, error) {
 func queryVersion(db *sql.DB) (string, error) {
 	var version string
 
-	rows, err := db.Query("SELECT version()")
-	if err != nil {
+	row := db.QueryRow("SELECT version()")
+	if err := row.Scan(&version); err != nil {
 		return "", xerrors.Errorf("querying version(): %w", err)
-	}
-
-	for rows.Next() {
-		if err := rows.Scan(&version); err != nil {
-			return "", xerrors.Errorf("scanning version(): %w", err)
-		}
-
-		rows.Close() // we expect only one row
-	}
-
-	if rows.Err() != nil {
-		return "", xerrors.Errorf("iterating version(): %w", err)
 	}
 
 	return version, nil

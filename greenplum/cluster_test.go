@@ -9,7 +9,6 @@ import (
 	"sort"
 	"testing"
 
-	sqlmock "github.com/DATA-DOG/go-sqlmock"
 	"github.com/greenplum-db/gp-common-go-libs/dbconn"
 	"github.com/greenplum-db/gp-common-go-libs/testhelper"
 	"golang.org/x/xerrors"
@@ -211,18 +210,31 @@ func TestClusterFromDB(t *testing.T) {
 	})
 
 	t.Run("populates a cluster using DB information", func(t *testing.T) {
-		db, ctrl := sqlmockDB(t)
-		defer ctrl.Finish()
+		db := openSQLite(t)
+		defer db.Close()
 
-		versionRows := sqlmock.NewRows([]string{"version"}).
-			AddRow("PostgreSQL 8.3.24 (Greenplum Database 5.3.4) on x86_64-apple-darwin18.7.0, compiled by Apple clang version 11.0.0 (clang-1100.0.33.17), 64-bit compiled on Mar 11 2020 12:10:06")
+		q := &queryer{t, db}
 
-		ctrl.ExpectQuery("SELECT version()").
-			WillReturnRows(versionRows)
+		q.MustExec(`CREATE TABLE pg_catalog.gp_segment_configuration(
+			dbid int2,
+			content int2,
+			role char,
+			preferred_role char,
+			mode char,
+			status char,
+			port int4,
+			hostname text,
+			address text,
+			datadir text
+		)`)
+		q.MustExec(`INSERT INTO pg_catalog.gp_segment_configuration VALUES
+			( 1, -1, 'p', 'p', 'n', 'u',  5432,  'localhost',  'localhost', '/data/gpseg-1' ),
+			( 2,  0, 'p', 'p', 'n', 'u', 15432,  'localhost',  'localhost', '/data/gpseg0'  ),
+			( 3,  1, 'p', 'p', 's', 'u', 15433,  'localhost',  'localhost', '/data/gpseg1'  ),
+			( 4,  1, 'm', 'm', 's', 'u', 15432, 'remotehost', 'remotehost', '/data/mirror1' )
+		`)
 
-		ctrl.ExpectQuery("SELECT .* FROM gp_segment_configuration").
-			WillReturnRows(testutils.MockSegmentConfiguration())
-
+		SQLiteVersionString = "PostgreSQL 8.4.24 (Greenplum Database 6.3.4) on x86_64-apple-darwin18.7.0, compiled by Apple clang version 11.0.0 (clang-1100.0.33.17), 64-bit compiled on Mar 11 2020 12:10:06"
 		binDir := "/usr/local/gpdb/bin"
 
 		actualCluster, err := greenplum.ClusterFromDB(db, binDir)
@@ -230,8 +242,13 @@ func TestClusterFromDB(t *testing.T) {
 			t.Errorf("got unexpected error: %+v", err)
 		}
 
-		expectedCluster := testutils.MockCluster()
-		expectedCluster.Version = dbconn.NewVersion("5.3.4")
+		expectedCluster := greenplum.MustCreateCluster(t, []greenplum.SegConfig{
+			{DbID: 1, ContentID: -1, Hostname: "localhost", Port: 5432, DataDir: "/data/gpseg-1", Role: "p"},
+			{DbID: 2, ContentID: 0, Hostname: "localhost", Port: 15432, DataDir: "/data/gpseg0", Role: "p"},
+			{DbID: 3, ContentID: 1, Hostname: "localhost", Port: 15433, DataDir: "/data/gpseg1", Role: "p"},
+			{DbID: 4, ContentID: 1, Hostname: "remotehost", Port: 15432, DataDir: "/data/mirror1", Role: "m"},
+		})
+		expectedCluster.Version = dbconn.NewVersion("6.3.4")
 		expectedCluster.BinDir = binDir
 
 		if !reflect.DeepEqual(actualCluster, expectedCluster) {

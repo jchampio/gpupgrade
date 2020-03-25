@@ -35,6 +35,9 @@ type Cluster struct {
 // ClusterFromDB will create a Cluster by querying the passed sql.DB for
 // information. You must pass the cluster's binary directory, since it cannot be
 // divined from the database.
+//
+// The database must be able to supply a GPDB-specific version() and a valid
+// gp_segment_configuration catalog table for GPDB 5 or higher.
 func ClusterFromDB(db *sql.DB, binDir string) (*Cluster, error) {
 	version, err := VersionFromDB(db)
 	if err != nil {

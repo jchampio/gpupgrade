@@ -1,7 +1,6 @@
 package greenplum_test
 
 import (
-	"database/sql/driver"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -159,72 +158,6 @@ func TestCluster(t *testing.T) {
 
 			if !xerrors.Is(err, greenplum.ErrInvalidSegments) {
 				t.Errorf("returned error %#v, want %#v", err, greenplum.ErrInvalidSegments)
-			}
-		})
-	}
-}
-
-// TODO: these tests would be better served executing against an actual SQL
-// engine rather than mocking out a specific implementation.
-func TestGetSegmentConfiguration(t *testing.T) {
-	testhelper.SetupTestLogger() // init gplog
-
-	cases := []struct {
-		name     string
-		rows     [][]driver.Value
-		expected []greenplum.SegConfig
-	}{{
-		"single-host, single-segment",
-		[][]driver.Value{
-			{"1", "0", "15432", "localhost", "/data/gpseg0", "p"},
-		},
-		[]greenplum.SegConfig{
-			{DbID: 1, ContentID: 0, Port: 15432, Hostname: "localhost", DataDir: "/data/gpseg0", Role: "p"},
-		},
-	}, {
-		"single-host, multi-segment",
-		[][]driver.Value{
-			{"1", "0", "15432", "localhost", "/data/gpseg0", "p"},
-			{"2", "1", "15433", "localhost", "/data/gpseg1", "p"},
-		},
-		[]greenplum.SegConfig{
-			{DbID: 1, ContentID: 0, Port: 15432, Hostname: "localhost", DataDir: "/data/gpseg0", Role: "p"},
-			{DbID: 2, ContentID: 1, Port: 15433, Hostname: "localhost", DataDir: "/data/gpseg1", Role: "p"},
-		},
-	}, {
-		"multi-host, multi-segment",
-		[][]driver.Value{
-			{"1", "0", "15432", "localhost", "/data/gpseg0", "p"},
-			{"2", "1", "15433", "localhost", "/data/gpseg1", "p"},
-			{"3", "2", "15434", "remotehost", "/data/gpseg2", "m"},
-		},
-		[]greenplum.SegConfig{
-			{DbID: 1, ContentID: 0, Port: 15432, Hostname: "localhost", DataDir: "/data/gpseg0", Role: "p"},
-			{DbID: 2, ContentID: 1, Port: 15433, Hostname: "localhost", DataDir: "/data/gpseg1", Role: "p"},
-			{DbID: 3, ContentID: 2, Port: 15434, Hostname: "remotehost", DataDir: "/data/gpseg2", Role: "m"},
-		},
-	}}
-
-	for _, c := range cases {
-		t.Run(fmt.Sprintf("%s cluster", c.name), func(t *testing.T) {
-			// Set up the connection to return the expected rows.
-			rows := sqlmock.NewRows([]string{"dbid", "contentid", "port", "hostname", "datadir", "role"})
-			for _, row := range c.rows {
-				rows.AddRow(row...)
-			}
-
-			db, ctrl := sqlmockDB(t)
-			defer ctrl.Finish()
-
-			ctrl.ExpectQuery("SELECT (.*)").WillReturnRows(rows)
-
-			results, err := greenplum.GetSegmentConfiguration(db, dbconn.NewVersion("6.0.0"))
-			if err != nil {
-				t.Errorf("returned error %+v", err)
-			}
-
-			if !reflect.DeepEqual(results, c.expected) {
-				t.Errorf("got configuration %+v, want %+v", results, c.expected)
 			}
 		})
 	}

@@ -154,6 +154,14 @@
   revision = "f91d3411e481ed313eeab65ebfe9076466c39d01"
 
 [[projects]]
+  digest = "1:e2ac6e4ee843b2001b6c3a7801180ea3f7fa6d61fb917ca7dde15e26ef02a082"
+  name = "github.com/mattn/go-sqlite3"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "9bdaffc12bf8be15afceb51bb60851edd4afdff5"
+  version = "v2.0.3"
+
+[[projects]]
   digest = "1:72f35d3e412bc67b121e15ea4c88a3b3da8bcbc2264339e7ffa4a1865799840c"
   name = "github.com/onsi/ginkgo"
   packages = [
@@ -407,6 +415,7 @@
     "github.com/hashicorp/go-multierror",
     "github.com/kballard/go-shellquote",
     "github.com/lib/pq",
+    "github.com/mattn/go-sqlite3",
     "github.com/onsi/ginkgo",
     "github.com/onsi/gomega",
     "github.com/onsi/gomega/gbytes",

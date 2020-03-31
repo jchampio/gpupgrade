@@ -1,4 +1,4 @@
 package ci
 
-// Generate pipeline.yml from template.yml using parse_template
-//go:generate go run ./parser/parse_template.go ./template.yml pipeline.yml
+// Generate dev-pipeline.yml and prod-pipeline.yml from template.yml using parse_template
+//go:generate go run ./parser/parse_template.go ./template.yml generated/${TARGET}-pipeline.yml $TARGET

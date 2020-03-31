@@ -115,8 +115,8 @@ GIT_URI := $(shell git ls-remote --get-url)
 
 ifeq ($(GIT_URI),https://github.com/greenplum-db/gpupgrade)
 ifeq ($(BRANCH),master)
-PIPELINE_NAME := gpupgrade
-FLY_TARGET := prod
+	PIPELINE_NAME := gpupgrade
+	FLY_TARGET := prod
 endif
 endif
 
@@ -124,21 +124,21 @@ endif
 PIPELINE_NAME ?= gpupgrade:$(shell git rev-parse --abbrev-ref HEAD | tr '/' ':')
 FLY_TARGET ?= cm
 ifeq ($(FLY_TARGET),prod)
-SECRETS_TYPE := prod
+	TARGET := prod
 else
-SECRETS_TYPE := dev
+	TARGET := dev
 endif
 
 .PHONY: set-pipeline expose-pipeline
 # TODO: Keep this in sync with the README at github.com/greenplum-db/continuous-integration
 set-pipeline:
 	# Keep pipeline.yml up to date
-	go generate ./ci
+	TARGET=$(TARGET) go generate ./ci
 	#NOTE-- make sure your gpupgrade-git-remote uses an https style git"
 	#NOTE-- such as https://github.com/greenplum-db/gpupgrade.git"
 	fly -t $(FLY_TARGET) set-pipeline -p $(PIPELINE_NAME) \
-		-c ci/pipeline.yml \
-		-l ~/workspace/gp-continuous-integration/secrets/gpupgrade.$(SECRETS_TYPE).yml \
+		-c ci/generated/$(TARGET)-pipeline.yml \
+		-l ~/workspace/gp-continuous-integration/secrets/gpupgrade.$(TARGET).yml \
 		-l ~/workspace/gp-continuous-integration/secrets/gpdb_common-ci-secrets.yml \
 		-l ~/workspace/gp-continuous-integration/secrets/gpdb_master-ci-secrets.prod.yml \
 		-l ~/workspace/gp-continuous-integration/secrets/ccp_ci_secrets_$(FLY_TARGET).yml \

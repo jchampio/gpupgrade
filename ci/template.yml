@@ -49,6 +49,15 @@ resources:
   {{- end}}
 {{end}}
 
+{{- if .ProdTarget }}
+- name: bin_gpupgrade_rc
+  type: gcs
+  source:
+    bucket: ((gcs-bucket))
+    json_key: ((google-service-account-key))
+    regexp: gpupgrade/published/master/gpupgrade-rc-(.*)-linux_x86_64
+{{end}}
+
 - name: bats
   type: git
   source:
@@ -319,6 +328,35 @@ jobs:
     <<: *set_failed
   on_success:
     <<: *ccp_destroy
+  on_failure:
+    <<: *slack_alert
+{{end -}}
+
+{{- if .ProdTarget }}
+# todo: In the future, we want to build gpupgrade first, and input that
+# binary to each job that needs it.
+# Then, this job can also receive the binary as an input and then will
+# upload it to the rc bucket.
+- name: publish-release-candidate
+  plan:
+    - get: gpupgrade_src
+      trigger: true
+      passed:
+        - build
+        - noinstall-tests
+        - install-tests
+        - 6-to-6
+        {{- range .UpgradeJobs}}
+        - {{.Source}}-to-{{.Target}}
+          {{- if .UseLinkMode }}-link-mode{{end -}}
+          {{- if .PrimariesOnly }}-primaries-only{{end -}}
+          {{- if .NoStandby }}-no-standby{{end -}}
+        {{end}}
+    - task: build-rc
+      file: gpupgrade_src/ci/tasks/build-rc.yml
+    - put: bin_gpupgrade_rc
+      params:
+        file: gpupgrade_bin_path/gpupgrade-rc-*-linux_x86_64
   on_failure:
     <<: *slack_alert
 {{end -}}

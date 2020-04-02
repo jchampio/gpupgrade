@@ -51,9 +51,9 @@ resources:
 - name: bin_gpupgrade_rc
   type: gcs
   source:
-    bucket: ((gcs-bucket))
-    json_key: ((google-service-account-key))
-    regexp: gpupgrade/published/master/gpupgrade-rc-(.*)-linux_x86_64
+    bucket: ((cm-artifacts-bucket))
+    json_key: ((cm-gcs-service-account-key))
+    regexp: release-candidates/gpupgrade-rc-(.*)-linux_x86_64
 
 
 - name: bats
@@ -642,7 +642,6 @@ jobs:
         - build
         - noinstall-tests
         - install-tests
-        - 6-to-6
         - 6.1.0-to-6.1.0
         - 5-to-6.1.0
         - 5-to-6.1.0-link-mode
@@ -658,11 +657,11 @@ jobs:
             tag: '1.12.7'
         inputs:
           - name: gpupgrade_src
-            path: ../../../go/src/github.com/greenplum-db/gpupgrade
+            path: go/src/github.com/greenplum-db/gpupgrade
         outputs:
           - name: gpupgrade_bin_path
         run:
-          path: gpupgrade_src/ci/scripts/build-rc.sh
+          path: go/src/github.com/greenplum-db/gpupgrade/ci/scripts/build-rc.sh
     - put: bin_gpupgrade_rc
       params:
         file: gpupgrade_bin_path/gpupgrade-rc-*-linux_x86_64

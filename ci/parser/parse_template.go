@@ -12,6 +12,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"log"
 	"os"
@@ -43,7 +44,9 @@ type Data struct {
 	ProdTarget                     bool
 }
 
-func generateData(target string) Data {
+var data Data
+
+func init() {
 	var upgradeJobs []*UpgradeJob
 	for _, sourceVersion := range sourceVersions {
 		for _, targetVersion := range targetVersions {
@@ -70,13 +73,12 @@ func generateData(target string) Data {
 	}
 
 	// Duplicate version data here in order to simplify template logic
-	return Data{
+	data = Data{
 		SourceVersions:    sourceVersions,
 		TargetVersions:    targetVersions,
 		AllVersions:       deduplicate(sourceVersions, targetVersions),
 		UpgradeJobs:       upgradeJobs,
 		LastTargetVersion: targetVersions[len(targetVersions)-1],
-		ProdTarget: 	   target == "prod",
 	}
 }
 
@@ -103,7 +105,11 @@ func deduplicate(a, b []string) []string {
 }
 
 func main() {
-	templateFilepath, pipelineFilepath, target := os.Args[1], os.Args[2], os.Args[3]
+	flag.BoolVar(&data.ProdTarget, "prod", false, "the target environment")
+	flag.Parse()
+
+	templateFilepath, pipelineFilepath := flag.Arg(0), flag.Arg(1)
+
 	templateFuncs := template.FuncMap{
 		// The escapeVersion function is used to ensure that the gcs-resource
 		// concourse plugin regex matches the version correctly. As an example
@@ -141,7 +147,7 @@ func main() {
 		log.Fatalf("error writing %s: %+v", pipelineFilepath, err)
 	}
 
-	err = yamlTemplate.ExecuteTemplate(pipelineFile, templateFilename, generateData(target))
+	err = yamlTemplate.ExecuteTemplate(pipelineFile, templateFilename, data)
 	closeErr := pipelineFile.Close()
 	if err != nil {
 		log.Fatalf("error executing template: %+v", err)

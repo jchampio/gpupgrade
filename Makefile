@@ -133,7 +133,7 @@ endif
 # TODO: Keep this in sync with the README at github.com/greenplum-db/continuous-integration
 set-pipeline:
 	# Keep pipeline.yml up to date
-	TARGET=$(TARGET) go generate ./ci
+	go generate ./ci
 	#NOTE-- make sure your gpupgrade-git-remote uses an https style git"
 	#NOTE-- such as https://github.com/greenplum-db/gpupgrade.git"
 	fly -t $(FLY_TARGET) set-pipeline -p $(PIPELINE_NAME) \

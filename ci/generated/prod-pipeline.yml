@@ -649,7 +649,20 @@ jobs:
         - 5-to-6.1.0-primaries-only
         - 5-to-6.1.0-no-standby
     - task: build-rc
-      file: gpupgrade_src/ci/tasks/build-rc.yml
+      config:
+        platform: linux
+        image_resource:
+          type: docker-image
+          source:
+            repository: golang
+            tag: '1.12.7'
+        inputs:
+          - name: gpupgrade_src
+            path: ../../../go/src/github.com/greenplum-db/gpupgrade
+        outputs:
+          - name: gpupgrade_bin_path
+        run:
+          path: gpupgrade_src/ci/scripts/build-rc.sh
     - put: bin_gpupgrade_rc
       params:
         file: gpupgrade_bin_path/gpupgrade-rc-*-linux_x86_64

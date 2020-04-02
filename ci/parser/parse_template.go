@@ -105,7 +105,7 @@ func deduplicate(a, b []string) []string {
 }
 
 func main() {
-	flag.BoolVar(&data.ProdTarget, "prod", false, "the target environment")
+	flag.BoolVar(&data.ProdTarget, "prod", false, "generate a production pipeline")
 	flag.Parse()
 
 	templateFilepath, pipelineFilepath := flag.Arg(0), flag.Arg(1)

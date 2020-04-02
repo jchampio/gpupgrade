@@ -198,8 +198,9 @@ pipeline, run:
 make set-pipeline FLY_TARGET=<CONCOURSE_INSTANCE> GIT_URI=https://github.com/<GITHUB_USERNAME>/gpupgrade.git
 ```
 
-Note: When making pipeline changes, make sure to also check in the prod pipeline changes
-into the prod-pipeline.yml file.
+Note: When making pipeline changes, change only the template.yml and run
+`go generate ./ci` (this will automatically run as part of `make set-pipeline`).
+Then check in the dev-pipeline.yml and prod-pipeline.yml files.
 
 If you want to use the defaults and have access to the continuous-integration
 secrets, there is a convenience recipe:

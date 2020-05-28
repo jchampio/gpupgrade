@@ -25,26 +25,33 @@ abort() {
 
 # skip_if_no_gpdb() will skip a test if a cluster's environment is not set up.
 skip_if_no_gpdb() {
-    [ -n "${GPHOME}" ] || skip "this test requires an active GPDB cluster (set GPHOME)"
-    [ -n "${PGPORT}" ] || skip "this test requires an active GPDB cluster (set PGPORT)"
+    [ -n "${GPHOME_SOURCE}" ] || skip "this test requires an active GPDB source cluster (set GPHOME_SOURCE)"
+    [ -n "${GPHOME_TARGET}" ] || skip "this test requires an active GPDB target cluster (set GPHOME_TARGET)"
+    [ -n "${PGPORT}" ] || skip "this test requires an active GPDB source cluster (set PGPORT)"
 }
 
 # start_source_cluster() ensures that database is up before returning
 start_source_cluster() {
-    "${GPHOME}"/bin/pg_isready -q || "${GPHOME}"/bin/gpstart -a
+    if command -v "${GPHOME_SOURCE}"/bin/pg_isready > /dev/null; then
+        "${GPHOME_SOURCE}"/bin/pg_isready -q || "${GPHOME_SOURCE}"/bin/gpstart -a
+    else
+        # 5X does not have pg_isready
+        "${GPHOME_SOURCE}"/bin/psql postgres -qc "SELECT 1" &> /dev/null || "${GPHOME_SOURCE}"/bin/gpstart -a
+    fi
 }
 
 # delete_cluster takes an master data directory and calls gpdeletesystem, and
 # removes the associated data directories.
 delete_cluster() {
-    local masterdir="$1"
+    local gphome="$1"
+    local masterdir="$2"
 
     # Perform a sanity check before deleting.
     expected_suffix="*qddir/demoDataDir.*.-1"
     [[ "$masterdir" == ${expected_suffix} ]] || \
         abort "cowardly refusing to delete $masterdir which does not look like an upgraded demo data directory. Expected suffix ${expected_suffix}"
 
-    __gpdeletesystem "$masterdir"
+    __gpdeletesystem "$gphome" "$masterdir"
 
     # XXX: Since gpugprade archives instead of removing data directories,
     # gpupgrade will fail when copying the master data directory to segments
@@ -83,12 +90,13 @@ delete_finalized_cluster() {
 # Calls gpdeletesystem on the cluster pointed to by the given master data
 # directory.
 __gpdeletesystem() {
-    local masterdir="$1"
+    local gphome="$1"
+    local masterdir="$2"
 
     # Look up the master port (fourth line of the postmaster PID file).
     local port=$(awk 'NR == 4 { print $0 }' < "$masterdir/postmaster.pid")
 
-    local gpdeletesystem="$GPHOME"/bin/gpdeletesystem
+    local gpdeletesystem="$gphome"/bin/gpdeletesystem
 
     # XXX gpdeletesystem returns 1 if there are warnings. There are always
     # warnings. So we ignore the exit code...
@@ -156,4 +164,36 @@ expected_target_datadir() {
 archive_dir() {
     local dir=$1
     echo "$(expected_target_datadir "$dir")".old
+}
+
+is_GPDB5() {
+    local gphome=$1
+    local version=$("$gphome"/bin/postgres --gp-version)
+
+    [[ $version =~ ^"postgres (Greenplum Database) 5." ]]
+}
+
+# get_datadirs returns the datadirs across various version of GPDB.
+# Arguments are GPHOME, PGPORT, and the WHERE clause to use when querying
+# gp_segment_configuration.
+query_datadirs() {
+    local gphome=$1
+    local port=$2
+    local where_clause=$3
+
+    local sql="SELECT datadir FROM gp_segment_configuration WHERE ${where_clause}"
+
+     if is_GPDB5 "$gphome"; then
+        sql="SELECT e.fselocation as datadir
+FROM gp_segment_configuration s
+JOIN pg_filespace_entry e ON s.dbid = e.fsedbid
+JOIN pg_filespace f ON e.fsefsoid = f.oid
+WHERE f.fsname = 'pg_system' AND ${where_clause}
+ORDER BY s.content"
+    fi
+
+    run "$gphome"/bin/psql -At -p "$port" postgres -c "$sql"
+    [ "$status" -eq 0 ] || fail "$output"
+
+    echo "$output"
 }

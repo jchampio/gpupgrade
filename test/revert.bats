@@ -17,8 +17,8 @@ setup() {
 
 @test "reverting after initialize succeeds" {
     gpupgrade initialize \
-        --source-bindir="$GPHOME/bin" \
-        --target-bindir="$GPHOME/bin" \
+        --source-bindir="$GPHOME_SOURCE/bin" \
+        --target-bindir="$GPHOME_TARGET/bin" \
         --source-master-port="${PGPORT}" \
         --temp-port-range 6020-6040 \
         --disk-free-ratio 0 \
@@ -54,8 +54,8 @@ setup() {
     local target_master_port=6020
 
     gpupgrade initialize \
-        --source-bindir="$GPHOME/bin" \
-        --target-bindir="$GPHOME/bin" \
+        --source-bindir="$GPHOME_SOURCE/bin" \
+        --target-bindir="$GPHOME_TARGET/bin" \
         --source-master-port="${PGPORT}" \
         --temp-port-range ${target_master_port}-6040 \
         --disk-free-ratio 0 \

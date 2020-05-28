@@ -9,7 +9,7 @@ load finalize_checks
 setup() {
     skip_if_no_gpdb
 
-    PSQL="$GPHOME/bin/psql -X --no-align --tuples-only postgres"
+    PSQL="$GPHOME_SOURCE/bin/psql -X --no-align --tuples-only postgres"
 
     setup_state_dir
 
@@ -29,7 +29,7 @@ teardown() {
     gpupgrade kill-services
 
     # reload old path and start
-    source "${GPHOME}/greenplum_path.sh"
+    source "${GPHOME_SOURCE}/greenplum_path.sh"
     gpstart -a
 
 }
@@ -55,14 +55,13 @@ upgrade_cluster() {
         # set this variable before we upgrade to make sure our decision to run below
         # is based on the source cluster before upgrade perhaps changes our cluster.
         local no_mirrors
-        no_mirrors=$(contents_without_mirror "${GPHOME}" "$(hostname)" "${PGPORT}")
+        no_mirrors=$(contents_without_mirror "${GPHOME_SOURCE}" "$(hostname)" "${PGPORT}")
 
         if [ "$LINK_MODE" == "--mode=link" ]; then
                # create a backup of datadirs as the mirrors will be deleted in finalize
                # and primaries pg_control file will be changed to pg_control.old to disable to old
                # cluster
-               source "${GPHOME}/greenplum_path.sh"
-               gpstop -a
+               "${GPHOME_SOURCE}"/bin/gpstop -a
                for datadir in "${datadirs[@]}"; do
                    cp -r ${datadir} ${datadir}_backup
                done
@@ -70,8 +69,8 @@ upgrade_cluster() {
         fi
 
         gpupgrade initialize \
-            --source-bindir="$GPHOME/bin" \
-            --target-bindir="$GPHOME/bin" \
+            --source-bindir="$GPHOME_SOURCE/bin" \
+            --target-bindir="$GPHOME_TARGET/bin" \
             --source-master-port="${PGPORT}" \
             --temp-port-range 6020-6040 \
             --disk-free-ratio 0 \
@@ -125,7 +124,7 @@ upgrade_cluster() {
         local standby_status_line=$(get_standby_status "$actual_standby_status")
         [[ $standby_status_line == *"Standby host passive"* ]] || fail "expected standby to be up and in passive mode, got **** ${actual_standby_status} ****"
 
-        validate_mirrors_and_standby "${GPHOME}" "$(hostname)" "${PGPORT}"
+        validate_mirrors_and_standby "${GPHOME_SOURCE}" "$(hostname)" "${PGPORT}"
 
 }
 @test "in copy mode gpupgrade finalize should swap the target data directories and ports with the source cluster" {

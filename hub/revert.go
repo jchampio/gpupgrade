@@ -5,13 +5,16 @@ package hub
 
 import (
 	"fmt"
+	"os/exec"
 	"path/filepath"
 	"time"
 
 	"github.com/greenplum-db/gp-common-go-libs/gplog"
 	"github.com/hashicorp/go-multierror"
+	"github.com/kballard/go-shellquote"
 	"golang.org/x/xerrors"
 
+	"github.com/greenplum-db/gpupgrade/greenplum"
 	"github.com/greenplum-db/gpupgrade/idl"
 	"github.com/greenplum-db/gpupgrade/step"
 	"github.com/greenplum-db/gpupgrade/upgrade"
@@ -63,6 +66,10 @@ func (s *Server) Revert(_ *idl.RevertRequest, stream idl.CliToHub_RevertServer) 
 
 			return upgrade.DeleteDirectories([]string{datadir}, upgrade.PostgresFiles, hostname, streams)
 		})
+
+		st.Run(idl.Substep_RESTORE_PG_CONTROL, func(streams step.OutStreams) error {
+			return RestorePgControlFiles(streams, s.Source)
+		})
 	}
 
 	st.Run(idl.Substep_ARCHIVE_LOG_DIRECTORIES, func(_ step.OutStreams) error {
@@ -100,4 +107,28 @@ func (s *Server) Revert(_ *idl.RevertRequest, stream idl.CliToHub_RevertServer) 
 	}
 
 	return st.Err()
+}
+
+func RestorePgControlFiles(streams step.OutStreams, source *greenplum.Cluster) error {
+	for _, seg := range source.Primaries {
+		err := renamePgControl(streams, seg.Hostname, seg.DataDir)
+		if err != nil {
+			return xerrors.Errorf("renaming pg_control on %s: %w", seg.Hostname, err)
+		}
+	}
+
+	return nil
+}
+
+func renamePgControl(streams step.OutStreams, host, datadir string) error {
+	old := filepath.Join(datadir, "global", "pg_control.old")
+	new := filepath.Join(datadir, "global", "pg_control")
+
+	cmd := exec.Command("ssh", host, shellquote.Join("mv", old, new))
+
+	cmd.Stdout = streams.Stdout()
+	cmd.Stderr = streams.Stderr()
+
+	gplog.Info("running %s", cmd)
+	return cmd.Run()
 }

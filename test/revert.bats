@@ -12,8 +12,12 @@ setup() {
     export GPUPGRADE_HOME="${STATE_DIR}/gpupgrade"
     echo $GPUPGRADE_HOME
 
+    gpupgrade kill-services
+
     PSQL="$GPHOME"/bin/psql
 }
+
+# TODO: add teardown
 
 @test "reverting after initialize succeeds" {
     gpupgrade initialize \

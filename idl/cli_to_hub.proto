@@ -75,6 +75,7 @@ enum Substep {
     DELETE_MASTER_STATEDIR = 26;
     ARCHIVE_LOG_DIRECTORIES = 27;
     START_SOURCE_CLUSTER = 28;
+    RESTORE_PG_CONTROL = 29;
 }
 
 enum Status {

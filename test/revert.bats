@@ -15,9 +15,15 @@ setup() {
     gpupgrade kill-services
 
     PSQL="$GPHOME"/bin/psql
+    TEARDOWN_FUNCTIONS=()
 }
 
-# TODO: add teardown
+# TODO: populate teardown
+teardown() {
+    for FUNCTION in "${TEARDOWN_FUNCTIONS[@]}"; do
+        $FUNCTION
+    done
+}
 
 @test "reverting after initialize succeeds" {
     gpupgrade initialize \
@@ -73,12 +79,32 @@ setup() {
     ! pg_isready -qp ${target_master_port} || fail "expected target cluster to not be running on port ${target_master_port}"
 }
 
+add_table() {
+    local name=$1
+
+    $PSQL postgres -c "CREATE TABLE $name(a int);"
+
+    TEARDOWN_FUNCTIONS+=( "remove_table $name" )
+}
+
+remove_table() {
+    local name=$1
+
+    $PSQL postgres -c "DROP TABLE $name;"
+}
+
 @test "reverting after execute in link mode succeeds" {
     local target_master_port=6020
     local old_segconfig
     local new_segconfig
 
     old_segconfig=$($PSQL -Atc "SELECT * FROM gp_segment_configuration ORDER BY dbid" postgres)
+
+    # Add a table to the source, that we will modify post-execute.
+    add_table 'should_be_reverted'
+    $PSQL postgres -v ON_ERROR_STOP=1 -c '
+        INSERT INTO should_be_reverted VALUES (1), (2), (3);
+    '
 
     gpupgrade initialize \
         --source-bindir="$GPHOME/bin" \
@@ -89,6 +115,9 @@ setup() {
         --mode link \
         --verbose 3>&-
     gpupgrade execute --verbose
+
+    # Modify our test table.
+    $PSQL -p $target_master_port postgres -c 'TRUNCATE should_be_reverted;'
 
     gpupgrade revert --verbose
 
@@ -110,6 +139,14 @@ setup() {
         echo "$new_segconfig"
 
         fail "source cluster's segment configuration has changed"
+    fi
+
+    # Check that our table is back the way it was before execute.
+    local row_count
+    row_count=$($PSQL postgres -Atc "SELECT COUNT(*) FROM should_be_reverted")
+
+    if (( $row_count != 3 )); then
+        fail "table truncated after execute was not reverted: row count $row_count"
     fi
 }
 

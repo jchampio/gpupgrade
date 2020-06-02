@@ -68,10 +68,16 @@ type Version struct {
 	GPVersion     string
 }
 
+type MajorVersion struct {
+	Source string
+	Target string
+}
+
 type Data struct {
 	UpgradeJobs       []*UpgradeJob
 	LastTargetVersion string
 	Versions          []*Version
+	MajorVersions     []*MajorVersion
 }
 
 var data Data
@@ -100,6 +106,16 @@ func init() {
 		}
 	}
 
+	var majorVersions []*MajorVersion
+	for _, source := range sourceVersions {
+		for _, target := range targetVersions {
+			majorVersions = append(majorVersions, &MajorVersion{
+				Target: target,
+				Source: source,
+			})
+		}
+	}
+
 	for _, centosVersion := range centosVersions {
 		// Special cases for 5->6. (These are special-cased to avoid exploding the
 		// test matrix too much.)
@@ -123,6 +139,7 @@ func init() {
 		UpgradeJobs:       upgradeJobs,
 		LastTargetVersion: targetVersions[len(targetVersions)-1],
 		Versions:          versions,
+		MajorVersions:     majorVersions,
 	}
 }
 

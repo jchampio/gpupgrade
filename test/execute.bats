@@ -46,7 +46,7 @@ ensure_hardlinks_for_relfilenode_on_master_and_segments() {
     local tablename=$2
     local expected_number_of_hardlinks=$3
 
-    local sql="SELECT e.fselocation as datadir
+    local sql="
     CREATE FUNCTION pg_temp.seg_relation_filepath(tbl text)
         RETURNS TABLE (dbid int, path text)
         EXECUTE ON ALL SEGMENTS
@@ -97,8 +97,7 @@ WHERE f.fsname = 'pg_system' AND role = 'p'
 }
 
 set_master_and_primary_datadirs() {
-    local datadirs=$(query_datadirs $GPHOME_SOURCE $PGPORT "role = 'p'")
-    master_and_primary_datadirs=("${datadirs[@]}")
+    master_and_primary_datadirs=($(query_datadirs $GPHOME_SOURCE $PGPORT "role = 'p'"))
 }
 
 reset_master_and_primary_pg_control_files() {

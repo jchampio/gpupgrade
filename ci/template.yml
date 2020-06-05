@@ -27,12 +27,12 @@ resources:
     uri: ((gpupgrade-git-remote))
     branch: ((gpupgrade-git-branch))
 
-{{range .MajorVersions}}
-- name: gpdb{{.Source}}_src
+{{range .AllVersions}}
+- name: gpdb{{.}}_src
   type: git
   source:
     uri: https://github.com/greenplum-db/gpdb
-    branch: {{.Source}}X_STABLE
+    branch: {{.}}X_STABLE
 {{end}}
 
 - name: retail_demo_src
@@ -210,8 +210,8 @@ jobs:
   on_failure:
     <<: *slack_alert
 
-{{range .MajorVersions}}
-- name: {{.Source}}-to-{{.Target}}-install-tests
+{{range .CheckJobs}}
+- name: {{.Name}}
   plan:
   - in_parallel:
     - get: gpupgrade_src
@@ -396,8 +396,8 @@ jobs:
         passed:
           - build
           - noinstall-tests
-          {{- range .MajorVersions}}
-          - {{ .Source }}-to-{{ .Target }}-install-tests
+          {{- range .CheckJobs}}
+          - {{ .Name }}
           {{- end}}
           {{- range .UpgradeJobs}}
           - {{ .Name }}

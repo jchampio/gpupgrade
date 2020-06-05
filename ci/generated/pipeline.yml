@@ -29,17 +29,17 @@ resources:
     branch: ((gpupgrade-git-branch))
 
 
-- name: gpdb6_src
-  type: git
-  source:
-    uri: https://github.com/greenplum-db/gpdb
-    branch: 6X_STABLE
-
 - name: gpdb5_src
   type: git
   source:
     uri: https://github.com/greenplum-db/gpdb
     branch: 5X_STABLE
+
+- name: gpdb6_src
+  type: git
+  source:
+    uri: https://github.com/greenplum-db/gpdb
+    branch: 6X_STABLE
 
 
 - name: retail_demo_src

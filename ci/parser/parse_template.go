@@ -21,6 +21,7 @@ import (
 	"path"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"text/template"
 
 	"github.com/blang/semver"
@@ -29,6 +30,14 @@ import (
 var sourceVersions = []string{"6", "5"}
 var targetVersions = []string{"6"}
 var centosVersions = []string{"6", "7"}
+
+type CheckJob struct {
+	Source, Target string
+}
+
+func (j *CheckJob) Name() string {
+	return fmt.Sprintf("%s-to-%s-install-tests", j.Source, j.Target)
+}
 
 type UpgradeJob struct {
 	Source, Target string
@@ -68,24 +77,25 @@ type Version struct {
 	GPVersion     string
 }
 
-type MajorVersion struct {
-	Source string
-	Target string
-}
-
 type Data struct {
+	AllVersions       []string // combination of Source/Target
 	UpgradeJobs       []*UpgradeJob
 	LastTargetVersion string
 	Versions          []*Version
-	MajorVersions     []*MajorVersion
+	CheckJobs         []*CheckJob
 }
 
 var data Data
 
 func init() {
+	var checkJobs []*CheckJob
 	var upgradeJobs []*UpgradeJob
 	for _, sourceVersion := range sourceVersions {
 		for _, targetVersion := range targetVersions {
+			checkJobs = append(checkJobs, &CheckJob{
+				Source: sourceVersion,
+				Target: targetVersion,
+			})
 			for _, centosVersion := range centosVersions {
 				upgradeJobs = append(upgradeJobs, &UpgradeJob{
 					Source:        sourceVersion,
@@ -102,16 +112,6 @@ func init() {
 			versions = append(versions, &Version{
 				CentosVersion: centosVersion,
 				GPVersion:     sourceVersion,
-			})
-		}
-	}
-
-	var majorVersions []*MajorVersion
-	for _, source := range sourceVersions {
-		for _, target := range targetVersions {
-			majorVersions = append(majorVersions, &MajorVersion{
-				Target: target,
-				Source: source,
 			})
 		}
 	}
@@ -136,11 +136,34 @@ func init() {
 	}
 
 	data = Data{
+		AllVersions:       deduplicate(sourceVersions, targetVersions),
 		UpgradeJobs:       upgradeJobs,
 		LastTargetVersion: targetVersions[len(targetVersions)-1],
 		Versions:          versions,
-		MajorVersions:     majorVersions,
+		CheckJobs:         checkJobs,
 	}
+}
+
+// deduplicate combines, sorts, and deduplicates two string slices.
+func deduplicate(a, b []string) []string {
+	var all []string
+
+	all = append(all, a...)
+	all = append(all, b...)
+	sort.Strings(all)
+
+	// Deduplicate by compacting runs of identical strings.
+	cur := 0
+	for next := 1; next < len(all); next++ {
+		if all[cur] == all[next] {
+			continue
+		}
+
+		cur++
+		all[cur] = all[next]
+	}
+
+	return all[:cur+1]
 }
 
 func main() {

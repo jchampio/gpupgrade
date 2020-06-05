@@ -72,7 +72,7 @@ delete_finalized_cluster() {
     local archive_masterdir=$(archive_dir "$masterdir")
     [ -d "$archive_masterdir" ] || abort "cowardly refusing to delete $masterdir. Expected $archive_masterdir to exist."
 
-    __gpdeletesystem "$masterdir"
+    __gpdeletesystem "$gphome" "$masterdir"
 
     local id=$(gpupgrade config show --id)
 

@@ -101,7 +101,7 @@ __gpdeletesystem() {
 
     # XXX gpdeletesystem returns 1 if there are warnings. There are always
     # warnings. So we ignore the exit code...
-    yes | PGPORT="$port" "$gpdeletesystem" -fd "$masterdir" || true
+    (source $gphome/greenplum_path.sh && yes | PGPORT="$port" "$gpdeletesystem" -fd "$masterdir") || true
 }
 
 delete_target_datadirs() {

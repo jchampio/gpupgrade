@@ -180,7 +180,7 @@ is_GPDB5() {
 query_datadirs() {
     local gphome=$1
     local port=$2
-    local where_clause=$3
+    local where_clause=${3:-true}
 
     local sql="SELECT datadir FROM gp_segment_configuration WHERE ${where_clause}"
 

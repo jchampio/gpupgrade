@@ -40,9 +40,9 @@ upgrade_cluster() {
 
         # place marker file in source master data directory
         local marker_file=source-cluster.test-marker
-        local mirror_datadirs=($(get_mirror_datadirs))
-        local primary_datadirs=($(get_primary_datadirs))
-        local datadirs=($(get_datadirs))
+        local mirror_datadirs=($(query_datadirs $GPHOME_SOURCE $PGPORT "role='m'"))
+        local primary_datadirs=($(query_datadirs $GPHOME_SOURCE $PGPORT "role='p'"))
+        local datadirs=($(query_datadirs $GPHOME_SOURCE $PGPORT))
         for datadir in "${datadirs[@]}"; do
             touch "$datadir/${marker_file}"
         done
@@ -148,19 +148,6 @@ get_segment_configuration() {
           from gp_segment_configuration
           order by content, role
     "
-}
-
-# Writes all datadirs in the system to stdout, one per line.
-get_datadirs() {
-    $PSQL -Atc "select datadir from gp_segment_configuration"
-}
-
-get_primary_datadirs() {
-    $PSQL -Atc "select datadir from gp_segment_configuration where role='p'"
-}
-
-get_mirror_datadirs() {
-    $PSQL -Atc "select datadir from gp_segment_configuration where role='m'"
 }
 
 get_standby_status() {

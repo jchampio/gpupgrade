@@ -65,7 +65,8 @@ delete_cluster() {
 # archive directories to their original name (which is the same as their
 # upgraded name).
 delete_finalized_cluster() {
-    local masterdir="$1"
+    local gphome="$1"
+    local masterdir="$2"
 
     # Perform a sanity check before deleting.
     local archive_masterdir=$(archive_dir "$masterdir")

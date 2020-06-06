@@ -50,7 +50,7 @@ upgrade_cluster() {
 
         # grab the original configuration before starting so we can verify the
         # target cluster ends up with the source cluster's original layout
-        local old_config=$(get_segment_configuration)
+        local old_config=$(get_segment_configuration "${GPHOME_SOURCE}")
 
         # set this variable before we upgrade to make sure our decision to run below
         # is based on the source cluster before upgrade perhaps changes our cluster.
@@ -104,7 +104,7 @@ upgrade_cluster() {
             fail "got gpperfmon.conf file $(cat $gpperfmon_config_file), wanted it to include ${MASTER_DATA_DIRECTORY}"
 
         # Check to make sure the new cluster matches the old one.
-        local new_config=$(get_segment_configuration)
+        local new_config=$(get_segment_configuration "${GPHOME_TARGET}")
         [ "$old_config" = "$new_config" ] || fail "actual config: $new_config, wanted $old_config"
 
         #
@@ -143,11 +143,24 @@ setup_state_dir() {
 # Writes the pieces of gp_segment_configuration that we need to ensure remain
 # the same across upgrade, one segment per line, sorted by content ID.
 get_segment_configuration() {
-    $PSQL -c "
-        select content, role, hostname, port, datadir
-          from gp_segment_configuration
-          order by content, role
-    "
+    local gphome=$1
+
+    if is_GPDB5 "$gphome"; then
+        $PSQL -c "
+            SELECT s.content, s.role, s.hostname, s.port, e.fselocation as datadir
+            FROM gp_segment_configuration s
+            JOIN pg_filespace_entry e ON s.dbid = e.fsedbid
+            JOIN pg_filespace f ON e.fsefsoid = f.oid
+            WHERE f.fsname = 'pg_system' AND ${where_clause}
+            ORDER BY s.content
+        "
+    else
+        $PSQL -c "
+            select content, role, hostname, port, datadir
+              from gp_segment_configuration
+              order by content, role
+        "
+    fi
 }
 
 get_standby_status() {

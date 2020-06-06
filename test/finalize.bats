@@ -151,7 +151,7 @@ get_segment_configuration() {
             FROM gp_segment_configuration s
             JOIN pg_filespace_entry e ON s.dbid = e.fsedbid
             JOIN pg_filespace f ON e.fsefsoid = f.oid
-            WHERE f.fsname = 'pg_system' AND ${where_clause}
+            WHERE f.fsname = 'pg_system'
             ORDER BY s.content
         "
     else

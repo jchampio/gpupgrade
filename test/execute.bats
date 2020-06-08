@@ -188,7 +188,7 @@ reset_master_and_primary_pg_control_files() {
     gpupgrade execute --verbose 3>&-
 
     # Put the source and target clusters back the way they were.
-    gpstop -a -d "$NEW_CLUSTER"
+    (source "$GPHOME_TARGET"/greenplum_path.sh && gpstop -a -d "$NEW_CLUSTER")
     gpstart -a 3>&-
 
     # Mark every substep in the status file as failed. Then re-execute.

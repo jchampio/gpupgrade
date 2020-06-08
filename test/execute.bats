@@ -21,7 +21,11 @@ setup() {
 }
 
 teardown() {
-    skip_if_no_gpdb
+    # XXX Beware, BATS_TEST_SKIPPED is not a documented export.
+    if [ -n "${BATS_TEST_SKIPPED}" ]; then
+        return
+    fi
+
     $PSQL postgres -c "drop table if exists test_linking;"
 
     gpupgrade kill-services

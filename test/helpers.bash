@@ -1,6 +1,11 @@
 # Copyright (c) 2017-2020 VMware, Inc. or its affiliates
 # SPDX-License-Identifier: Apache-2.0
 
+# Default to GPHOME for both the source and target installations. These may be
+# overridden manually for cross-version testing.
+GPHOME_SOURCE=${GPHOME_SOURCE:-$GPHOME}
+GPHOME_TARGET=${GPHOME_TARGET:-$GPHOME}
+
 # log() prints its arguments to the TAP stream. Newlines are supported (each
 # line will be correctly escaped in TAP).
 log() {
@@ -25,8 +30,8 @@ abort() {
 
 # skip_if_no_gpdb() will skip a test if a cluster's environment is not set up.
 skip_if_no_gpdb() {
-    [ -n "${GPHOME_SOURCE}" ] || skip "this test requires an active GPDB source cluster (set GPHOME_SOURCE)"
-    [ -n "${GPHOME_TARGET}" ] || skip "this test requires an active GPDB target cluster (set GPHOME_TARGET)"
+    [ -n "${GPHOME_SOURCE}" ] || skip "this test requires an active GPDB source cluster (set GPHOME or GPHOME_SOURCE)"
+    [ -n "${GPHOME_TARGET}" ] || skip "this test requires an active GPDB target cluster (set GPHOME or GPHOME_TARGET)"
     [ -n "${PGPORT}" ] || skip "this test requires an active GPDB source cluster (set PGPORT)"
 }
 

@@ -152,7 +152,7 @@ get_segment_configuration() {
             JOIN pg_filespace_entry e ON s.dbid = e.fsedbid
             JOIN pg_filespace f ON e.fsefsoid = f.oid
             WHERE f.fsname = 'pg_system'
-            ORDER BY s.content
+            ORDER BY s.content, s.role
         "
     else
         $PSQL -c "

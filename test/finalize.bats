@@ -120,13 +120,14 @@ upgrade_cluster() {
         #   That is a more accurate representation if the standby is running and
         #   in sync, since gpstate might simply check if the process is running.
         local new_datadir=$(gpupgrade config show --target-datadir)
-        local actual_standby_status=$(gpstate -d "${new_datadir}")
+        local actual_standby_status=$(source "${GPHOME_TARGET}/greenplum_path.sh" && gpstate -d "${new_datadir}")
         local standby_status_line=$(get_standby_status "$actual_standby_status")
         [[ $standby_status_line == *"Standby host passive"* ]] || fail "expected standby to be up and in passive mode, got **** ${actual_standby_status} ****"
 
-        validate_mirrors_and_standby "${GPHOME_SOURCE}" "$(hostname)" "${PGPORT}"
+        validate_mirrors_and_standby "${GPHOME_TARGET}" "$(hostname)" "${PGPORT}"
 
 }
+
 @test "in copy mode gpupgrade finalize should swap the target data directories and ports with the source cluster" {
     upgrade_cluster
 }

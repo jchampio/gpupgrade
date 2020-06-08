@@ -39,10 +39,41 @@ teardown() {
         $FUNCTION
     done
 
+    start_source_cluster_postexecute
+}
+
+# XXX Equivalent to start_source_cluster, but it additionally performs mirror
+# recovery for GPDB5 clusters.
+#
+# Without revert, we need to manually perform an incremental recovery on GPDB5
+# mirrors, because the upgrade process desyncs the primaries.
+start_source_cluster_postexecute() {
+    # Mark GPDB5 mirrors down so that gpstart doesn't fail. We'll recover the
+    # mirrors later.
+    if is_GPDB5 "$GPHOME_SOURCE"; then
+        (
+            # TODO: can we just make the assumption that GPHOME_SOURCE and
+            # GPHOME are equal, since we already rely on the ambient environment
+            # anyway (e.g. PGPORT)?
+            set -e
+            source "$GPHOME_SOURCE"/greenplum_path.sh
+
+            gpstart -am
+
+            PGOPTIONS='-c gp_session_role=utility -c allow_system_table_mods=dml' \
+            psql postgres -c "
+                UPDATE gp_segment_configuration SET status = 'd'
+                 WHERE role = 'm' AND content != -1;
+                UPDATE gp_segment_configuration SET mode = 'c'
+                 WHERE role = 'p' AND content != -1;
+            "
+
+            gpstop -am
+        )
+    fi
+
     start_source_cluster
 
-    # XXX Without revert, we need to manually perform an incremental recovery on
-    # GPDB5 mirrors, because the upgrade process desyncs the primaries.
     if is_GPDB5 "$GPHOME_SOURCE"; then
         (source "$GPHOME_SOURCE"/greenplum_path.sh && gprecoverseg -a)
     fi
@@ -196,7 +227,7 @@ reset_master_and_primary_pg_control_files() {
 
     # Put the source and target clusters back the way they were.
     (source "$GPHOME_TARGET"/greenplum_path.sh && gpstop -a -d "$NEW_CLUSTER")
-    gpstart -a 3>&-
+    start_source_cluster_postexecute
 
     # Mark every substep in the status file as failed. Then re-execute.
     sed -i.bak -e 's/"COMPLETE"/"FAILED"/g' "$GPUPGRADE_HOME/status.json"

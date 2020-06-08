@@ -32,7 +32,11 @@ teardown() {
 
 @test "initialize runs gpinitsystem based on the source cluster" {
     # Store the data directories for each source segment by port.
-    run $PSQL -AtF$'\t' -p $PGPORT postgres -c "select port, datadir from gp_segment_configuration where role = 'p'"
+    if is_GPDB5 "$GPHOME_SOURCE"; then
+        run $PSQL -AtF$'\t' -p $PGPORT postgres -c "SELECT s.port, e.fselocation as datadir FROM gp_segment_configuration s JOIN pg_filespace_entry e ON s.dbid = e.fsedbid JOIN pg_filespace f ON e.fsefsoid = f.oid WHERE f.fsname = 'pg_system' and s.role='p'"
+    else
+        run $PSQL -AtF$'\t' -p $PGPORT postgres -c "select port, datadir from gp_segment_configuration where role = 'p'"
+    fi
     [ "$status" -eq 0 ] || fail "$output"
 
     declare -a olddirs

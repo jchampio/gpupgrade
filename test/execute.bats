@@ -41,8 +41,11 @@ teardown() {
 
     start_source_cluster
 
-    # FIXME: Why do we need a gprecoverseg?
-    gprecoverseg -a
+    # XXX Without revert, we need to manually perform an incremental recovery on
+    # GPDB5 mirrors, because the upgrade process desyncs the primaries.
+    if is_GPDB5 "$GPHOME_SOURCE"; then
+        (source "$GPHOME_SOURCE"/greenplum_path.sh && gprecoverseg -a)
+    fi
 }
 
 ensure_hardlinks_for_relfilenode_on_master_and_segments() {

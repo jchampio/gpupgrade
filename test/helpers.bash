@@ -182,7 +182,7 @@ query_datadirs() {
     local port=$2
     local where_clause=${3:-true}
 
-    local sql="SELECT datadir FROM gp_segment_configuration WHERE ${where_clause}"
+    local sql="SELECT datadir FROM gp_segment_configuration WHERE ${where_clause} ORDER BY content, role"
 
      if is_GPDB5 "$gphome"; then
         sql="SELECT e.fselocation as datadir
@@ -190,7 +190,7 @@ FROM gp_segment_configuration s
 JOIN pg_filespace_entry e ON s.dbid = e.fsedbid
 JOIN pg_filespace f ON e.fsefsoid = f.oid
 WHERE f.fsname = 'pg_system' AND ${where_clause}
-ORDER BY s.content"
+ORDER BY s.content, s.role"
     fi
 
     run "$gphome"/bin/psql -At -p "$port" postgres -c "$sql"

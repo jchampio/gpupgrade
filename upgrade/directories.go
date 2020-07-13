@@ -23,6 +23,8 @@ const OldSuffix = ".old"
 var PostgresFiles = []string{"postgresql.conf", "PG_VERSION"}
 var StateDirectoryFiles = []string{"config.json", "status.json"}
 
+var DeleteDirectoriesFunc = DeleteDirectories
+
 func GetConfigFile() string {
 	return filepath.Join(utils.GetStateDir(), ConfigFileName)
 }
@@ -204,4 +206,74 @@ func DeleteDirectories(directories []string, requiredPaths []string, hostname st
 	}
 
 	return mErr.ErrorOrNil()
+}
+
+// Tablespace Directory Structure
+// ==============================
+//
+//   DIR
+//   ├── filespace.txt
+//   ├── master
+//   │   ├── demoDataDir-1
+//   │   │   └── 16385
+//   │   │       ├── 1
+//   │   │       │   └── GPDB_6_301908232
+//   │   │       │       └── 12812
+//   │   │       │           └── 16389
+//   │   │       └── 12094
+//   │   │           ├── 16384
+//   │   │           └── PG_VERSION
+//   ├── primary1
+//   │   └── demoDataDir0
+//   │       └── 16385
+//   │           ├── 12094
+//   │           │   ├── 16384
+//   │           │   └── PG_VERSION
+//   │           └── 2
+//   │               └── GPDB_6_301908232
+//   │                   └── 12812
+//   │                       └── 16389
+//
+//  GPDB 5X:  DIR/<fsname>/<datadir>/<tablespace_oid>/<db_oid>/<relfilenode>
+//  GPDB 6X:  DIR/<fsname>/<datadir>/<tablespace_oid>/<db_oid>/GPDB_6_<catalog_version>/<db_oid>/<relfilenode>
+func DeleteTablespaceDirectories(streams step.OutStreams, dirs []string) error {
+	hostname, err := utils.System.Hostname()
+	if err != nil {
+		return err
+	}
+
+	err = DeleteDirectoriesFunc(dirs, []string{}, hostname, streams)
+	if err != nil {
+		return err
+	}
+
+	// For example, the 6X tablesapce
+	//    /filespace/demoDataDir0/16386/1/GPDB_6_301908232
+	// has been deleted above. Now check that it's parent directory
+	// can also be deleted by ensuring that its contents do not overlap with
+	// the tablespace of 5X.
+	for _, dir := range dirs {
+		parent := filepath.Dir(dir)
+
+		entries, err := utils.System.ReadDir(parent)
+		if err != nil {
+			return err
+		}
+
+		// If the parent directory is not empty it contains files for the 5X
+		// tablespace. For example, the oid for template1 is 1 which can conflict
+		// with the 6X tablespace directory which uses segment dbid's which is
+		// also 1. Thus, we do not want to delete the directory.
+		if len(entries) > 0 {
+			return nil
+		}
+
+		// If the directory is empty it 'only' contained the target cluster
+		// tablespace and is safe to delete.
+		if err := utils.System.Remove(parent); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }

@@ -10,6 +10,7 @@ import (
 
 	"github.com/greenplum-db/gpupgrade/idl"
 	"github.com/greenplum-db/gpupgrade/step"
+	"github.com/greenplum-db/gpupgrade/testutils"
 	"github.com/greenplum-db/gpupgrade/upgrade"
 	"github.com/greenplum-db/gpupgrade/utils"
 )
@@ -40,4 +41,11 @@ func (s *Server) DeleteDataDirectories(ctx context.Context, in *idl.DeleteDataDi
 
 	err = deleteDirectories(in.Datadirs, upgrade.PostgresFiles, hostname, step.DevNullStream)
 	return &idl.DeleteDataDirectoriesReply{}, err
+}
+
+func (s *Server) DeleteTablespaceDirectories(ctx context.Context, in *idl.DeleteTablespaceRequest) (*idl.DeleteTablespaceReply, error) {
+	gplog.Info("received request to delete tablespace directories from the hub")
+
+	err := upgrade.DeleteTablespaceDirectories(&testutils.DevNullWithClose{}, in.GetDirs())
+	return &idl.DeleteTablespaceReply{}, err
 }

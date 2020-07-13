@@ -24,6 +24,10 @@ import (
 	"github.com/greenplum-db/gpupgrade/utils"
 )
 
+func ResetDeleteDirectoriesFunc() {
+	upgrade.DeleteDirectoriesFunc = upgrade.DeleteDirectories
+}
+
 func TestTempDataDir(t *testing.T) {
 	var id upgrade.ID
 
@@ -418,6 +422,140 @@ func TestDeleteDirectories(t *testing.T) {
 			t.Errorf("dataDir %s exists", directories[1])
 		}
 	})
+}
+
+func TestDeleteTablespaceDirectories(t *testing.T) {
+	utils.System.Hostname = func() (s string, err error) {
+		return "", nil
+	}
+	defer func() {
+		utils.System.Hostname = os.Hostname
+	}()
+
+	t.Run("deletes tablespace directories", func(t *testing.T) {
+		tablespaceDir, parent := mustMakeTablespaceDir(t)
+		defer testutils.MustRemoveAll(t, parent)
+
+		err := upgrade.DeleteTablespaceDirectories(&testutils.DevNullWithClose{}, []string{tablespaceDir})
+		if err != nil {
+			t.Errorf("DeleteTablespaceDirectories returned error %+v", err)
+		}
+	})
+
+	t.Run("does not delete parent tablespace directory if its not empty", func(t *testing.T) {
+		tablespaceDir, parent := mustMakeTablespaceDir(t)
+		defer testutils.MustRemoveAll(t, parent)
+
+		// create a tablespace relfilenode in parent tablespaceDir
+		testutils.MustWriteToFile(t, filepath.Join(filepath.Dir(tablespaceDir), "12812"), "")
+
+		called := false
+		utils.System.Remove = func(name string) error {
+			called = true
+			return nil
+		}
+		defer func() {
+			utils.System.Remove = os.Remove
+		}()
+
+		err := upgrade.DeleteTablespaceDirectories(&testutils.DevNullWithClose{}, []string{tablespaceDir})
+		if err != nil {
+			t.Errorf("DeleteTablespaceDirectories returned error %+v", err)
+		}
+
+		if called {
+			t.Errorf("unexpected call to Remove")
+		}
+	})
+
+	t.Run("errors when Hostname fails", func(t *testing.T) {
+		expected := errors.New("permission denied")
+		utils.System.Hostname = func() (string, error) {
+			return "", expected
+		}
+		defer func() {
+			utils.System.Hostname = os.Hostname
+		}()
+
+		err := upgrade.DeleteTablespaceDirectories(&testutils.DevNullWithClose{}, []string{})
+		if err != expected {
+			t.Errorf("got %#v want %#v", err, expected)
+		}
+	})
+
+	t.Run("errors when deleteDirectories fails", func(t *testing.T) {
+		expected := errors.New("permission denied")
+		upgrade.DeleteDirectoriesFunc = func(directories []string, requiredPaths []string, hostname string, streams step.OutStreams) error {
+			return expected
+		}
+		defer ResetDeleteDirectoriesFunc()
+
+		err := upgrade.DeleteTablespaceDirectories(&testutils.DevNullWithClose{}, []string{})
+		if err != expected {
+			t.Errorf("got %#v want %#v", err, expected)
+		}
+	})
+
+	t.Run("errors when ReadDir fails", func(t *testing.T) {
+		tablespaceDir, parent := mustMakeTablespaceDir(t)
+		defer testutils.MustRemoveAll(t, parent)
+
+		expected := errors.New("permission denied")
+		utils.System.ReadDir = func(dirname string) ([]os.FileInfo, error) {
+			return nil, expected
+		}
+		defer func() {
+			utils.System.ReadDir = ioutil.ReadDir
+		}()
+
+		err := upgrade.DeleteTablespaceDirectories(&testutils.DevNullWithClose{}, []string{tablespaceDir})
+		if err != expected {
+			t.Errorf("got %#v want %#v", err, expected)
+		}
+	})
+
+	t.Run("errors when Remove fails", func(t *testing.T) {
+		tablespaceDir, parent := mustMakeTablespaceDir(t)
+		defer testutils.MustRemoveAll(t, parent)
+
+		expected := errors.New("permission denied")
+		utils.System.Remove = func(name string) error {
+			return expected
+		}
+		defer func() {
+			utils.System.Remove = os.Remove
+		}()
+
+		err := upgrade.DeleteTablespaceDirectories(&testutils.DevNullWithClose{}, []string{tablespaceDir})
+		if err != expected {
+			t.Errorf("got %#v want %#v", err, expected)
+		}
+	})
+}
+
+// mustMakeTablespaceDir returns a temporary tablespace directory, and
+// its parent directory which should be removed for cleanup.
+func mustMakeTablespaceDir(t *testing.T) (string, string) {
+	t.Helper()
+
+	// ex: /filespace/demoDataDir0/16386
+	tempDir := os.TempDir()
+
+	// ex: /filespace/demoDataDir0/16386/1
+	parent := filepath.Join(tempDir, "1")
+	err := os.MkdirAll(tempDir, 0700)
+	if err != nil {
+		t.Fatalf("creating parent tablespace directory: %v", err)
+	}
+
+	// ex: /filespace/demoDataDir0/16386/1/GPDB_6_301908232
+	tablespaceDir := filepath.Join(parent, "GPDB_6_301908232")
+	err = os.MkdirAll(tablespaceDir, 0700)
+	if err != nil {
+		t.Fatalf("creating tablespace directory: %v", err)
+	}
+
+	return tablespaceDir, parent
 }
 
 func setupDirs(t *testing.T, subdirectories []string, requiredPaths []string) (tmpDir string, createdDirectories []string) {

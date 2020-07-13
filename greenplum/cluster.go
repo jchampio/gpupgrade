@@ -37,8 +37,9 @@ type Cluster struct {
 	// check for key existence.
 	Mirrors map[int]SegConfig
 
-	GPHome  string
-	Version dbconn.GPDBVersion
+	GPHome         string
+	Version        dbconn.GPDBVersion
+	CatalogVersion string
 }
 
 // ClusterFromDB will create a Cluster by querying the passed DBConn for

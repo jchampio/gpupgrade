@@ -78,7 +78,18 @@ func (s *Server) InitializeCreateCluster(in *idl.InitializeCreateClusterRequest,
 	})
 
 	st.Run(idl.Substep_INIT_TARGET_CLUSTER, func(stream step.OutStreams) error {
-		return s.CreateTargetCluster(stream)
+		err := s.CreateTargetCluster(stream)
+		if err != nil {
+			return err
+		}
+
+		version, err := GetCatalogVersion(stream, s.Target.GPHome, s.Target.MasterDataDir())
+		if err != nil {
+			return err
+		}
+
+		s.Target.CatalogVersion = version
+		return s.SaveConfig()
 	})
 
 	st.Run(idl.Substep_SHUTDOWN_TARGET_CLUSTER, func(stream step.OutStreams) error {

@@ -19,6 +19,7 @@ import (
 
 	"github.com/greenplum-db/gpupgrade/greenplum"
 	"github.com/greenplum-db/gpupgrade/step"
+	"github.com/greenplum-db/gpupgrade/testutils"
 	"github.com/greenplum-db/gpupgrade/testutils/exectest"
 	"github.com/greenplum-db/gpupgrade/utils"
 )
@@ -30,11 +31,29 @@ func gpinitsystem_Exits1() {
 	os.Exit(1)
 }
 
+func pg_controldata() {
+	os.Stdout.WriteString(`
+pg_control version number:            9420600
+Catalog version number:               301908232
+Database system identifier:           6849079892457217099
+Database cluster state:               in production
+pg_control last modified:             Mon Jul 13 14:36:28 2020
+Latest checkpoint location:           0/180001D0
+Prior checkpoint location:            0/18000150
+Latest checkpoint's REDO location:    0/180001D0
+`)
+}
+
 func init() {
 	exectest.RegisterMains(
 		gpinitsystem,
 		gpinitsystem_Exits1,
+		pg_controldata,
 	)
+}
+
+func ResetPgControldataCmd() {
+	pgControldataCmd = exec.Command
 }
 
 func TestCreateInitialInitsystemConfig(t *testing.T) {
@@ -263,6 +282,47 @@ func TestGetMasterSegPrefix(t *testing.T) {
 			if err == nil {
 				t.Fatalf("got nil, want err")
 			}
+		}
+	})
+}
+
+func TestGetCatalogVersion(t *testing.T) {
+	testhelper.SetupTestLogger()
+
+	gphome := "/usr/local/target"
+	datadir := "/data/qddir_upgrade/seg-1"
+
+	t.Run("returns catalog version", func(t *testing.T) {
+		pgControldataCmd = exectest.NewCommand(pg_controldata)
+		defer ResetPgControldataCmd()
+
+		version, err := GetCatalogVersion(&testutils.DevNullWithClose{}, gphome, datadir)
+		if err != nil {
+			t.Errorf("GetCatalogVersion returned error %+v", err)
+		}
+
+		expected := "301908232"
+		if version != expected {
+			t.Errorf("got %s want %s", version, expected)
+		}
+	})
+
+	t.Run("errors when pg_controldata fails", func(t *testing.T) {
+		pgControldataCmd = exectest.NewCommand(Failure)
+		defer ResetPgControldataCmd()
+
+		version, err := GetCatalogVersion(&testutils.DevNullWithClose{}, gphome, datadir)
+		var exitErr *exec.ExitError
+		if !xerrors.As(err, &exitErr) {
+			t.Fatalf("got error type %T want %T", err, exitErr)
+		}
+
+		if exitErr.ExitCode() != 1 {
+			t.Errorf("got exit code %d want 1", exitErr.ExitCode())
+		}
+
+		if version != "" {
+			t.Errorf("got version %s want empty string", version)
 		}
 	})
 }

@@ -79,6 +79,10 @@ func (s *Server) Revert(_ *idl.RevertRequest, stream idl.CliToHub_RevertServer) 
 	}
 
 	if len(s.Config.Target.Primaries) > 0 {
+		st.Run(idl.Substep_DELETE_TABLESPACES, func(streams step.OutStreams) error {
+			return DeleteTablespaceDirectories(streams, s.agentConns, s.Config.Target, s.Tablespaces)
+		})
+
 		st.Run(idl.Substep_DELETE_PRIMARY_DATADIRS, func(_ step.OutStreams) error {
 			return DeletePrimaryDataDirectories(s.agentConns, s.Config.Target)
 		})

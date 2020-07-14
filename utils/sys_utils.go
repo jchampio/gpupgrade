@@ -38,6 +38,7 @@ type SystemFunctions struct {
 	Remove       func(name string) error
 	RemoveAll    func(name string) error
 	Rename       func(oldpath, newpath string) error
+	ReadDir      func(dirname string) ([]os.FileInfo, error)
 	ReadFile     func(filename string) ([]byte, error)
 	WriteFile    func(filename string, data []byte, perm os.FileMode) error
 	Stat         func(name string) (os.FileInfo, error)
@@ -60,6 +61,7 @@ func InitializeSystemFunctions() *SystemFunctions {
 		Now:          time.Now,
 		Open:         os.Open,
 		OpenFile:     os.OpenFile,
+		ReadDir:      ioutil.ReadDir,
 		Remove:       os.Remove,
 		RemoveAll:    os.RemoveAll,
 		Rename:       os.Rename,

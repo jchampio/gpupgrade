@@ -87,7 +87,7 @@ func TestRsync(t *testing.T) {
 			Excludes: excludes,
 		}
 
-		_, err := server.Rsync(context.Background(), request)
+		_, err := server.RsyncDataDirectories(context.Background(), request)
 		if err != nil {
 			t.Errorf("unexpected err %#v", err)
 		}
@@ -105,7 +105,7 @@ func TestRsync(t *testing.T) {
 			{Source: source, Destination: destination},
 		}}
 
-		_, err := server.Rsync(context.Background(), request)
+		_, err := server.RsyncDataDirectories(context.Background(), request)
 		if err == nil {
 			t.Errorf("expected an error")
 		}
@@ -125,7 +125,7 @@ func TestRsync(t *testing.T) {
 			{Source: source, Destination: destination},
 		}}
 
-		_, err := server.Rsync(context.Background(), request)
+		_, err := server.RsyncDataDirectories(context.Background(), request)
 		if err == nil {
 			t.Error("expected error, returned nil")
 		}

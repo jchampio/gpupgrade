@@ -36,6 +36,12 @@ func (s *Server) Revert(_ *idl.RevertRequest, stream idl.CliToHub_RevertServer) 
 		}
 	}()
 
+	// ensure that agentConns is populated
+	_, err = s.AgentConns()
+	if err != nil {
+		return xerrors.Errorf("connect to gpupgrade agent: %w", err)
+	}
+
 	if !s.Source.HasAllMirrorsAndStandby() {
 		return errors.New("Source cluster does not have mirrors and/or standby. Cannot restore source cluster. Please contact support.")
 	}

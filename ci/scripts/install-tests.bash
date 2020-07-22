@@ -114,7 +114,9 @@ EOF
     make check --keep-going
 
     make install
-'
+' || status=$?
 
 df -h
 cat /tmp/oplog
+
+exit $status

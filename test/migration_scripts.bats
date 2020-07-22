@@ -64,6 +64,9 @@ backup_source_cluster() {
     local datadir_root
     datadir_root="$(realpath "$MASTER_DATA_DIRECTORY"/../..)"
 
+    log "111111 $MASTER_DATA_DIRECTORY"
+    log "222222 $datadir_root"
+
     gpstop -af
     rsync --archive "${datadir_root:?}"/ "${backup_dir:?}"/
     gpstart -a
@@ -80,6 +83,9 @@ restore_source_cluster() {
 
     local datadir_root
     datadir_root="$(realpath "$MASTER_DATA_DIRECTORY"/../..)"
+
+    log "333333 $MASTER_DATA_DIRECTORY"
+    log "444444 $datadir_root"
 
     stop_any_cluster
     rsync --archive -I --delete "${backup_dir:?}"/ "${datadir_root:?}"/

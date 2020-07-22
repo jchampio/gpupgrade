@@ -84,6 +84,8 @@ fi
 # setup gpupgrade
 chown -R gpadmin:gpadmin gpupgrade_src
 
+df -h
+
 su gpadmin -c '
     set -ex
 
@@ -92,7 +94,27 @@ su gpadmin -c '
 
     cd gpupgrade_src
     make
+
+    mkdir -p ~/.bin
+    cat - > ~/.bin/redirect <<"EOF"
+#! /bin/bash
+cmd=$(basename "$0")
+
+printf "%q " "$cmd" "$@" >> /tmp/oplog
+printf "\\n" >> /tmp/oplog
+
+PATH=/usr/bin:$PATH "$cmd" "$@"
+EOF
+    chmod +x ~/.bin/redirect
+    ln -sf redirect ~/.bin/rm
+    ln -sf redirect ~/.bin/rsync
+    ln -sf redirect ~/.bin/mv
+    export PATH=~/.bin:$PATH
+
     make check --keep-going
 
     make install
 '
+
+df -h
+cat /tmp/oplog

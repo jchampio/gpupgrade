@@ -65,7 +65,10 @@ backup_source_cluster() {
     datadir_root="$(realpath "$MASTER_DATA_DIRECTORY"/../..)"
 
     gpstop -af
-    rsync --archive "$datadir_root"/ "$backup_dir"/
+    # TODO: Find out why in some cases the variables used in rsync are empty/not-set
+    # which causes deletion of the the root directory. Once we have identified,
+    # do the necessary refactoring
+    rsync --archive "${datadir_root:?}"/ "${backup_dir:?}"/
     gpstart -a
 }
 
@@ -82,7 +85,10 @@ restore_source_cluster() {
     datadir_root="$(realpath "$MASTER_DATA_DIRECTORY"/../..)"
 
     stop_any_cluster
-    rsync --archive -I --delete "$backup_dir"/ "$datadir_root"/
+    # TODO: Find out why in some cases the variables used in rsync are empty/not-set
+    # which causes deletion of the the root directory. Once we have identified,
+    # do the necessary refactoring
+    rsync --archive -I --delete "${backup_dir:?}"/ "${datadir_root:?}"/
     gpstart -a
 }
 

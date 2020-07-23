@@ -39,7 +39,7 @@ teardown() {
 
     gpupgrade kill-services
 
-    restore_source_cluster "$STATE_DIR"/backup
+    restore_source_cluster "$STATE_DIR"/backup || return 1
     rm -rf "$STATE_DIR"/backup
 
     rm -r "$STATE_DIR"
@@ -64,6 +64,9 @@ backup_source_cluster() {
     local datadir_root
     datadir_root="$(realpath "$MASTER_DATA_DIRECTORY"/../..)"
 
+    log "11111 $MASTER_DATA_DIRECTORY"
+    log "22222 $datadir_root"
+
     gpstop -af
     rsync --archive "${datadir_root:?}"/ "${backup_dir:?}"/
     gpstart -a
@@ -80,6 +83,11 @@ restore_source_cluster() {
 
     local datadir_root
     datadir_root="$(realpath "$MASTER_DATA_DIRECTORY"/../..)"
+
+    log "33333 $MASTER_DATA_DIRECTORY"
+    log "44444 $datadir_root"
+
+    [ -n "$datadir_root" ] || return 1
 
     stop_any_cluster
     rsync --archive -I --delete "${backup_dir:?}"/ "${datadir_root:?}"/

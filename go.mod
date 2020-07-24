@@ -6,7 +6,7 @@ require (
 	github.com/DATA-DOG/go-sqlmock v1.4.0
 	github.com/blang/semver v3.5.1+incompatible
 	github.com/cloudfoundry/gosigar v1.1.0
-	github.com/golang/mock v1.3.1-0.20190508161146-9fa652df1129
+	github.com/golang/mock v1.4.3
 	github.com/golang/protobuf v1.3.2
 	github.com/google/renameio v0.1.0
 	github.com/greenplum-db/gp-common-go-libs v1.0.2

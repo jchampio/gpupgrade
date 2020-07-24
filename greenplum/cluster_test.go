@@ -79,11 +79,7 @@ func TestCluster(t *testing.T) {
 		t.Run(fmt.Sprintf("%s cluster", c.name), func(t *testing.T) {
 			segments := append(c.primaries, c.mirrors...)
 
-			actualCluster, err := greenplum.NewCluster(segments)
-			if err != nil {
-				t.Fatalf("returned error %+v", err)
-			}
-
+			actualCluster := greenplum.MustCreateCluster(t, segments)
 			actualContents := actualCluster.GetContentList()
 
 			var expectedContents []int
@@ -340,10 +336,7 @@ func TestSelectSegments(t *testing.T) {
 		{ContentID: 3, Role: "p"},
 		{ContentID: 3, Role: "m"},
 	}
-	cluster, err := greenplum.NewCluster(segs)
-	if err != nil {
-		t.Fatalf("creating test cluster: %+v", err)
-	}
+	cluster := greenplum.MustCreateCluster(t, segs)
 
 	// Ensure all segments are visited correctly.
 	selectAll := func(_ *greenplum.SegConfig) bool { return true }
@@ -376,10 +369,7 @@ func TestHasAllMirrorsAndStandby(t *testing.T) {
 			{ContentID: 2, Role: "p"},
 			{ContentID: 2, Role: "m"},
 		}
-		cluster, err := greenplum.NewCluster(segs)
-		if err != nil {
-			t.Fatalf("NewCluster returned error: %+v", err)
-		}
+		cluster := greenplum.MustCreateCluster(t, segs)
 
 		if !cluster.HasAllMirrorsAndStandby() {
 			t.Errorf("expected a cluster that has all mirrors and a standby")
@@ -434,15 +424,11 @@ func TestHasAllMirrorsAndStandby(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			cluster, err := greenplum.NewCluster(c.segs)
-			if err != nil {
-				t.Fatalf("NewCluster returned error: %+v", err)
-			}
+			cluster := greenplum.MustCreateCluster(t, c.segs)
 
 			if cluster.HasAllMirrorsAndStandby() {
 				t.Errorf("expected a cluster missing at least one mirror or its standby")
 			}
 		})
 	}
-
 }

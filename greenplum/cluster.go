@@ -17,9 +17,6 @@ import (
 	"github.com/greenplum-db/gpupgrade/upgrade"
 )
 
-var isPostmasterRunningCmd = exec.Command
-var startStopCmd = exec.Command
-
 const MasterDbid = 1
 
 type Cluster struct {
@@ -344,7 +341,7 @@ func runStartStopCmd(stream step.OutStreams, gphome, command string, env string)
 		env,
 		command)
 
-	cmd := startStopCmd("bash", "-c", commandWithEnv)
+	cmd := execCommand("bash", "-c", commandWithEnv)
 	gplog.Info("running command: %q", cmd)
 	cmd.Stdout = stream.Stdout()
 	cmd.Stderr = stream.Stderr()
@@ -358,7 +355,7 @@ func (c *Cluster) IsMasterRunning(stream step.OutStreams) (bool, error) {
 		return false, nil
 	}
 
-	cmd := isPostmasterRunningCmd("pgrep", "-F", path)
+	cmd := execCommand("pgrep", "-F", path)
 
 	cmd.Stdout = stream.Stdout()
 	cmd.Stderr = stream.Stderr()

@@ -3,7 +3,27 @@
 
 package greenplum
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/golang/mock/gomock"
+
+	"github.com/greenplum-db/gpupgrade/testutils/exectest"
+)
+
+func init() {
+	// Make sure all tests explicitly set execCommand.
+	ResetExecCommand()
+}
+
+func MockExecCommand(ctrl *gomock.Controller) (mock *exectest.MockCommandSpy, cleanup func()) {
+	execCommand, mock = exectest.NewCommandMock(ctrl)
+	return mock, ResetExecCommand
+}
+
+func ResetExecCommand() {
+	execCommand = nil
+}
 
 // MustCreateCluster creates a utils.Cluster and calls t.Fatalf() if there is
 // any error.

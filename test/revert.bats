@@ -23,17 +23,6 @@ setup() {
 teardown() {
     skip_if_no_gpdb
 
-    if [ -n "$TABLE" ]; then
-        $PSQL postgres -c "DROP TABLE ${TABLE}"
-    fi
-
-    if [ -n "$MARKER" ]; then
-        local datadirs=($(query_datadirs $GPHOME_SOURCE $PGPORT))
-        for datadir in "${datadirs[@]}"; do
-            rm -f "$datadir/${MARKER}"
-        done
-    fi
-
     run_teardowns
 }
 
@@ -89,6 +78,7 @@ test_revert_after_execute() {
     mirrors=($(query_datadirs $GPHOME_SOURCE $PGPORT "role='m'"))
     for datadir in "${mirrors[@]}"; do
         touch "$datadir/${MARKER}"
+        register_teardown rm -f "$datadir/${MARKER}"
     done
 
     # Add a tablespace, which only works when upgrading from 5X.
@@ -101,6 +91,8 @@ test_revert_after_execute() {
     # Add a table
     TABLE="should_be_reverted"
     $PSQL postgres -c "CREATE TABLE ${TABLE} (a INT)"
+    register_teardown $PSQL postgres -c "DROP TABLE ${TABLE}"
+
     $PSQL postgres -c "INSERT INTO ${TABLE} VALUES (1), (2), (3)"
 
     gpupgrade initialize \

@@ -46,3 +46,13 @@ EOF
     run_teardowns
     (( ! was_run )) || fail "teardown was re-run incorrectly"
 }
+
+@test "teardown failures are reported even without set -e" {
+    local status=0
+
+    register_teardown false
+
+    # Chaining commands with || will disable set -e.
+    run_teardowns || status=$?
+    [ "$status" -eq 1 ] || fail "status was $status; expected 1"
+}

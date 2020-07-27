@@ -23,7 +23,7 @@ register_teardown() {
 # Runs all teardown commands (registered via register_teardown) in LIFO order
 # and clears the list of teardowns.
 run_teardowns() {
-    _run "${TEARDOWN_FUNCTIONS[@]}"
+    _run "${TEARDOWN_FUNCTIONS[@]}" || return $?
 
     TEARDOWN_FUNCTIONS=()
 }
@@ -46,6 +46,6 @@ _run() {
         printf '\n'
 
         # Run.
-        "${cmd[@]}"
+        "${cmd[@]}" || return $?
     done
 }

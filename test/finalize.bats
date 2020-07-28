@@ -17,6 +17,7 @@ setup() {
 
 teardown() {
     # XXX Beware, BATS_TEST_SKIPPED is not a documented export.
+    skip_if_no_gpdb
     if [ -n "${BATS_TEST_SKIPPED}" ]; then
         return
     fi
@@ -25,21 +26,21 @@ teardown() {
         delete_finalized_cluster $GPHOME_TARGET $NEW_CLUSTER
     fi
 
-    gpupgrade kill-services
+    gpupgrade kill-services || return $?
 
-    restore_cluster
+    restore_cluster || return $?
 
     # reload old path and start
-    source "${GPHOME_SOURCE}/greenplum_path.sh"
-    gpstart -a
+    source "${GPHOME_SOURCE}/greenplum_path.sh" || return $? # TODO remove
+    gpstart -a || return $?
 
     # delete tablespace data added to the source cluster
     if is_GPDB5 "${GPHOME_SOURCE}"; then
-        delete_tablespace_data
+        delete_tablespace_data || return $?
     fi
 
     # delete the state_dir, which also contains the tablespace filesystem
-    cleanup_state_dir
+    cleanup_state_dir || return $?
 }
 
 upgrade_cluster() {

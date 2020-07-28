@@ -264,7 +264,8 @@ restore_cluster() {
     # Precondition: the source cluster must be down. rsync'ing over a live
     # cluster makes for some very strange and hard-to-debug failure modes.
     if isready; then
-        abort "restore_cluster was invoked on a live source cluster (stop it first)"
+        log "restore_cluster was invoked on a live source cluster (stop it first)"
+        return 1
     fi
 
     if is_GPDB5 "$GPHOME_SOURCE"; then

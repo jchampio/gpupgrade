@@ -19,11 +19,15 @@ func (s *Server) GetConfig(ctx context.Context, in *idl.GetConfigRequest) (*idl.
 	case "id":
 		resp.Value = s.UpgradeID.String()
 	case "source-gphome":
-		resp.Value = s.Source.GPHome
+		if s.Source != nil {
+			resp.Value = s.Source.GPHome
+		}
 	case "target-gphome":
-		resp.Value = s.Target.GPHome
+		resp.Value = s.TargetGPHome
 	case "target-datadir":
-		resp.Value = s.Target.MasterDataDir()
+		if s.Target != nil {
+			resp.Value = s.Target.MasterDataDir()
+		}
 	default:
 		return nil, status.Errorf(codes.NotFound, "%s is not a valid configuration key", in.Name)
 	}

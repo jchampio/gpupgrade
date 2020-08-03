@@ -13,7 +13,7 @@ import (
 	"testing"
 
 	sqlmock "github.com/DATA-DOG/go-sqlmock"
-	"github.com/greenplum-db/gp-common-go-libs/dbconn"
+	"github.com/blang/semver"
 	"github.com/greenplum-db/gp-common-go-libs/testhelper"
 	"golang.org/x/xerrors"
 
@@ -153,15 +153,11 @@ func TestWriteSegmentArray(t *testing.T) {
 }
 
 func TestRunInitsystemForTargetCluster(t *testing.T) {
-	cluster6X := &greenplum.Cluster{
-		GPHome:  "/usr/local/gpdb6",
-		Version: dbconn.NewVersion("6.0.0"),
-	}
+	gpHome6 := "/usr/local/gpdb6"
+	version6 := semver.MustParse("6.0.0")
 
-	cluster7X := &greenplum.Cluster{
-		GPHome:  "/usr/local/gpdb7",
-		Version: dbconn.NewVersion("7.0.0"),
-	}
+	gpHome7 := "/usr/local/gpdb7"
+	version7 := semver.MustParse("7.0.0")
 
 	gpinitsystemConfigPath := "/dir/.gpupgrade/gpinitsystem_config"
 
@@ -184,7 +180,7 @@ func TestRunInitsystemForTargetCluster(t *testing.T) {
 				}
 			})
 
-		err := RunInitsystemForTargetCluster(step.DevNullStream, cluster7X, gpinitsystemConfigPath)
+		err := RunInitsystemForTargetCluster(step.DevNullStream, gpHome7, gpinitsystemConfigPath, version7)
 		if err != nil {
 			t.Error("gpinitsystem failed")
 		}
@@ -204,7 +200,7 @@ func TestRunInitsystemForTargetCluster(t *testing.T) {
 				}
 			})
 
-		err := RunInitsystemForTargetCluster(step.DevNullStream, cluster6X, gpinitsystemConfigPath)
+		err := RunInitsystemForTargetCluster(step.DevNullStream, gpHome6, gpinitsystemConfigPath, version6)
 		if err != nil {
 			t.Error("gpinitsystem failed")
 		}
@@ -213,7 +209,7 @@ func TestRunInitsystemForTargetCluster(t *testing.T) {
 	t.Run("returns an error when gpinitsystem fails with --ignore-warnings when upgrading to GPDB6", func(t *testing.T) {
 		execCommand = exectest.NewCommand(gpinitsystem_Exits1)
 
-		err := RunInitsystemForTargetCluster(step.DevNullStream, cluster6X, gpinitsystemConfigPath)
+		err := RunInitsystemForTargetCluster(step.DevNullStream, gpHome6, gpinitsystemConfigPath, version6)
 
 		var actual *exec.ExitError
 		if !xerrors.As(err, &actual) {
@@ -228,7 +224,7 @@ func TestRunInitsystemForTargetCluster(t *testing.T) {
 	t.Run("returns an error when gpinitsystem errors when upgrading to GPDB7 or higher", func(t *testing.T) {
 		execCommand = exectest.NewCommand(gpinitsystem_Exits1)
 
-		err := RunInitsystemForTargetCluster(step.DevNullStream, cluster7X, gpinitsystemConfigPath)
+		err := RunInitsystemForTargetCluster(step.DevNullStream, gpHome7, gpinitsystemConfigPath, version7)
 
 		var actual *exec.ExitError
 		if !xerrors.As(err, &actual) {

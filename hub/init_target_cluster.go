@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/blang/semver"
 	"github.com/greenplum-db/gp-common-go-libs/dbconn"
 	"github.com/greenplum-db/gp-common-go-libs/gplog"
 	"github.com/pkg/errors"
@@ -59,6 +60,9 @@ func (s *Server) writeConf(sourceDBConn *dbconn.DBConn) error {
 	return WriteInitsystemFile(gpinitsystemConfig, s.initsystemConfPath())
 }
 
+// CreateTargetCluster runs gpinitsystem using the server's
+// TargetInitializeConfig, then fills in the Target cluster and persists it to
+// disk.
 func (s *Server) CreateTargetCluster(stream step.OutStreams) error {
 	err := s.InitTargetCluster(stream)
 	if err != nil {
@@ -68,7 +72,7 @@ func (s *Server) CreateTargetCluster(stream step.OutStreams) error {
 	conn := db.NewDBConn("localhost", s.TargetInitializeConfig.Master.Port, "template1")
 	defer conn.Close()
 
-	s.Target, err = greenplum.ClusterFromDB(conn, s.Target.GPHome)
+	s.Target, err = greenplum.ClusterFromDB(conn, s.TargetGPHome)
 	if err != nil {
 		return xerrors.Errorf("retrieve target configuration: %w", err)
 	}
@@ -81,7 +85,13 @@ func (s *Server) CreateTargetCluster(stream step.OutStreams) error {
 }
 
 func (s *Server) InitTargetCluster(stream step.OutStreams) error {
-	return RunInitsystemForTargetCluster(stream, s.Target, s.initsystemConfPath())
+	version, err := greenplum.GPHomeVersion(s.TargetGPHome)
+	if err != nil {
+		return err
+	}
+
+	return RunInitsystemForTargetCluster(stream,
+		s.TargetGPHome, s.initsystemConfPath(), version)
 }
 
 func GetCheckpointSegmentsAndEncoding(gpinitsystemConfig []string, dbConnector *dbconn.DBConn) ([]string, error) {
@@ -156,16 +166,16 @@ func WriteSegmentArray(config []string, targetInitializeConfig InitializeConfig)
 	return config, nil
 }
 
-func RunInitsystemForTargetCluster(stream step.OutStreams, target *greenplum.Cluster, gpinitsystemFilepath string) error {
-	args := "-a -I " + gpinitsystemFilepath
-	if target.Version.SemVer.Major < 7 {
+func RunInitsystemForTargetCluster(stream step.OutStreams, gpHome, configPath string, version semver.Version) error {
+	args := "-a -I " + configPath
+	if version.Major < 7 {
 		// For 6X we add --ignore-warnings to gpinitsystem to return 0 on
 		// warnings and 1 on errors. 7X and later does this by default.
 		args += " --ignore-warnings"
 	}
 
 	script := fmt.Sprintf("source %[1]s/greenplum_path.sh && %[1]s/bin/gpinitsystem %[2]s",
-		target.GPHome,
+		gpHome,
 		args,
 	)
 	cmd := execCommand("bash", "-c", script)

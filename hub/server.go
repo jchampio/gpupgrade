@@ -349,17 +349,24 @@ type InitializeConfig struct {
 // Config contains all the information that will be persisted to/loaded from
 // from disk during calls to Save() and Load().
 type Config struct {
+	// Source is the GPDB cluster that is being upgraded. It is populated during
+	// the generation of the cluster config in the initialize step; before that,
+	// it is nil.
 	Source *greenplum.Cluster
+
+	// Target is the upgraded GPDB cluster. It is populated during the target
+	// gpinitsystem execution in the initialize step; before that, it is nil.
 	Target *greenplum.Cluster
 
 	// TargetInitializeConfig contains all the info needed to initialize the
 	// target cluster's master, standby, primaries and mirrors.
 	TargetInitializeConfig InitializeConfig
 
-	Port        int
-	AgentPort   int
-	UseLinkMode bool
-	UpgradeID   upgrade.ID
+	Port         int
+	AgentPort    int
+	UseLinkMode  bool
+	TargetGPHome string
+	UpgradeID    upgrade.ID
 
 	// Tablespaces contains the tablespace in the database keyed by
 	// dbid and tablespace oid

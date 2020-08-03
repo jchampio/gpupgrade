@@ -43,9 +43,19 @@ func (s *Server) Revert(_ *idl.RevertRequest, stream idl.CliToHub_RevertServer) 
 		return xerrors.Errorf("connect to gpupgrade agent: %w", err)
 	}
 
+	// FIXME: if we're not in link mode, this doesn't matter. And even if we're
+	// not in link mode, if the target hasn't been started yet, we can still
+	// revert safely.
 	if !s.Source.HasAllMirrorsAndStandby() {
 		return errors.New("Source cluster does not have mirrors and/or standby. Cannot restore source cluster. Please contact support.")
 	}
+
+	// Precondition: the user has invoked initialize at least once, and has not
+	// progressed past execute (finalize has not started). Therefore, IF the
+	// target cluster exists, it is still in its temporary location. And the
+	// source cluster is still in its original location.
+	//
+	// If the target cluster is started, it must be stopped.
 
 	// Since revert needs to work at any point, and stop is not yet idempotent
 	// check if the cluster is running before stopping.
@@ -65,8 +75,14 @@ func (s *Server) Revert(_ *idl.RevertRequest, stream idl.CliToHub_RevertServer) 
 		})
 	}
 
-	// Restoring the source master and primaries is only needed if upgrading the
-	// primaries had started.
+	// In link mode, if the target cluster has been started at ANY point --
+	// regardless of whether or not it is currently running -- it is unsafe to
+	// use the source cluster as-is, and the master/primaries must be restored
+	// from standby/mirrors. Otherwise, any pg_control.old files simply need to
+	// be moved back to their original locations.
+
+	// Restoring the source master and primaries is only needed if the target
+	// was started in link mode.
 	// TODO: For now we use if the source master is not running to determine this.
 	running, err = s.Source.IsMasterRunning(st.Streams())
 	if err != nil {
@@ -82,6 +98,10 @@ func (s *Server) Revert(_ *idl.RevertRequest, stream idl.CliToHub_RevertServer) 
 			return RsyncMasterAndPrimariesTablespaces(stream, s.agentConns, s.Source, s.Tablespaces)
 		})
 	}
+
+	// If the target cluster has data directories on disk, they must be removed.
+	//
+	// If any target-version tablespace directories exist, they must be removed.
 
 	if len(s.Config.Target.Primaries) > 0 {
 		st.Run(idl.Substep_DELETE_TABLESPACES, func(streams step.OutStreams) error {
@@ -119,6 +139,15 @@ func (s *Server) Revert(_ *idl.RevertRequest, stream idl.CliToHub_RevertServer) 
 		return DeleteStateDirectories(s.agentConns, s.Source.MasterHostname())
 	})
 
+	// If the source cluster is stopped, it needs to be started.
+	//
+	// If the source cluster is already started, then either
+	//  1. it was never stopped
+	//  2. the last revert failed after starting it
+	//  3. it was started manually in copy mode, or before link mode upgrade, by an unwary user
+	//  4. it was started manually after link mode upgrade by a very persistent user
+	// Case 4 seems unnecessary to handle. All other cases are unproblematic.
+
 	// Since revert needs to work at any point, and start is not yet idempotent
 	// check if the cluster is not running before starting.
 	running, err = s.Source.IsMasterRunning(st.Streams())
@@ -150,6 +179,14 @@ func (s *Server) Revert(_ *idl.RevertRequest, stream idl.CliToHub_RevertServer) 
 		})
 	}
 
+	// If a 5X source cluster's primaries were booted during upgrade, we should
+	// perform an incremental recovery to ensure that the mirrors and primaries
+	// are resynchronized. But this is safe to do even in the case where the
+	// primaries were not upgraded.
+
+	// FIXME: UseLinkMode is not quite the flag we want. Recovery needs to
+	// happen for 5X source clusters that haven't already been rsync-restored by
+	// the link-mode revert code above.
 	if !s.UseLinkMode {
 		st.Run(idl.Substep_RESTORE_SOURCE_CLUSTER, func(streams step.OutStreams) error {
 			return Recoverseg(streams, s.Source)

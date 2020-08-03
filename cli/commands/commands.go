@@ -143,9 +143,8 @@ func BuildRootCommand() *cobra.Command {
 	root.AddCommand(Agent())
 	root.AddCommand(Hub())
 
-	subConfigSet := createConfigSetSubcommand()
 	subConfigShow := createConfigShowSubcommand()
-	config.AddCommand(subConfigSet, subConfigShow)
+	config.AddCommand(subConfigShow)
 
 	return addHelpToCommand(root, GlobalHelp)
 }
@@ -231,44 +230,6 @@ var config = &cobra.Command{
 	Use:   "config",
 	Short: "subcommands to set parameters for subsequent gpupgrade commands",
 	Long:  "subcommands to set parameters for subsequent gpupgrade commands",
-}
-
-func createConfigSetSubcommand() *cobra.Command {
-	subSet := &cobra.Command{
-		Use:   "set",
-		Short: "set an upgrade parameter",
-		Long:  "set an upgrade parameter",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			if cmd.Flags().NFlag() == 0 {
-				return errors.New("the set command requires at least one flag to be specified")
-			}
-
-			client := connectToHub()
-
-			var requests []*idl.SetConfigRequest
-			cmd.Flags().Visit(func(flag *pflag.Flag) {
-				requests = append(requests, &idl.SetConfigRequest{
-					Name:  flag.Name,
-					Value: flag.Value.String(),
-				})
-			})
-
-			for _, request := range requests {
-				_, err := client.SetConfig(context.Background(), request)
-				if err != nil {
-					return err
-				}
-				gplog.Info("Successfully set %s to %s", request.Name, request.Value)
-			}
-
-			return nil
-		},
-	}
-
-	subSet.Flags().String("source-gphome", "", "path for the source Greenplum installation")
-	subSet.Flags().String("target-gphome", "", "path for the target Greenplum installation")
-
-	return subSet
 }
 
 func createConfigShowSubcommand() *cobra.Command {

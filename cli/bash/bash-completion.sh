@@ -322,32 +322,6 @@ __gpupgrade_handle_word()
     __gpupgrade_handle_word
 }
 
-_gpupgrade_config_set()
-{
-    last_command="gpupgrade_config_set"
-
-    command_aliases=()
-
-    commands=()
-
-    flags=()
-    two_word_flags=()
-    local_nonpersistent_flags=()
-    flags_with_completion=()
-    flags_completion=()
-
-    flags+=("--source-gphome=")
-    two_word_flags+=("--source-gphome")
-    local_nonpersistent_flags+=("--source-gphome=")
-    flags+=("--target-gphome=")
-    two_word_flags+=("--target-gphome")
-    local_nonpersistent_flags+=("--target-gphome=")
-
-    must_have_one_flag=()
-    must_have_one_noun=()
-    noun_aliases=()
-}
-
 _gpupgrade_config_show()
 {
     last_command="gpupgrade_config_show"
@@ -383,7 +357,6 @@ _gpupgrade_config()
     command_aliases=()
 
     commands=()
-    commands+=("set")
     commands+=("show")
 
     flags=()

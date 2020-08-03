@@ -196,26 +196,6 @@ func (mr *MockCliToHubClientMockRecorder) Revert(arg0, arg1 interface{}, arg2 ..
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Revert", reflect.TypeOf((*MockCliToHubClient)(nil).Revert), varargs...)
 }
 
-// SetConfig mocks base method
-func (m *MockCliToHubClient) SetConfig(arg0 context.Context, arg1 *idl.SetConfigRequest, arg2 ...grpc.CallOption) (*idl.SetConfigReply, error) {
-	m.ctrl.T.Helper()
-	varargs := []interface{}{arg0, arg1}
-	for _, a := range arg2 {
-		varargs = append(varargs, a)
-	}
-	ret := m.ctrl.Call(m, "SetConfig", varargs...)
-	ret0, _ := ret[0].(*idl.SetConfigReply)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// SetConfig indicates an expected call of SetConfig
-func (mr *MockCliToHubClientMockRecorder) SetConfig(arg0, arg1 interface{}, arg2 ...interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	varargs := append([]interface{}{arg0, arg1}, arg2...)
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetConfig", reflect.TypeOf((*MockCliToHubClient)(nil).SetConfig), varargs...)
-}
-
 // StopServices mocks base method
 func (m *MockCliToHubClient) StopServices(arg0 context.Context, arg1 *idl.StopServicesRequest, arg2 ...grpc.CallOption) (*idl.StopServicesReply, error) {
 	m.ctrl.T.Helper()
@@ -372,21 +352,6 @@ func (m *MockCliToHubServer) Revert(arg0 *idl.RevertRequest, arg1 idl.CliToHub_R
 func (mr *MockCliToHubServerMockRecorder) Revert(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Revert", reflect.TypeOf((*MockCliToHubServer)(nil).Revert), arg0, arg1)
-}
-
-// SetConfig mocks base method
-func (m *MockCliToHubServer) SetConfig(arg0 context.Context, arg1 *idl.SetConfigRequest) (*idl.SetConfigReply, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "SetConfig", arg0, arg1)
-	ret0, _ := ret[0].(*idl.SetConfigReply)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// SetConfig indicates an expected call of SetConfig
-func (mr *MockCliToHubServerMockRecorder) SetConfig(arg0, arg1 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetConfig", reflect.TypeOf((*MockCliToHubServer)(nil).SetConfig), arg0, arg1)
 }
 
 // StopServices mocks base method

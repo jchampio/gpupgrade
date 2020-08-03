@@ -12,7 +12,6 @@ service CliToHub {
     rpc Execute(ExecuteRequest) returns (stream Message) {}
     rpc Finalize(FinalizeRequest) returns (stream Message) {}
     rpc Revert(RevertRequest) returns (stream Message) {}
-    rpc SetConfig (SetConfigRequest) returns (SetConfigReply) {}
     rpc GetConfig (GetConfigRequest) returns (GetConfigReply) {}
     rpc RestartAgents(RestartAgentsRequest) returns (RestartAgentsReply) {}
     rpc StopServices(StopServicesRequest) returns (StopServicesReply) {}
@@ -139,12 +138,6 @@ enum ResponseKey {
 message Response {
   map<string,string> data = 1;
 }
-
-message SetConfigRequest {
-    string name = 1;
-    string value = 2;
-}
-message SetConfigReply {}
 
 message GetConfigRequest {
     string name = 1;

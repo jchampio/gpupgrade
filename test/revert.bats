@@ -195,6 +195,112 @@ test_revert_after_execute() {
     gpupgrade revert --verbose
 }
 
+setup_master_upgrade_failure() {
+    # XXX As a cheap test, insert a piece of data that is known to cause a
+    # master upgrade failure but is not yet caught by --check. This will be
+    # harder once that bug is fixed...
+    #
+    # This test will fail for 6->6, where the lag() function doesn't take bigint
+    # as a second argument (and will upgrade without issue).
+    "$PSQL" postgres --single-transaction -f - <<"EOF"
+        CREATE TABLE lag_test_table (a int, b int);
+        CREATE VIEW lag_view AS
+            SELECT lag(b, '1'::bigint)
+            OVER (ORDER BY a)
+            FROM lag_test_table;
+EOF
+    register_teardown "$PSQL" postgres -c "DROP TABLE lag_test_table CASCADE;"
+}
+
+test_revert_after_execute_master_failure() {
+    local mode="$1"
+    local target_master_port=6020
+    local old_config new_config mirrors primaries rows
+
+    # Save segment configuration
+    old_config=$(get_segment_configuration "${GPHOME_SOURCE}")
+
+    # Place marker files on mirrors
+    MARKER=source-cluster.MARKER
+    mirrors=($(query_datadirs $GPHOME_SOURCE $PGPORT "role='m'"))
+    for datadir in "${mirrors[@]}"; do
+        touch "$datadir/${MARKER}"
+        register_teardown rm -f "$datadir/${MARKER}"
+    done
+
+    # Add a tablespace, which only works when upgrading from 5X.
+    if is_GPDB5 "$GPHOME_SOURCE"; then
+        local tablespace_table="tablespace_table"
+        create_tablespace_with_table "$tablespace_table"
+        register_teardown delete_tablespace_data "$tablespace_table"
+    fi
+
+    # Add a table
+    TABLE="should_be_reverted"
+    $PSQL postgres -c "CREATE TABLE ${TABLE} (a INT)"
+    register_teardown $PSQL postgres -c "DROP TABLE ${TABLE}"
+
+    $PSQL postgres -c "INSERT INTO ${TABLE} VALUES (1), (2), (3)"
+
+    gpupgrade initialize \
+        --source-gphome="$GPHOME_SOURCE" \
+        --target-gphome="$GPHOME_TARGET" \
+        --source-master-port="${PGPORT}" \
+        --temp-port-range ${target_master_port}-6040 \
+        --disk-free-ratio 0 \
+        --mode "$mode" \
+        --verbose 3>&-
+
+    # Execute should fail.
+    local status=0
+    gpupgrade execute --verbose || status=$?
+    [ "$status" -ne 0 ] || fail "expected execute to fail"
+
+    # Revert
+    gpupgrade revert --verbose
+
+    # Verify the table is untouched
+    rows=$($PSQL postgres -Atc "SELECT COUNT(*) FROM ${TABLE}")
+    if (( rows != 3 )); then
+        fail "table ${TABLE} was not untouched: got $rows rows want 3"
+    fi
+
+    if is_GPDB5 "$GPHOME_SOURCE"; then
+        check_tablespace_data "$tablespace_table"
+    fi
+
+    # Verify that the marker files do not exist on primaries. Unlike for the
+    # successful execute case, a revert from a failed master upgrade should
+    # never require an rsync from mirrors, since the master hasn't been started
+    # yet.
+    primaries=($(query_datadirs $GPHOME_SOURCE $PGPORT "role='p'"))
+    for datadir in "${primaries[@]}"; do
+        [ ! -f "${datadir}/${MARKER}" ] || fail "revert resulted in unexpected ${MARKER} marker file in datadir: $datadir"
+    done
+
+    # Check that transactions can be started on the source
+    $PSQL postgres --single-transaction -c "SELECT version()" || fail "unable to start transaction"
+
+    # Check to make sure the old cluster still matches
+    new_config=$(get_segment_configuration "${GPHOME_SOURCE}")
+    [ "$old_config" = "$new_config" ] || fail "actual config: $new_config, wanted: $old_config"
+
+    # ensure target cluster is down
+    ! isready "${GPHOME_TARGET}" ${target_master_port} || fail "expected target cluster to not be running on port ${target_master_port}"
+
+    is_source_standby_in_sync || fail "expected standby to eventually be in sync"
+}
+
+@test "reverting succeeds after copy-mode execute fails during master upgrade" {
+    setup_master_upgrade_failure
+    test_revert_after_execute_master_failure copy
+}
+
+@test "reverting succeeds after link-mode execute fails during master upgrade" {
+    setup_master_upgrade_failure
+    test_revert_after_execute_master_failure link
+}
+
 # gp_segment_configuration does not show us the status correctly. We must check that the
 # sent_location from the master equals the replay_location of the standby.
 is_source_standby_in_sync() {

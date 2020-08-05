@@ -136,36 +136,37 @@ func (s *Server) Revert(_ *idl.RevertRequest, stream idl.CliToHub_RevertServer) 
 		return DeleteStateDirectories(s.agentConns, s.Source.MasterHostname())
 	})
 
-	// Since revert needs to work at any point, and start is not yet idempotent
-	// check if the cluster is not running before starting.
-	running, err = s.Source.IsMasterRunning(st.Streams())
-	if err != nil {
-		return err
-	}
+	// If the source cluster is not running, it must be started.
+	st.AlwaysRun(idl.Substep_START_SOURCE_CLUSTER, func(streams step.OutStreams) error {
+		running, err = s.Source.IsMasterRunning(streams)
+		if err != nil {
+			return err
+		}
 
-	if !running {
-		st.Run(idl.Substep_START_SOURCE_CLUSTER, func(streams step.OutStreams) error {
-			err := s.Source.Start(streams)
-			var exitErr *exec.ExitError
-			if xerrors.As(err, &exitErr) {
-				// In copy mode the gpdb 5x source cluster mirrors do not come
-				// up causing gpstart to return a non-zero exit status.
-				// This substep fails preventing the following substep steps
-				// from running including gprecoverseg.
-				// TODO: For 5X investigate how to check for this case and not
-				//  ignore all errors with exit code 1.
-				if !s.UseLinkMode && exitErr.ExitCode() == 1 {
-					return nil
-				}
-			}
-
-			if err != nil {
-				return xerrors.Errorf("starting source cluster: %w", err)
-			}
-
+		if running {
 			return nil
-		})
-	}
+		}
+
+		err = s.Source.Start(streams)
+		var exitErr *exec.ExitError
+		if xerrors.As(err, &exitErr) {
+			// In copy mode the gpdb 5x source cluster mirrors do not come
+			// up causing gpstart to return a non-zero exit status.
+			// This substep fails preventing the following substep steps
+			// from running including gprecoverseg.
+			// TODO: For 5X investigate how to check for this case and not
+			//  ignore all errors with exit code 1.
+			if !s.UseLinkMode && exitErr.ExitCode() == 1 {
+				return nil
+			}
+		}
+
+		if err != nil {
+			return xerrors.Errorf("starting source cluster: %w", err)
+		}
+
+		return nil
+	})
 
 	if !s.UseLinkMode {
 		st.Run(idl.Substep_RESTORE_SOURCE_CLUSTER, func(streams step.OutStreams) error {

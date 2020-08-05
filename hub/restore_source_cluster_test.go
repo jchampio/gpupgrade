@@ -535,3 +535,102 @@ func TestRestorePrimariesPgControl(t *testing.T) {
 		}
 	})
 }
+
+func TestRestoreMasterAndPrimariesPgControl(t *testing.T) {
+	testhelper.SetupTestLogger()
+	cluster := hub.MustCreateCluster(t, []greenplum.SegConfig{
+		{ContentID: -1, Hostname: "master", DataDir: "/data/qddir", Role: greenplum.PrimaryRole},
+		{ContentID: -1, Hostname: "standby", DataDir: "/data/standby", Role: greenplum.MirrorRole},
+		{ContentID: 0, Hostname: "sdw1", DataDir: "/data/dbfast1/seg1", Role: greenplum.PrimaryRole},
+		{ContentID: 0, Hostname: "msdw1", DataDir: "/data/dbfast_mirror1/seg1", Role: greenplum.MirrorRole},
+		{ContentID: 1, Hostname: "sdw1", DataDir: "/data/dbfast2/seg2", Role: greenplum.PrimaryRole},
+		{ContentID: 1, Hostname: "msdw1", DataDir: "/data/dbfast_mirror2/seg2", Role: greenplum.MirrorRole},
+		{ContentID: 2, Hostname: "sdw2", DataDir: "/data/dbfast3/seg3", Role: greenplum.PrimaryRole},
+		{ContentID: 2, Hostname: "msdw2", DataDir: "/data/dbfast_mirror3/seg3", Role: greenplum.MirrorRole},
+		{ContentID: 3, Hostname: "sdw2", DataDir: "/data/dbfast4/seg4", Role: greenplum.PrimaryRole},
+		{ContentID: 3, Hostname: "msdw2", DataDir: "/data/dbfast_mirror4/seg4", Role: greenplum.MirrorRole},
+	})
+
+	t.Run("errors when restoring pg_control on the master and primaries fails", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+
+		expected := os.ErrNotExist
+		hub.RestoreMasterPgControl = func(dir string) error {
+			return expected
+		}
+
+		sdw1 := mock_idl.NewMockAgentClient(ctrl)
+		sdw1.EXPECT().RestorePrimariesPgControl(
+			gomock.Any(),
+			gomock.Any(),
+		).Return(&idl.RestorePgControlReply{}, nil)
+
+		failedClient := mock_idl.NewMockAgentClient(ctrl)
+		failedClient.EXPECT().RestorePrimariesPgControl(
+			gomock.Any(),
+			gomock.Any(),
+		).Return(nil, expected)
+
+		agentConns := []*hub.Connection{
+			{nil, sdw1, "sdw1", nil},
+			{nil, failedClient, "sdw2", nil},
+		}
+
+		err := hub.RestoreMasterAndPrimariesPgControl(agentConns, cluster)
+
+		var multiErr *multierror.Error
+		if !xerrors.As(err, &multiErr) {
+			t.Fatalf("got error %#v, want type %T", err, multiErr)
+		}
+
+		if len(multiErr.Errors) != 2 {
+			t.Errorf("received %d errors, want %d", len(multiErr.Errors), 1)
+		}
+
+		for _, err := range multiErr.Errors {
+			if !xerrors.Is(err, expected) {
+				t.Errorf("got error %#v, want %#v", expected, err)
+			}
+		}
+	})
+
+	t.Run("restores master and primaries pg_control successfully using correct arguments", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+
+		expectedMasterDir := "/data/qddir"
+		hub.RestoreMasterPgControl = func(dir string) error {
+			if dir != expectedMasterDir {
+				t.Errorf("got %s, want %s", dir, expectedMasterDir)
+			}
+			return nil
+		}
+
+		sdw1 := mock_idl.NewMockAgentClient(ctrl)
+		sdw1.EXPECT().RestorePrimariesPgControl(
+			gomock.Any(),
+			&idl.RestorePgControlRequest{
+				Datadirs: []string{"/data/dbfast1/seg1", "/data/dbfast2/seg2"},
+			},
+		).Return(&idl.RestorePgControlReply{}, nil)
+
+		sdw2 := mock_idl.NewMockAgentClient(ctrl)
+		sdw2.EXPECT().RestorePrimariesPgControl(
+			gomock.Any(),
+			&idl.RestorePgControlRequest{
+				Datadirs: []string{"/data/dbfast3/seg3", "/data/dbfast4/seg4"},
+			},
+		).Return(&idl.RestorePgControlReply{}, nil)
+
+		agentConns := []*hub.Connection{
+			{nil, sdw1, "sdw1", nil},
+			{nil, sdw2, "sdw2", nil},
+		}
+
+		err := hub.RestoreMasterAndPrimariesPgControl(agentConns, cluster)
+		if err != nil {
+			t.Errorf("unexpected err %#v", err)
+		}
+	})
+}

@@ -17,6 +17,7 @@ import (
 	"github.com/greenplum-db/gpupgrade/greenplum"
 	"github.com/greenplum-db/gpupgrade/idl"
 	"github.com/greenplum-db/gpupgrade/step"
+	"github.com/greenplum-db/gpupgrade/upgrade"
 	"github.com/greenplum-db/gpupgrade/utils/rsync"
 )
 
@@ -28,6 +29,8 @@ var Excludes = []string{
 	"pg_hba.conf", "postmaster.opts", "postgresql.auto.conf", "internal.auto.conf",
 	"gp_dbid", "postgresql.conf", "backup_label.old", "postmaster.pid", "recovery.conf",
 }
+
+var RestoreMasterPgControl = upgrade.RestorePgControl
 
 func RsyncMasterAndPrimaries(stream step.OutStreams, agentConns []*Connection, source *greenplum.Cluster) error {
 	if !source.HasAllMirrorsAndStandby() {
@@ -238,4 +241,27 @@ func RestorePrimariesPgControl(agentConns []*Connection, source *greenplum.Clust
 	}
 
 	return ExecuteRPC(agentConns, request)
+}
+
+func RestoreMasterAndPrimariesPgControl(agentConns []*Connection, source *greenplum.Cluster) error {
+	var wg sync.WaitGroup
+	errs := make(chan error, 2)
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		errs <- RestoreMasterPgControl(source.MasterDataDir())
+	}()
+
+	errs <- RestorePrimariesPgControl(agentConns, source)
+
+	wg.Wait()
+	close(errs)
+
+	var mErr *multierror.Error
+	for err := range errs {
+		mErr = multierror.Append(mErr, err)
+	}
+
+	return mErr.ErrorOrNil()
 }

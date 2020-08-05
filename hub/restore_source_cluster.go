@@ -213,3 +213,29 @@ func RsyncPrimariesTablespaces(agentConns []*Connection, source *greenplum.Clust
 
 	return ExecuteRPC(agentConns, request)
 }
+
+func RestorePrimariesPgControl(agentConns []*Connection, source *greenplum.Cluster) error {
+	request := func(conn *Connection) error {
+		primaries := source.SelectSegments(func(seg *greenplum.SegConfig) bool {
+			return seg.IsOnHost(conn.Hostname) && !seg.IsStandby() && seg.IsPrimary()
+		})
+
+		if len(primaries) == 0 {
+			return nil
+		}
+
+		var dataDirs []string
+		for _, primary := range primaries {
+			dataDirs = append(dataDirs, primary.DataDir)
+		}
+
+		req := &idl.RestorePgControlRequest{
+			Datadirs: dataDirs,
+		}
+
+		_, err := conn.AgentClient.RestorePrimariesPgControl(context.Background(), req)
+		return err
+	}
+
+	return ExecuteRPC(agentConns, request)
+}

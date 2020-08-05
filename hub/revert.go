@@ -78,12 +78,23 @@ func (s *Server) Revert(_ *idl.RevertRequest, stream idl.CliToHub_RevertServer) 
 	}
 
 	if !running && s.UseLinkMode {
+		hasRun, err := step.HasRun(idl.Step_EXECUTE, idl.Substep_START_TARGET_CLUSTER)
+		if err != nil {
+			return err
+		}
+
 		st.Run(idl.Substep_RESTORE_SOURCE_CLUSTER, func(stream step.OutStreams) error {
-			if err := RsyncMasterAndPrimaries(stream, s.agentConns, s.Source); err != nil {
-				return err
+			if hasRun {
+				if err := RsyncMasterAndPrimaries(stream, s.agentConns, s.Source); err != nil {
+					return err
+				}
+
+				return RsyncMasterAndPrimariesTablespaces(stream, s.agentConns, s.Source, s.Tablespaces)
 			}
 
-			return RsyncMasterAndPrimariesTablespaces(stream, s.agentConns, s.Source, s.Tablespaces)
+			// since the target cluster was not started, just restore pg_control.old
+			// to pg_control
+			return RestoreMasterAndPrimariesPgControl(s.agentConns, s.Source)
 		})
 	}
 

@@ -478,7 +478,7 @@ jobs:
           - name: gpupgrade_src
           - name: bin_gpupgrade
         run:
-          path: gpupgrade_src/ci/scripts/upgrade-cluster.bash
+          path: gpupgrade_src/ci/scripts/bats-on-cluster.bash
       params:
   ensure:
     <<: *set_failed

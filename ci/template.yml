@@ -424,6 +424,7 @@ jobs:
           trigger: true
         {{- end }}
         - get: ccp_src
+        - get: bats
     - put: terraform
       params:
         <<: *ccp_default_params
@@ -463,7 +464,7 @@ jobs:
           args:
             - greenplum-db-{{majorVersion .Source}}
             - greenplum-db-{{majorVersion .Target}}
-    - task: upgrade_cluster
+    - task: run_bats
       config:
         platform: linux
         image_resource:
@@ -477,6 +478,7 @@ jobs:
           - name: cluster_env_files
           - name: gpupgrade_src
           - name: bin_gpupgrade
+          - name: bats
         run:
           path: gpupgrade_src/ci/scripts/bats-on-cluster.bash
       params:

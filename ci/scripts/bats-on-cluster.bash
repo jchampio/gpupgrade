@@ -44,6 +44,9 @@ SQL_EOF
 
 # TODO: combine this or at least pull out common functions with upgrade-cluster.bash?
 
+# Install BATS
+./bats/install.sh /usr/local
+
 # This port is selected by our CI pipeline
 MASTER_PORT=5432
 
@@ -69,6 +72,8 @@ time ssh mdw bash <<EOF
     set -eux -o pipefail
 
     echo "HELLO WORLD"
+    cd gpupgrade_src
+    bats -r test/args.bats
 EOF
 
 echo 'bats test successful.'

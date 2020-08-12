@@ -5,6 +5,12 @@
 
 set -eux -o pipefail
 
+is_GPDB5() {
+    local gphome=$1
+    version=$(ssh mdw "$gphome"/bin/postgres --gp-version)
+    [[ $version =~ ^"postgres (Greenplum Database) 5." ]]
+}
+
 drop_gphdfs_roles() {
   echo 'Dropping gphdfs role...'
   ssh mdw "
@@ -66,7 +72,9 @@ for host in "${hosts[@]}"; do
     ssh centos@$host "sudo mv /tmp/gpupgrade /usr/local/bin"
 done
 
-drop_gphdfs_roles
+if is_GPDB5 "$GPHOME_SOURCE"; then
+  drop_gphdfs_roles
+fi
 
 time ssh mdw bash <<EOF
     set -eux -o pipefail

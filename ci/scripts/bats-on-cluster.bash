@@ -50,9 +50,6 @@ SQL_EOF
 
 # TODO: combine this or at least pull out common functions with upgrade-cluster.bash?
 
-# Install BATS
-./bats/install.sh /usr/local
-
 # This port is selected by our CI pipeline
 MASTER_PORT=5432
 
@@ -72,16 +69,25 @@ for host in "${hosts[@]}"; do
     ssh centos@$host "sudo mv /tmp/gpupgrade /usr/local/bin"
 done
 
+# Install gpupgrade_src on mdw
+scp -rpq gpupgrade_src gpadmin@mdw:/home/gpadmin
+
+# Install bats on mdw
+# TODO: install this to /usr/local with correct permissions
+scp -rpq bats gpadmin@mdw:/home/gpadmin
+ssh mdw bash <<EOF
+    set -eux -o pipefail
+    /home/gpadmin/bats/install.sh /home/gpadmin/bats_bin
+EOF
+
 if is_GPDB5 "$GPHOME_SOURCE"; then
   drop_gphdfs_roles
 fi
 
 time ssh mdw bash <<EOF
     set -eux -o pipefail
-
     echo "HELLO WORLD"
-    cd gpupgrade_src
-    bats -r test/args.bats
+     /home/gpadmin/bats_bin/bin/bats gpupgrade_src/test/args.bats
 EOF
 
 echo 'bats test successful.'

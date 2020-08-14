@@ -312,11 +312,11 @@ test_revert_after_execute_master_failure() {
 
     # Place marker files on mirrors
     MARKER=source-cluster.MARKER
-    mirrors=($(query_datadirs $GPHOME_SOURCE $PGPORT "role='m'"))
-    for datadir in "${mirrors[@]}"; do
-        touch "$datadir/${MARKER}"
-        register_teardown rm -f "$datadir/${MARKER}"
-    done
+    mirrors=$(query_host_datadirs "$GPHOME_SOURCE" "$PGPORT" "role='m'")
+    while read -r host datadir; do
+        ssh -n "$host" touch "$datadir/${MARKER}"
+        register_teardown ssh "$host" rm -f "$datadir/${MARKER}"
+    done <<< "$mirrors"
 
     # Add a tablespace, which only works when upgrading from 5X.
     if is_GPDB5 "$GPHOME_SOURCE"; then
@@ -363,10 +363,10 @@ test_revert_after_execute_master_failure() {
     # successful execute case, a revert from a failed master upgrade should
     # never require an rsync from mirrors, since the master hasn't been started
     # yet.
-    primaries=($(query_datadirs $GPHOME_SOURCE $PGPORT "role='p'"))
-    for datadir in "${primaries[@]}"; do
-        [ ! -f "${datadir}/${MARKER}" ] || fail "revert resulted in unexpected ${MARKER} marker file in datadir: $datadir"
-    done
+    primaries=$(query_host_datadirs "$GPHOME_SOURCE" "$PGPORT" "role='p'")
+    while read -r host datadir; do
+        ssh -n "$host" "[ ! -f '${datadir}/${MARKER}' ]" || fail "revert resulted in unexpected ${MARKER} marker file in datadir: $host:$datadir"
+    done <<< "$primaries"
 
     # Check that transactions can be started on the source
     $PSQL postgres --single-transaction -c "SELECT version()" || fail "unable to start transaction"

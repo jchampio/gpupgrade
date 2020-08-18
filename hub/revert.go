@@ -49,6 +49,25 @@ func (s *Server) Revert(_ *idl.RevertRequest, stream idl.CliToHub_RevertServer) 
 		return xerrors.Errorf("connect to gpupgrade agent: %w", err)
 	}
 
+	archiveDir, err := s.revert(st)
+	if err != nil {
+		return err
+	}
+
+	message := &idl.Message{Contents: &idl.Message_Response{Response: &idl.Response{Data: map[string]string{
+		idl.ResponseKey_source_port.String():                  strconv.Itoa(s.Source.MasterPort()),
+		idl.ResponseKey_source_master_data_directory.String(): s.Source.MasterDataDir(),
+		idl.ResponseKey_source_version.String():               s.Source.Version.VersionString,
+		idl.ResponseKey_revert_log_archive_directory.String(): archiveDir,
+	}}}}
+	if err := stream.Send(message); err != nil {
+		return xerrors.Errorf("sending response message: %w", err)
+	}
+
+	return st.Err()
+}
+
+func (s *Server) revert(st *step.Step) (string, error) {
 	// If the target cluster is started, it must be stopped.
 	if s.Target != nil {
 		st.AlwaysRun(idl.Substep_SHUTDOWN_TARGET_CLUSTER, func(streams step.OutStreams) error {
@@ -104,7 +123,7 @@ func (s *Server) Revert(_ *idl.RevertRequest, stream idl.CliToHub_RevertServer) 
 		// cluster as its files could have been modified.
 		targetStarted, err := step.HasRun(idl.Step_EXECUTE, idl.Substep_START_TARGET_CLUSTER)
 		if err != nil {
-			return err
+			return "", err
 		}
 
 		if targetStarted {
@@ -120,7 +139,7 @@ func (s *Server) Revert(_ *idl.RevertRequest, stream idl.CliToHub_RevertServer) 
 
 	handleMirrorStartupFailure, err := s.expectMirrorFailure()
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	// If the source cluster is not running, it must be started.
@@ -183,17 +202,7 @@ func (s *Server) Revert(_ *idl.RevertRequest, stream idl.CliToHub_RevertServer) 
 		return DeleteStateDirectories(s.agentConns, s.Source.MasterHostname())
 	})
 
-	message := &idl.Message{Contents: &idl.Message_Response{Response: &idl.Response{Data: map[string]string{
-		idl.ResponseKey_source_port.String():                  strconv.Itoa(s.Source.MasterPort()),
-		idl.ResponseKey_source_master_data_directory.String(): s.Source.MasterDataDir(),
-		idl.ResponseKey_source_version.String():               s.Source.Version.VersionString,
-		idl.ResponseKey_revert_log_archive_directory.String(): archiveDir,
-	}}}}
-	if err := stream.Send(message); err != nil {
-		return xerrors.Errorf("sending response message: %w", err)
-	}
-
-	return st.Err()
+	return archiveDir, nil
 }
 
 // In 5X, running pg_upgrade on the primaries can cause the mirrors to receive an invalid

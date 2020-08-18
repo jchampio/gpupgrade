@@ -39,6 +39,7 @@ func TestConfig(t *testing.T) {
 				}}}, // Tablespaces
 			greenplum.TablespacesMappingFile, // TablespacesMappingFilePath
 			"301908232",                      // TargetCatalogVersion
+			false,                            // DebugIdempotence
 		}
 
 		buf := new(bytes.Buffer)

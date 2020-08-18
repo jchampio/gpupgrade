@@ -109,6 +109,10 @@ func HasRun(step idl.Step, substep idl.Substep) (bool, error) {
 	return false, nil
 }
 
+func (s *Step) Name() idl.Step {
+	return s.name
+}
+
 func (s *Step) Streams() OutStreams {
 	return s.streams
 }

@@ -428,3 +428,54 @@ test_revert_after_execute_pg_upgrade_failure() {
     setup_primary_upgrade_failure
     test_revert_after_execute_pg_upgrade_failure "Upgrading primary segments" link
 }
+
+# Enables the .DebugIdempotence flag in the hub's config.
+enable_idempotence_debugging() {
+    local config="$GPUPGRADE_HOME"/config.json
+
+    gpupgrade kill-services
+
+    jq '.DebugIdempotence = true' < "${config}" > "${config}.bak"
+    mv "${config}.bak" "${config}"
+
+    gpupgrade restart-services 3>&-
+}
+
+test_revert_idempotence_after_execute() {
+    local mode=$1
+
+    gpupgrade initialize \
+        --source-gphome="$GPHOME_SOURCE" \
+        --target-gphome="$GPHOME_TARGET" \
+        --source-master-port="${PGPORT}" \
+        --temp-port-range 6020-6040 \
+        --disk-free-ratio 0 \
+        --mode "$mode" \
+        --verbose 3>&-
+
+    gpupgrade execute --verbose
+
+    enable_idempotence_debugging
+
+    while true; do
+        run gpupgrade revert --verbose
+        echo "$output"
+
+        if [ "$status" -eq 0 ]; then
+            break # revert is finished
+        fi
+
+        # We expect all failures to be forced by the idempotence tests; anything
+        # else suggests that idempotence is broken for some substep.
+        [[ $output = *"forced error for idempotence testing"* ]] || \
+                fail "unexpected failure during revert"
+    done
+}
+
+@test "revert is idempotent after copy-mode execute" {
+    test_revert_idempotence_after_execute copy
+}
+
+@test "revert is idempotent after link-mode execute" {
+    test_revert_idempotence_after_execute link
+}

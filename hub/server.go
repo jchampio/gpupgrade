@@ -374,6 +374,9 @@ type Config struct {
 	Tablespaces                greenplum.Tablespaces
 	TablespacesMappingFilePath string
 	TargetCatalogVersion       string
+
+	// Debugging Features
+	DebugIdempotence bool
 }
 
 func (c *Config) Load(r io.Reader) error {

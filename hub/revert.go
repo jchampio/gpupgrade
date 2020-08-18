@@ -49,7 +49,12 @@ func (s *Server) Revert(_ *idl.RevertRequest, stream idl.CliToHub_RevertServer) 
 		return xerrors.Errorf("connect to gpupgrade agent: %w", err)
 	}
 
-	archiveDir, err := s.revert(st)
+	var runner SubstepRunner = st
+	if s.DebugIdempotence {
+		runner = idempotenceRunner{st}
+	}
+
+	archiveDir, err := s.revert(runner)
 	if err != nil {
 		return err
 	}
@@ -67,7 +72,12 @@ func (s *Server) Revert(_ *idl.RevertRequest, stream idl.CliToHub_RevertServer) 
 	return st.Err()
 }
 
-func (s *Server) revert(st *step.Step) (string, error) {
+type SubstepRunner interface {
+	Run(idl.Substep, func(step.OutStreams) error)
+	AlwaysRun(idl.Substep, func(step.OutStreams) error)
+}
+
+func (s *Server) revert(st SubstepRunner) (string, error) {
 	// If the target cluster is started, it must be stopped.
 	if s.Target != nil {
 		st.AlwaysRun(idl.Substep_SHUTDOWN_TARGET_CLUSTER, func(streams step.OutStreams) error {

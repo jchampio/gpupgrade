@@ -377,6 +377,18 @@ func TestStepFinish(t *testing.T) {
 	})
 }
 
+func TestStep(t *testing.T) {
+	t.Run("Name() returns the underlying step code", func(t *testing.T) {
+		name := idl.Step_INITIALIZE
+		s := step.New(name, nil, nil, nil)
+
+		actual := s.Name()
+		if actual != name {
+			t.Errorf("Name() = %q, want %q", actual, name)
+		}
+	})
+}
+
 func TestStatusFile(t *testing.T) {
 	stateDir, err := ioutil.TempDir("", "")
 	if err != nil {

@@ -3,7 +3,14 @@
 
 package cli
 
-import "github.com/blang/semver/v4"
+import (
+	"fmt"
+
+	"github.com/blang/semver/v4"
+
+	"github.com/greenplum-db/gpupgrade/greenplum"
+	"github.com/greenplum-db/gpupgrade/utils/errorlist"
+)
 
 var (
 	// SourceVersionAllowed returns whether or not the given semver.Version is a
@@ -43,4 +50,22 @@ func accumulateRanges(a *semver.Range, ranges []semver.Range) {
 			*a = a.OR(r)
 		}
 	}
+}
+
+func ValidateVersions(sourceGPHome, targetGPHome string) error {
+	var err error
+
+	sourceVersion, sErr := greenplum.GPHomeVersion(sourceGPHome)
+	if sErr == nil && !SourceVersionAllowed(sourceVersion) {
+		sErr = fmt.Errorf("source cluster version %s is not supported", sourceVersion)
+	}
+	err = errorlist.Append(err, sErr)
+
+	targetVersion, tErr := greenplum.GPHomeVersion(targetGPHome)
+	if tErr == nil && !TargetVersionAllowed(targetVersion) {
+		tErr = fmt.Errorf("target cluster version %s is not supported", targetVersion)
+	}
+	err = errorlist.Append(err, tErr)
+
+	return err
 }
